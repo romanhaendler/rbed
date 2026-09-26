@@ -28,6 +28,7 @@ public final class Detector implements AutoCloseable {
   private final boolean hasHistory;
   private final long latestHistoryEnd;
   private final Rule[] rules;
+  private final ChannelState[] pulses;
   private long now;
   private long samples;
   private boolean closed;
@@ -49,6 +50,8 @@ public final class Detector implements AutoCloseable {
     }
     hasHistory = !b.history.isEmpty();
     latestHistoryEnd = latest;
+    pulses = b.pulses.stream().map(this::channel).toArray(ChannelState[]::new);
+    for (ChannelState pulse : pulses) pulse.pulse = true;
 
     notDeclaredBefore = new HashSet<>(b.rules.keySet());
     rules = new Rule[b.rules.size()];
@@ -142,6 +145,7 @@ public final class Detector implements AutoCloseable {
     for (Map.Entry<String, Double> value : values.entrySet()) {
       channel(value.getKey()).add(timestamp, value.getValue());
     }
+    for (ChannelState pulse : pulses) pulse.endPulse(timestamp);
     long previous = now;
     now = timestamp;
     for (Rule rule : rules) rule.step(timestamp, previous, first);
@@ -206,6 +210,7 @@ public final class Detector implements AutoCloseable {
   public static final class Builder {
     private final Map<String, RuleBuilder> rules = new LinkedHashMap<>();
     private final List<Event> history = new ArrayList<>();
+    private final Set<String> pulses = new LinkedHashSet<>();
     private EventListener listener = new EventListener() {};
     private double samplingRate;
 
@@ -225,6 +230,15 @@ public final class Detector implements AutoCloseable {
 
     public Builder listener(EventListener listener) {
       this.listener = Objects.requireNonNull(listener, "listener");
+      return this;
+    }
+
+    /**
+     * Declares Pulse Channels, such as deployment markers: their value exists only in the Sample
+     * that carries it and is undefined in all other Samples, instead of holding.
+     */
+    public Builder pulse(String... channels) {
+      for (String channel : channels) pulses.add(Objects.requireNonNull(channel, "channel"));
       return this;
     }
 

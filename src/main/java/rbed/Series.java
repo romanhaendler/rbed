@@ -9,7 +9,10 @@ import java.util.Arrays;
 class Series {
   /** The current value; NaN while undefined. */
   double value = Double.NaN;
+  /** The value before the last update. */
   double previous = Double.NaN;
+  /** The value of the last update; differs from {@link #value} only for Pulse Channels. */
+  private double last = Double.NaN;
   /** When {@link #value} was last updated. */
   long time;
   private long previousTime;
@@ -17,8 +20,9 @@ class Series {
   private Averaged[] derived = new Averaged[0];
 
   void add(long t, double v) {
-    previous = value;
+    previous = last;
     previousTime = time;
+    last = v;
     value = v;
     time = t;
     updated = true;

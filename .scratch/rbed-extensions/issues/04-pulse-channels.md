@@ -4,8 +4,8 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Pulse Channel is undefined in Samples without it; comparisons on it are false then
-- [ ] Rate, rising/falling and averages of a Pulse Channel only see Samples carrying it
-- [ ] Aggregates count only Samples carrying it
+- [x] Pulse Channel is undefined in Samples without it; comparisons on it are false then
+- [x] Rate, rising/falling and averages of a Pulse Channel only see Samples carrying it
+- [x] Aggregates count only Samples carrying it
