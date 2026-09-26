@@ -62,10 +62,10 @@ class TimeAdvanceTest {
     Detector d = detector(r -> r.when(channel("x").above(0)).maxGap(100));
     d.push(0, Map.of("x", 0.0));
     d.push(10, Map.of("x", 1.0));
-    d.advanceTo(50);
-    d.advanceTo(111);
+    d.advanceTo(50);   // still within maxGap of the last Sample: valid
+    d.advanceTo(111);  // stale: truncated at the last valid moment, 50
     d.advanceTo(200);
-    assertEquals(List.of("pending E 10", "confirmed E 10", "ended E 10..10 truncatedEnd"), rec.log);
+    assertEquals(List.of("pending E 10", "confirmed E 10", "ended E 10..50 truncatedEnd"), rec.log);
   }
 
   @Test
@@ -101,5 +101,25 @@ class TimeAdvanceTest {
     Detector sampled = Detector.builder().samplingRate(1)
         .rule("E", r -> r.when(channel("x").above(0))).build();
     assertThrows(IllegalStateException.class, () -> sampled.advanceTo(20));
+  }
+
+  @Test
+  void maxGapAfterAdvancesTruncatesAtTheLastValidMoment() {
+    Detector d = detector(r -> r.when(channel("x").above(0)).forDuration(500).maxGap(1000));
+    d.push(0, Map.of("x", 1.0));
+    d.advanceTo(600);   // Confirmed on the held value
+    d.advanceTo(1200);  // data stale: the Event cannot end before it was Confirmed
+    assertEquals(List.of("pending E 0", "confirmed E 0",
+        "ended E 0..600 truncatedStart truncatedEnd"), rec.log);
+  }
+
+  @Test
+  void eventStartedOnAnAdvanceIsTruncatedNoEarlierThanItsStart() {
+    Detector d = detector(r -> r.when(channel("x").age().above(100)).maxGap(1000));
+    d.push(0, Map.of("x", 1.0));
+    d.advanceTo(200);
+    d.advanceTo(1100);
+    assertEquals(List.of("pending E 200", "confirmed E 200", "ended E 200..200 truncatedEnd"),
+        rec.log);
   }
 }

@@ -52,7 +52,17 @@ public abstract class Expression {
     requireFinite(low);
     requireFinite(high);
     if (low > high) throw new IllegalArgumentException("between: " + low + " > " + high);
-    return below(low).or(above(high)).not();
+    Expression self = this;
+    return new Condition() {
+      @Override Bound bind(Detector detector) {
+        Expression.Bound x = self.bind(detector);
+        return () -> {
+          if (x.absent()) return Truth.FALSE;
+          double v = x.value();
+          return v != v ? Truth.UNKNOWN : Truth.of(v >= low && v <= high);
+        };
+      }
+    };
   }
 
   /** This value plus {@code other}. */

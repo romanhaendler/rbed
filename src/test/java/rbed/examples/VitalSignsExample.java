@@ -3,7 +3,7 @@ package rbed.examples;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static rbed.Conditions.channel;
 import static rbed.Conditions.during;
-import static rbed.examples.Series.SECOND;
+import static rbed.examples.Samples.SECOND;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -51,7 +51,7 @@ class VitalSignsExample {
         })
         .build();
 
-    for (Sample sample : Series.every(1, 0, 600, SECOND, s -> Map.of(
+    for (Sample sample : Samples.every(1, 0, 600, SECOND, s -> Map.of(
         "hr", s < 60 ? 80.0 : s < 300 ? 120.0 : 85.0,
         "spo2", s < 120 ? 97.0 : s < 200 ? 86.0 : 96.0))) {
       boolean dropout = sample.timestamp() >= 150 * SECOND && sample.timestamp() < 170 * SECOND;
@@ -61,11 +61,12 @@ class VitalSignsExample {
     detector.close();
 
     assertEquals(List.of(
-            "Tachycardia 60..149 truncatedEnd",   // noticed at 160 s, 11 s after the last Sample
+            // stale at 160 s, 11 s after the last Sample; valid until the advance at 159 s
+            "Tachycardia 60..159 truncatedEnd",
             "HypoxicTachycardia 130..160",        // Tachycardia interrupted
             "SensorLost 155..170",                // 6 s without heart rate until data resumes
             "Desaturation 120..200",
             "Tachycardia 170..300 truncatedStart"),
-        Series.describe(ended, SECOND));
+        Samples.describe(ended, SECOND));
   }
 }

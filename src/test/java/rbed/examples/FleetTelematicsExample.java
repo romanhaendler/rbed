@@ -2,8 +2,8 @@ package rbed.examples;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static rbed.Conditions.channel;
-import static rbed.examples.Series.MINUTE;
-import static rbed.examples.Series.SECOND;
+import static rbed.examples.Samples.MINUTE;
+import static rbed.examples.Samples.SECOND;
 
 import java.util.List;
 import java.util.Map;
@@ -44,7 +44,7 @@ class FleetTelematicsExample {
             .forDuration(2 * MINUTE))
         .build();
 
-    List<Event> events = detector.detect(Series.every(1, 0, 1500, SECOND,
+    List<Event> events = detector.detect(Samples.every(1, 0, 1500, SECOND,
         s -> Map.of("speed", speed(s), "rpm", s < 60 ? 0.0 : 800.0)));
 
     assertEquals(List.of(
@@ -53,6 +53,6 @@ class FleetTelematicsExample {
             // each speed from 301 to 903 s holds for 1 s: 11940 m
             "Trip 301..904 {km=11.94}",
             "Idling 904..1499 truncatedEnd"), // last Sample at 1499 s
-        Series.describe(events, SECOND));
+        Samples.describe(events, SECOND));
   }
 }

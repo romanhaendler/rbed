@@ -2,7 +2,7 @@ package rbed.examples;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static rbed.Conditions.channel;
-import static rbed.examples.Series.HOUR;
+import static rbed.examples.Samples.HOUR;
 
 import java.util.List;
 import java.util.Map;
@@ -41,13 +41,13 @@ class FloodWarningExample {
             .when(channel("level").falling().and(channel("level").above(300))))
         .build();
 
-    List<Sample> series = Series.every(0.25, 0, 72, HOUR, h -> Map.of("level", levelCm(h)))
+    List<Sample> series = Samples.every(0.25, 0, 72, HOUR, h -> Map.of("level", levelCm(h)))
         .stream().filter(s -> s.timestamp() != 20 * HOUR).toList(); // one missing report
     List<Event> events = detector.detect(series);
 
     assertEquals(List.of(
             "Receding 12.25..26",       // 437.5 cm at 12.25 h; exactly 300 cm at 26 h
             "FloodWarning 5.25..31.25"), // 305 cm at 5.25 h; 247.5 cm at 31.25 h
-        Series.describe(events, HOUR));
+        Samples.describe(events, HOUR));
   }
 }

@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-class SmoothedSeriesTest {
+class MovingAverageFunctionsTest {
   final Recorder rec = new Recorder();
 
   /** One Sample per second with the given values of x. */
@@ -50,7 +50,7 @@ class SmoothedSeriesTest {
   }
 
   @Test
-  void smoothedSeriesInEndConditionFillsFromTheFirstSample() {
+  void movingAverageInEndConditionFillsFromTheFirstSample() {
     // Confirmed at 2 s; average of 2 is falling first at 5 s ((200 + 5) / 2 < 200)
     assertEquals(List.of("ended E 0..5000 truncatedStart"), run(Detector.builder()
             .rule("E", r -> r

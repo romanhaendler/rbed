@@ -3,7 +3,7 @@ package rbed.examples;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static rbed.Conditions.after;
 import static rbed.Conditions.channel;
-import static rbed.examples.Series.MINUTE;
+import static rbed.examples.Samples.MINUTE;
 
 import java.util.HashMap;
 import java.util.List;
@@ -13,11 +13,11 @@ import rbed.Detector;
 import rbed.Event;
 
 /**
- * IT operations: per-minute metrics of a web service (errors per minute, CPU %) and a deployment
- * marker, declared as a Pulse Channel so it is only set in the Sample that carries it.
+ * IT operations: per-minute metrics of a web service (errors per minute, CPU %) and a Channel
+ * reporting deployments, declared as a Pulse Channel so it is only set in the Sample carrying it.
  *
  * <ul>
- *   <li>Deployment: the marker is set.
+ *   <li>Deployment: a deployment is reported.
  *   <li>ErrorSpike: more than 5 errors per minute for 2 minutes.
  *   <li>Regression: an error spike within 30 minutes after a Deployment, i.e. probably caused by
  *       it.
@@ -44,7 +44,7 @@ class DeploymentRegressionExample {
         .rule("HighCpu", r -> r.when(channel("cpu").above(90)).forDuration(5 * MINUTE))
         .build();
 
-    List<Event> events = detector.detect(Series.every(1, 0, 120, MINUTE, m -> {
+    List<Event> events = detector.detect(Samples.every(1, 0, 120, MINUTE, m -> {
       Map<String, Double> values = new HashMap<>(Map.of(
           "errors", errors(m),
           "cpu", m >= 90 && m < 100 ? 95.0 : 50.0));
@@ -58,6 +58,6 @@ class DeploymentRegressionExample {
             "Regression 25..35",   // 14 minutes after the Deployment
             "ErrorSpike 80..85",   // too long after it: no Regression
             "HighCpu 90..100"),
-        Series.describe(events, MINUTE));
+        Samples.describe(events, MINUTE));
   }
 }

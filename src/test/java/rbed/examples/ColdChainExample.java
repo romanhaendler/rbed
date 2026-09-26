@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static rbed.Conditions.after;
 import static rbed.Conditions.channel;
 import static rbed.Conditions.totalDuration;
-import static rbed.examples.Series.MINUTE;
+import static rbed.examples.Samples.MINUTE;
 
 import java.util.List;
 import java.util.Map;
@@ -45,7 +45,7 @@ class ColdChainExample {
         .rule("CumulativeLimit", r -> r.when(totalDuration("Excursion").above(45 * MINUTE)))
         .build();
 
-    List<Event> events = detector.detect(Series.every(1, 0, 480, MINUTE, m -> Map.of(
+    List<Event> events = detector.detect(Samples.every(1, 0, 480, MINUTE, m -> Map.of(
         "temp", temperature(m),
         "door", m >= 60 && m < 65 ? 1.0 : 0.0)));
 
@@ -56,6 +56,6 @@ class ColdChainExample {
             "Excursion 300..330",        // unrelated to the door: too long after it closed
             // 28 minutes from the first; the second, Confirmed at 315, adds up to 46 at 318
             "CumulativeLimit 318..479 truncatedEnd"),
-        Series.describe(events, MINUTE));
+        Samples.describe(events, MINUTE));
   }
 }

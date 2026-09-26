@@ -4,8 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static rbed.Conditions.after;
 import static rbed.Conditions.channel;
 import static rbed.Conditions.count;
-import static rbed.examples.Series.MINUTE;
-import static rbed.examples.Series.SECOND;
+import static rbed.examples.Samples.MINUTE;
+import static rbed.examples.Samples.SECOND;
 
 import java.util.List;
 import java.util.Map;
@@ -46,7 +46,7 @@ class HvacShortCyclingExample {
         .build();
 
     List<Event> events = detector.detect(
-        Series.every(10, 0, 2400, SECOND, s -> Map.of("power", power(s))));
+        Samples.every(10, 0, 2400, SECOND, s -> Map.of("power", power(s))));
 
     assertEquals(List.of(
             "Run 100..700 {shortCycle=false}",
@@ -56,6 +56,6 @@ class HvacShortCyclingExample {
             "Run 1600..2200 {shortCycle=false}",
             // Runs Confirmed at 130, 830 and 1630 s; the window keeps all three until the end
             "FrequentStarts 1630..2390 truncatedEnd"),
-        Series.describe(events, SECOND));
+        Samples.describe(events, SECOND));
   }
 }

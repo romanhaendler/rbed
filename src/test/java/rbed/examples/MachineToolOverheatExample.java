@@ -3,7 +3,7 @@ package rbed.examples;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static rbed.Conditions.channel;
 import static rbed.Conditions.during;
-import static rbed.examples.Series.SECOND;
+import static rbed.examples.Samples.SECOND;
 
 import java.util.List;
 import java.util.Map;
@@ -57,7 +57,7 @@ class MachineToolOverheatExample {
         .rule("FastHeating", r -> r.when(channel("temp").rate().above(0.5)).forSamples(5))
         .build();
 
-    List<Sample> series = Series.every(1, 0, 600, SECOND,
+    List<Sample> series = Samples.every(1, 0, 600, SECOND,
         s -> Map.of("temp", temperature(s), "load", load(s)));
     List<Event> events = detector.detectValues(series.stream().map(Sample::values).toList());
 
@@ -66,6 +66,6 @@ class MachineToolOverheatExample {
             "Overheat 121..331 {peak=100.0}", // 81 °C at 121 s; below 70 °C from 331 s
             "OverheatUnderLoad 151..391",     // Overheat Confirmed at 151 s, End confirmed 391 s
             "HighLoad 100..400"),
-        Series.describe(events, SECOND));
+        Samples.describe(events, SECOND));
   }
 }

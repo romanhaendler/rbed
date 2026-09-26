@@ -16,17 +16,17 @@ public final class LatestEvent {
 
   /** The mean of a Channel over the latest Event (so far, if it is running). */
   public Expression mean(String channel) {
-    return statistic(channel, Accumulator.Statistic.MEAN);
+    return aggregate(channel, Accumulator.Aggregate.MEAN);
   }
 
   /** The minimum of a Channel over the latest Event (so far, if it is running). */
   public Expression min(String channel) {
-    return statistic(channel, Accumulator.Statistic.MIN);
+    return aggregate(channel, Accumulator.Aggregate.MIN);
   }
 
   /** The maximum of a Channel over the latest Event (so far, if it is running). */
   public Expression max(String channel) {
-    return statistic(channel, Accumulator.Statistic.MAX);
+    return aggregate(channel, Accumulator.Aggregate.MAX);
   }
 
   /** The latest Event's duration in milliseconds; for a running Event, up to now. */
@@ -39,14 +39,12 @@ public final class LatestEvent {
     };
   }
 
-  private Expression statistic(String channel, Accumulator.Statistic statistic) {
+  private Expression aggregate(String channel, Accumulator.Aggregate aggregate) {
     Objects.requireNonNull(channel, "channel");
     return new Expression() {
       @Override Bound bind(Detector detector) {
-        Rule producer = detector.referencedEvent(name).producer;
-        if (producer == null) return () -> Double.NaN; // only History, which has no Aggregates
-        int index = producer.aggregate(detector.channel(channel));
-        return () -> producer.latest(index, statistic);
+        // not a Channel lookup of the reading Rule: the referenced Rule aggregates it
+        return detector.referencedEvent(name).latest(detector.channel(channel), aggregate);
       }
     };
   }

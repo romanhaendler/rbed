@@ -14,13 +14,28 @@ final class EventState {
   /** Events Confirmed so far. */
   long count;
   /** The Rule producing these Events; null for names only known from History. */
-  Rule producer;
+  private Rule producer;
   private long lastDuration;
   private long runningStart;
   private long endedDuration;
   /** Confirmation times within the largest window any count(...).within(...) needs. */
   private Timestamps confirmations;
   private long countWindow;
+
+  void producedBy(Rule rule) {
+    producer = rule;
+  }
+
+  /**
+   * An Aggregate of a Channel over the latest Confirmed Event, running or Ended; the producing
+   * Rule starts aggregating the Channel. Always undefined for names only known from History.
+   */
+  Expression.Bound latest(ChannelState channel, Accumulator.Aggregate aggregate) {
+    Rule rule = producer;
+    if (rule == null) return () -> Double.NaN;
+    int index = rule.aggregate(channel);
+    return () -> rule.latest(index, aggregate);
+  }
 
   /** Keeps confirmation times for counting within {@code window}; call before any Event. */
   void countWithin(long window) {
@@ -75,6 +90,9 @@ final class EventState {
     lastConfirmed = hasBeenConfirmed ? Math.max(lastConfirmed, timestamp) : timestamp;
     hasBeenConfirmed = true;
     count++;
-    if (confirmations != null) confirmations.add(timestamp);
+    if (confirmations != null) {
+      confirmations.add(timestamp);
+      confirmations.dropOlderThan(timestamp, countWindow); // bounded even if never evaluated
+    }
   }
 }

@@ -8,13 +8,13 @@ import rbed.Event;
 import rbed.Sample;
 
 /** Helpers that keep the examples about Rules rather than about generating data. */
-final class Series {
+final class Samples {
   static final long SECOND = 1_000;
   static final long MINUTE = 60 * SECOND;
   static final long HOUR = 60 * MINUTE;
   static final long DAY = 24 * HOUR;
 
-  private Series() {}
+  private Samples() {}
 
   /**
    * Samples every {@code step} from {@code from} (inclusive) to {@code to} (exclusive), all in the

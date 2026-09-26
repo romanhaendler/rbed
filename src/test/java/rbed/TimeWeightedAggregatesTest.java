@@ -94,4 +94,29 @@ class TimeWeightedAggregatesTest {
     assertEquals(0, endedX().integral());
     assertTrue(Double.isNaN(endedX().timeWeightedMean()));
   }
+
+  @Test
+  void eventStartingOnAnAdvanceIntegratesHeldValuesFromItsStart() {
+    Detector d = Detector.builder()
+        .rule("E", r -> r.when(channel("x").age().above(50))).listener(rec).build();
+    d.push(0, Map.of("x", 10.0));
+    d.advanceTo(100);             // starts: x has held 10 since 0
+    d.push(300, Map.of("x", 10.0)); // fresh value: ends
+    assertEquals(10 * 0.2, endedX().integral());
+    assertEquals(10, endedX().timeWeightedMean());
+  }
+
+  @Test
+  void eventWithoutSamplesStillHasTimeWeightedValues() {
+    Detector d = Detector.builder()
+        .rule("E", r -> r.when(channel("x").age().above(50))).listener(rec).build();
+    d.push(0, Map.of("x", 10.0));
+    d.advanceTo(100);
+    d.advanceTo(200);
+    d.close();
+    assertEquals(0, endedX().count());
+    assertTrue(Double.isNaN(endedX().mean()));
+    assertEquals(10 * 0.1, endedX().integral());
+    assertEquals(10, endedX().timeWeightedMean());
+  }
 }

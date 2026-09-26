@@ -4,8 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static rbed.Conditions.after;
 import static rbed.Conditions.channel;
 import static rbed.Conditions.count;
-import static rbed.examples.Series.MINUTE;
-import static rbed.examples.Series.SECOND;
+import static rbed.examples.Samples.MINUTE;
+import static rbed.examples.Samples.SECOND;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -61,7 +61,7 @@ class IntervalTrainingExample {
         })
         .build();
 
-    List<Event> events = detector.detect(Series.every(1, 0, 420, SECOND, s -> Map.of(
+    List<Event> events = detector.detect(Samples.every(1, 0, 420, SECOND, s -> Map.of(
         "speed", s >= 60 && (s - 60) % 120 < 30 ? 7.0 : 2.0,
         "hr", heartRate(s))));
 
@@ -70,7 +70,7 @@ class IntervalTrainingExample {
             "Sprint 180..210", "Recovered 261..300",
             "Sprint 300..330", "Recovered 381..419 truncatedEnd",
             "SessionDone 305..419 truncatedEnd"), // third Sprint Confirmed at 305 s
-        Series.describe(events, SECOND));
+        Samples.describe(events, SECOND));
     assertEquals(List.of(51L, 51L, 51L), recoverySeconds);
   }
 }

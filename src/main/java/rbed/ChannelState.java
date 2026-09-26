@@ -1,20 +1,31 @@
 package rbed;
 
 /** One Channel inside one Detector. */
-final class ChannelState extends Series {
+final class ChannelState extends ValueTrack {
   final String name;
-  /** A Pulse Channel's value exists only in the Sample carrying it. */
-  boolean pulse;
+  /** Whether the Sample being applied carried this Channel; only maintained for pulses. */
+  boolean carried;
+  private boolean absent;
 
   ChannelState(String name) {
     this.name = name;
   }
 
-  /** Makes a Pulse Channel absent unless the Sample at {@code timestamp} carried it. */
-  void endPulse(long timestamp) {
-    if (time != timestamp) {
-      value = Double.NaN;
-      absent = true;
-    }
+  @Override
+  void update(long t, double v) {
+    super.update(t, v);
+    carried = true;
+    absent = false;
+  }
+
+  @Override
+  boolean absent() {
+    return absent;
+  }
+
+  /** A Pulse Channel that the current moment does not carry: its value is absent. */
+  void pulseAbsent() {
+    value = Double.NaN;
+    absent = true;
   }
 }

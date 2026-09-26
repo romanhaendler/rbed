@@ -7,74 +7,64 @@ import java.util.function.Supplier;
 
 /**
  * The current value of a Channel, or of a moving average derived from one, plus Expressions over
- * how it developed. History-based values use the series' own updates (a Channel's values, not the
+ * how it developed. Functions of the past use the track's own updates (a Channel's values, not the
  * Samples in which it was absent) and are undefined until enough of them exist.
  */
 public final class ChannelExpression extends Expression {
-  /** Resolves the series in a Detector; each call on a moving average creates its own window. */
-  private final Function<Detector, Series> series;
+  /** Resolves the track in a Detector; each call on a moving average creates its own window. */
+  private final Function<Detector, ValueTrack> track;
 
   ChannelExpression(String channel) {
     Objects.requireNonNull(channel, "channel");
-    this.series = detector -> detector.channel(channel);
+    this.track = detector -> detector.referencedChannel(channel);
   }
 
-  private ChannelExpression(Function<Detector, Series> series) {
-    this.series = series;
+  private ChannelExpression(Function<Detector, ValueTrack> track) {
+    this.track = track;
   }
 
   @Override
   Bound bind(Detector detector) {
-    Series s = series.apply(detector);
+    ValueTrack t = track.apply(detector);
     return new Bound() {
       @Override public double value() {
-        return s.value;
+        return t.value;
       }
 
       @Override public boolean absent() {
-        return s.absent;
+        return t.absent();
       }
     };
   }
 
-  /** True when the last value is greater than the previous one. */
+  /** True when the latest value is greater than the previous one. */
   public Condition rising() {
-    return new Condition() {
-      @Override Bound bind(Detector detector) {
-        Series s = series.apply(detector);
-        return () -> s.absent ? Truth.FALSE : Truth.greater(s.value, s.previous);
-      }
-    };
+    return trend(true);
   }
 
-  /** True when the last value is less than the previous one. */
+  /** True when the latest value is less than the previous one. */
   public Condition falling() {
-    return new Condition() {
-      @Override Bound bind(Detector detector) {
-        Series s = series.apply(detector);
-        return () -> s.absent ? Truth.FALSE : Truth.less(s.value, s.previous);
-      }
-    };
+    return trend(false);
   }
 
   /** Change per second between the last two values. */
   public Expression rate() {
     return new Expression() {
       @Override Bound bind(Detector detector) {
-        return series.apply(detector)::rate;
+        return track.apply(detector)::rate;
       }
     };
   }
 
   /**
-   * Milliseconds since the last value, at the current Sample or time advance; undefined before
+   * Milliseconds since the latest value, at the current Sample or time advance; undefined before
    * the first value. Together with {@link Detector#advanceTo} this detects silent sensors.
    */
   public Expression age() {
     return new Expression() {
       @Override Bound bind(Detector detector) {
-        Series s = series.apply(detector);
-        return () -> s.age(detector.now());
+        ValueTrack t = track.apply(detector);
+        return () -> t.age(detector.now());
       }
     };
   }
@@ -99,8 +89,19 @@ public final class ChannelExpression extends Expression {
     return averageOverDuration(duration.toMillis());
   }
 
+  private Condition trend(boolean rising) {
+    return new Condition() {
+      @Override Bound bind(Detector detector) {
+        ValueTrack t = track.apply(detector);
+        return rising
+            ? () -> t.absent() ? Truth.FALSE : Truth.greater(t.value, t.previous)
+            : () -> t.absent() ? Truth.FALSE : Truth.less(t.value, t.previous);
+      }
+    };
+  }
+
   /** Each binding gets its own window, fed with every value of the source from the start. */
   private ChannelExpression average(Supplier<Window> newWindow) {
-    return new ChannelExpression(detector -> series.apply(detector).average(newWindow.get()));
+    return new ChannelExpression(detector -> track.apply(detector).average(newWindow.get()));
   }
 }

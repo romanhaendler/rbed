@@ -92,11 +92,11 @@ List<Event> events = detector.detect(List.of(
 
 For regularly sampled data without timestamps, configure `.samplingRate(hz)` on the builder (at most 1000 Hz, since timestamps are milliseconds) and use `push(values)` / `detectValues(listOfMaps)`.
 
-## Silent sensors and markers
+## Silent sensors and Pulse Channels
 
 When no Samples arrive, call `advanceTo(timestamp)` from your clock. Rules are evaluated at that moment: durations can be reached, `maxGap` is noticed, and `channel("x").age()` grows. So `when(channel("hr").age().above(10_000))` raises an Event while a sensor is silent. An advance is not a Sample: it does not count for `forSamples` or Aggregates.
 
-Declare markers such as deployments with `.pulse("deploy")` on the builder. A Pulse Channel's value exists only in the Sample carrying it. Otherwise it is absent: comparisons on it are false, so `channel("deploy").above(0.5).not()` means "no deployment now".
+Declare one-off reports, such as deployments, as Pulse Channels with `.pulse("deploy")` on the builder. A Pulse Channel's value exists only in the Sample carrying it. Otherwise it is absent: comparisons on it are false, so `channel("deploy").above(0.5).not()` means "no deployment now".
 
 ## Restarts
 
@@ -117,7 +117,7 @@ Runnable end-to-end examples from different domains, each a test with its expect
 | Logistics        | `src/test/java/rbed/examples/ColdChainExample.java`               | attributing a cause with `after`, `totalDuration` limit  |
 | Environment      | `src/test/java/rbed/examples/FloodWarningExample.java`            | smoothed rate of a moving average, hysteresis            |
 | Sports           | `src/test/java/rbed/examples/IntervalTrainingExample.java`        | `after`, rep count via `count`, listener-side timing     |
-| IT operations    | `src/test/java/rbed/examples/DeploymentRegressionExample.java`    | a Pulse Channel as deployment marker                     |
+| IT operations    | `src/test/java/rbed/examples/DeploymentRegressionExample.java`    | a Pulse Channel reporting deployments                    |
 
 ## Performance
 

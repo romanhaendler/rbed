@@ -13,7 +13,7 @@ A named signal within a time series, such as "weight" or "hook height".
 _Avoid_: Signal, series, column, variable
 
 **Pulse Channel**:
-A Channel whose value exists only in the Sample that carries it, such as a deployment marker; in other Samples it is absent (comparisons on it are false) instead of holding its last value.
+A Channel whose value exists only in the Sample that carries it, such as one reporting deployments; in other Samples it is absent (comparisons on it are false) instead of holding its last value.
 _Avoid_: Marker, event channel, trigger channel
 
 **Condition**:

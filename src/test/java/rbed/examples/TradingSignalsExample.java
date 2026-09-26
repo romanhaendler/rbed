@@ -2,7 +2,7 @@ package rbed.examples;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static rbed.Conditions.channel;
-import static rbed.examples.Series.DAY;
+import static rbed.examples.Samples.DAY;
 
 import java.util.List;
 import java.util.Map;
@@ -41,13 +41,13 @@ class TradingSignalsExample {
         .build();
 
     List<Event> events = detector.detect(
-        Series.every(1, 0, 600, DAY, day -> Map.of("price", price(day))));
+        Samples.every(1, 0, 600, DAY, day -> Map.of("price", price(day))));
 
     int golden = 199;
     while (!(sma(golden, 50) > sma(golden, 200))) golden++;
     assertEquals(List.of(
             "DeathCross 199.." + golden + " truncatedStart",
             "GoldenCross " + golden + "..599 truncatedEnd"),
-        Series.describe(events, DAY));
+        Samples.describe(events, DAY));
   }
 }

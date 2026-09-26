@@ -93,4 +93,17 @@ class LatestEventTest {
         .rule("A", r -> r.when(latest("B").duration().above(0)))
         .rule("B", r -> r.when(channel("x").above(0))).build());
   }
+
+  @Test
+  void readingLatestValuesDoesNotAggregateTheChannelInTheReadingRule() {
+    Detector d = Detector.builder()
+        .rule("A", r -> r.when(channel("y").above(0)))
+        .rule("B", r -> r.when(latest("A").mean("z").above(0).and(channel("y").above(0))))
+        .listener(rec).build();
+    d.push(0, Map.of("y", 1.0, "z", 5.0));
+    d.push(1, Map.of("y", 0.0));
+    Event b = rec.ended.get(1);
+    assertEquals("B", b.name());
+    assertThrows(IllegalArgumentException.class, () -> b.aggregates("z"));
+  }
 }

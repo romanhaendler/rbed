@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.OptionalLong;
 import org.junit.jupiter.api.Test;
 
-class EventStatisticsTest {
+class EventCountAndDurationTest {
   final Recorder rec = new Recorder();
 
   static Event ended(String name, long start, long confirmed, long end) {

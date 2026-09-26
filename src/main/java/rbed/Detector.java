@@ -31,25 +31,27 @@ public final class Detector implements AutoCloseable {
   private final long latestHistoryEnd;
   private final Rule[] rules;
   private final ChannelState[] pulses;
-  /** The latest moment observed: a Sample or a time advance. */
+  /** The latest moment processed: a Sample or a time advance. */
   private long now;
-  private boolean observed;
+  private boolean started;
   private long lastSample;
   private long samples;
   private boolean closed;
   private List<Event> collected;
-  /** Timestamp of the Sample being applied, for {@link #applyValue}. */
-  private long applying;
+  /** Timestamp of the Sample being applied by {@link #applyValue}. */
+  private long sampleTimestamp;
   /**
    * Callbacks for {@link Map#forEach}, created once: iterating a HashMap this way needs no
    * iterator, so pushing a Sample allocates nothing regardless of what the JIT inlines.
    */
   private final BiConsumer<String, Double> validateValue = Detector::validate;
   private final BiConsumer<String, Double> applyValue =
-      (channel, value) -> channel(channel).add(applying, value);
+      (channel, value) -> channel(channel).update(sampleTimestamp, value);
 
-  /** While binding Rules: the Rule being bound, the names it must not reference, and the
-   * Channels its Conditions look up. */
+  /**
+   * While binding Rules: the Rule being bound, the names it must not reference, and the Channels
+   * its Conditions refer to.
+   */
   private String bindingRule;
   private Set<String> notDeclaredBefore;
   private Set<ChannelState> channelLookups;
@@ -58,7 +60,6 @@ public final class Detector implements AutoCloseable {
     listener = b.listener;
     samplingRate = b.samplingRate;
     pulses = b.pulses.stream().map(this::channel).toArray(ChannelState[]::new);
-    for (ChannelState pulse : pulses) pulse.pulse = true;
 
     notDeclaredBefore = new HashSet<>(b.rules.keySet());
     rules = new Rule[b.rules.size()];
@@ -71,16 +72,20 @@ public final class Detector implements AutoCloseable {
     notDeclaredBefore = null;
     bindingRule = null;
 
-    // after binding, so that Event counts see the History too
-    List<Event> history = new ArrayList<>(b.history);
-    history.sort(Comparator.comparingLong(e -> e.confirmed().getAsLong()));
-    long latest = Long.MIN_VALUE;
-    for (Event e : history) {
+    hasHistory = !b.history.isEmpty();
+    latestHistoryEnd = remember(b.history); // after binding, so that Event counts see it too
+  }
+
+  /** Applies History in order of confirmation; returns its latest end. */
+  private long remember(List<Event> history) {
+    List<Event> ordered = new ArrayList<>(history);
+    ordered.sort(Comparator.comparingLong(e -> e.confirmed().getAsLong()));
+    long latestEnd = Long.MIN_VALUE;
+    for (Event e : ordered) {
       event(e.name()).remember(e);
-      latest = Math.max(latest, e.end().getAsLong());
+      latestEnd = Math.max(latestEnd, e.end().getAsLong());
     }
-    hasHistory = !history.isEmpty();
-    latestHistoryEnd = latest;
+    return latestEnd;
   }
 
   public static Builder builder() {
@@ -135,11 +140,11 @@ public final class Detector implements AutoCloseable {
   public void close() {
     if (closed) return;
     closed = true;
-    if (observed) for (Rule rule : rules) rule.close(now);
+    if (started) for (Rule rule : rules) rule.close();
   }
 
   private List<Event> batch(Runnable pushAll) {
-    if (observed || closed) throw new IllegalStateException("Detector has already been used");
+    if (started || closed) throw new IllegalStateException("Detector has already been used");
     collected = new ArrayList<>();
     pushAll.run();
     close();
@@ -149,8 +154,8 @@ public final class Detector implements AutoCloseable {
   /**
    * Tells this Detector that time has passed up to {@code timestamp} without new Samples. Rules
    * are evaluated at that moment with every Channel holding its value (Pulse Channels are
-   * undefined): durations can be reached, max gaps noticed, and {@code age()} grows. An advance is
-   * not a Sample, so it does not count for {@code forSamples} or Aggregates.
+   * absent): durations can be reached, max gaps noticed, and {@code age()} grows. An advance is
+   * not a Sample, so it does not count for {@code forSamples} or Sample-based Aggregates.
    *
    * @param timestamp milliseconds; must be strictly greater than the previous Sample or advance
    * @throws IllegalStateException if a sampling rate was configured, or after {@link #close}
@@ -160,19 +165,25 @@ public final class Detector implements AutoCloseable {
       throw new IllegalStateException("Detector has a sampling rate: time advances with Samples");
     }
     moveTo(timestamp);
-    for (ChannelState pulse : pulses) pulse.endPulse(timestamp);
-    for (Rule rule : rules) rule.step(timestamp, lastSample, samples > 0, false);
+    for (ChannelState pulse : pulses) pulse.pulseAbsent();
+    evaluate(timestamp, false);
   }
 
   private void accept(long timestamp, Map<String, Double> values) {
     values.forEach(validateValue); // first, so a rejected Sample leaves no trace
     moveTo(timestamp);
-    applying = timestamp;
+    for (ChannelState pulse : pulses) pulse.carried = false;
+    sampleTimestamp = timestamp;
     values.forEach(applyValue);
-    for (ChannelState pulse : pulses) pulse.endPulse(timestamp);
-    for (Rule rule : rules) rule.step(timestamp, lastSample, samples > 0, true);
+    for (ChannelState pulse : pulses) if (!pulse.carried) pulse.pulseAbsent();
+    evaluate(timestamp, true);
     lastSample = timestamp;
     samples++;
+  }
+
+  /** Evaluates every Rule, in declaration order, at the current moment. */
+  private void evaluate(long timestamp, boolean isSample) {
+    for (Rule rule : rules) rule.step(timestamp, isSample);
   }
 
   private static void validate(String channel, Double value) {
@@ -183,18 +194,27 @@ public final class Detector implements AutoCloseable {
 
   private void moveTo(long timestamp) {
     if (closed) throw new IllegalStateException("Detector is closed");
-    if (observed ? timestamp <= now : hasHistory && timestamp <= latestHistoryEnd) {
-      throw new IllegalArgumentException("Timestamp " + timestamp + " is not after " + (observed
+    if (started ? timestamp <= now : hasHistory && timestamp <= latestHistoryEnd) {
+      throw new IllegalArgumentException("Timestamp " + timestamp + " is not after " + (started
           ? "the previous one, " + now
           : "the end of the History, " + latestHistoryEnd));
     }
     now = timestamp;
-    observed = true;
+    started = true;
   }
 
   /** Timestamp of the latest Sample or time advance. */
   long now() {
     return now;
+  }
+
+  boolean hasSamples() {
+    return samples > 0;
+  }
+
+  /** Timestamp of the latest Sample; while Rules evaluate a Sample, the one before it. */
+  long lastSample() {
+    return lastSample;
   }
 
   void ended(Event event) {
@@ -208,11 +228,17 @@ public final class Detector implements AutoCloseable {
       state = new ChannelState(name);
       channels.put(name, state);
     }
+    return state;
+  }
+
+  /** A Channel that a Condition being bound refers to; recorded for the Rule's Aggregates. */
+  ChannelState referencedChannel(String name) {
+    ChannelState state = channel(name);
     if (channelLookups != null) channelLookups.add(state);
     return state;
   }
 
-  /** Starts recording which Channels the Conditions being bound look up. */
+  /** Starts recording which Channels the Conditions being bound refer to. */
   void recordChannelLookups() {
     channelLookups = new LinkedHashSet<>();
   }
@@ -274,8 +300,8 @@ public final class Detector implements AutoCloseable {
     }
 
     /**
-     * Declares Pulse Channels, such as deployment markers: their value exists only in the Sample
-     * that carries it instead of holding. In other Samples the pulse is absent: comparisons on it
+     * Declares Pulse Channels, such as a Channel reporting deployments: their value exists only in
+     * the Sample that carries it instead of holding. In other Samples the pulse is absent: comparisons on it
      * (and {@code rising}/{@code falling}) are false, so {@code not()} of them is true, while
      * computing with it is undefined. {@code age()} gives the time since the last pulse.
      */
