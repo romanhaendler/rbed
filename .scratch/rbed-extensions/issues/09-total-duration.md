@@ -4,8 +4,8 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Sums Ended Events and the running Confirmed one up to now
-- [ ] Includes History durations
-- [ ] Reference validation as for `after`
+- [x] Sums Ended Events and the running Confirmed one up to now
+- [x] Includes History durations
+- [x] Reference validation as for `after`

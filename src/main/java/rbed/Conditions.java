@@ -27,4 +27,26 @@ public final class Conditions {
   public static After after(String eventName) {
     return new After(eventName, List.of(), Long.MAX_VALUE);
   }
+
+  /**
+   * The number of Events with the given name Confirmed since the Detector started, History
+   * included; narrow it with {@link EventCount#within}.
+   */
+  public static EventCount count(String eventName) {
+    return new EventCount(eventName, -1);
+  }
+
+  /**
+   * The summed duration in milliseconds of all Events with the given name since the Detector
+   * started, History included: Ended ones in full, plus a Confirmed running one up to now.
+   */
+  public static Expression totalDuration(String eventName) {
+    Objects.requireNonNull(eventName, "eventName");
+    return new Expression() {
+      @Override Bound bind(Detector detector) {
+        EventState events = detector.referencedEvent(eventName);
+        return () -> events.totalDuration(detector.now());
+      }
+    };
+  }
 }

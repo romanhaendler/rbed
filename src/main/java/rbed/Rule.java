@@ -139,7 +139,7 @@ final class Rule {
     state = State.CONFIRMED;
     confirmedAt = now;
     inEndPhase = false;
-    events.confirm(now);
+    events.confirm(now, holding.since);
     detector.listener.onConfirmed(snapshot(OptionalLong.empty(), false));
   }
 

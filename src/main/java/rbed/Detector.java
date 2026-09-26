@@ -2,6 +2,7 @@ package rbed;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -46,13 +47,6 @@ public final class Detector implements AutoCloseable {
   private Detector(Builder b) {
     listener = b.listener;
     samplingRate = b.samplingRate;
-    long latest = Long.MIN_VALUE;
-    for (Event e : b.history) {
-      event(e.name()).remember(e);
-      latest = Math.max(latest, e.end().getAsLong());
-    }
-    hasHistory = !b.history.isEmpty();
-    latestHistoryEnd = latest;
     pulses = b.pulses.stream().map(this::channel).toArray(ChannelState[]::new);
     for (ChannelState pulse : pulses) pulse.pulse = true;
 
@@ -66,6 +60,17 @@ public final class Detector implements AutoCloseable {
     }
     notDeclaredBefore = null;
     bindingRule = null;
+
+    // after binding, so that Event counts see the History too
+    List<Event> history = new ArrayList<>(b.history);
+    history.sort(Comparator.comparingLong(e -> e.confirmed().getAsLong()));
+    long latest = Long.MIN_VALUE;
+    for (Event e : history) {
+      event(e.name()).remember(e);
+      latest = Math.max(latest, e.end().getAsLong());
+    }
+    hasHistory = !history.isEmpty();
+    latestHistoryEnd = latest;
   }
 
   public static Builder builder() {

@@ -4,8 +4,8 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Count slides with time (also on advances) and includes History
-- [ ] Memory bounded by the Events inside the window
-- [ ] Reference validation as for `after`
+- [x] Count slides with time (also on advances) and includes History
+- [x] Memory bounded by the Events inside the window
+- [x] Reference validation as for `after`
