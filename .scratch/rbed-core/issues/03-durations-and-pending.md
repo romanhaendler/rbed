@@ -4,10 +4,10 @@
 
 **Blocked by:** 01 (Walking skeleton)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `forSamples(n)` confirms on the n-th consecutive true Sample (counting the first)
-- [ ] `forDuration(d)` confirms on the first Sample with timestamp − start ≥ d
-- [ ] A Pending Event whose Condition fails is reported via `onDiscarded`
-- [ ] truncatedStart is set when Pending begins at the first Sample
-- [ ] `close()` Discards a Pending Event
+- [x] `forSamples(n)` confirms on the n-th consecutive true Sample (counting the first)
+- [x] `forDuration(d)` confirms on the first Sample with timestamp − start ≥ d
+- [x] A Pending Event whose Condition fails is reported via `onDiscarded`
+- [x] truncatedStart is set when Pending begins at the first Sample
+- [x] `close()` Discards a Pending Event
