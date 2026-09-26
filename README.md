@@ -93,7 +93,7 @@ Pass Events stored before a restart with `.history(events)`, so that `after(...)
 
 Conditions are bound to the Detector once, in `build()`. After that, pushing a Sample does not look anything up by name. In steady state (no Event starting or ending) it allocates nothing, so memory stays bounded however long an Event lasts. Moving averages use fixed ring buffers with compensated sums, so they neither allocate nor drift.
 
-Measured with `mvn test -Pperformance` (Apple Silicon laptop, JDK 21):
+Measured with `mvn test -Pperformance` (Apple M2, JDK 21):
 
 | Scenario                                                  | Throughput             |
 | --------------------------------------------------------- | ---------------------- |
