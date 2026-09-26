@@ -12,6 +12,10 @@ _Avoid_: Measurement, data point, record
 A named signal within a time series, such as "weight" or "hook height".
 _Avoid_: Signal, series, column, variable
 
+**Pulse Channel**:
+A Channel whose value exists only in the Sample that carries it, such as a deployment marker; in other Samples it is undefined instead of holding its last value.
+_Avoid_: Marker, event channel, trigger channel
+
 **Condition**:
 A statement about the current Sample that is true, false or undefined (while the data it needs is not available yet), such as "weight above 500". Undefined never counts as true.
 _Avoid_: Predicate, check, filter
