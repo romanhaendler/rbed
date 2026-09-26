@@ -4,8 +4,8 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] All five operations with Expression and double operands
-- [ ] Undefined propagates; division by zero is undefined, never true
-- [ ] No allocation per Sample
+- [x] All five operations with Expression and double operands
+- [x] Undefined propagates; division by zero is undefined, never true
+- [x] No allocation per Sample

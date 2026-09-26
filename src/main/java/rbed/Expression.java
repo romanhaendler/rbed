@@ -1,6 +1,7 @@
 package rbed;
 
 import java.util.Objects;
+import java.util.function.DoubleBinaryOperator;
 
 /**
  * A numeric value derived from the current Sample; undefined while the data it needs is not
@@ -44,6 +45,72 @@ public abstract class Expression {
     requireFinite(high);
     if (low > high) throw new IllegalArgumentException("between: " + low + " > " + high);
     return below(low).or(above(high)).not();
+  }
+
+  /** This value plus {@code other}. */
+  public Expression plus(Expression other) {
+    return combine(this, other, (x, y) -> x + y);
+  }
+
+  /** This value plus {@code c}. */
+  public Expression plus(double c) {
+    return plus(constant(c));
+  }
+
+  /** This value minus {@code other}. */
+  public Expression minus(Expression other) {
+    return combine(this, other, (x, y) -> x - y);
+  }
+
+  /** This value minus {@code c}. */
+  public Expression minus(double c) {
+    return minus(constant(c));
+  }
+
+  /** This value times {@code other}. */
+  public Expression times(Expression other) {
+    return combine(this, other, (x, y) -> x * y);
+  }
+
+  /** This value times {@code c}. */
+  public Expression times(double c) {
+    return times(constant(c));
+  }
+
+  /** This value divided by {@code other}; undefined when {@code other} is 0. */
+  public Expression dividedBy(Expression other) {
+    return combine(this, other, (x, y) -> x / y);
+  }
+
+  /** This value divided by {@code c}; undefined when {@code c} is 0. */
+  public Expression dividedBy(double c) {
+    return dividedBy(constant(c));
+  }
+
+  /** The absolute value. */
+  public Expression abs() {
+    Expression self = this;
+    return new Expression() {
+      @Override Bound bind(Detector detector) {
+        Bound inner = self.bind(detector);
+        return () -> Math.abs(inner.value());
+      }
+    };
+  }
+
+  /** Undefined if an operand is undefined or the result is not finite. */
+  private static Expression combine(Expression left, Expression right, DoubleBinaryOperator op) {
+    Objects.requireNonNull(right, "other");
+    return new Expression() {
+      @Override Bound bind(Detector detector) {
+        Bound x = left.bind(detector);
+        Bound y = right.bind(detector);
+        return () -> {
+          double result = op.applyAsDouble(x.value(), y.value());
+          return Double.isFinite(result) ? result : Double.NaN;
+        };
+      }
+    };
   }
 
   private static Expression constant(double value) {
