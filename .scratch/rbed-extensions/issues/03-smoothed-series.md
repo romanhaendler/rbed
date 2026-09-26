@@ -4,9 +4,9 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `rate`, `rising`, `falling` and further averages on averages
-- [ ] Derived series undefined while warming up; previous value = value at the source's previous update
-- [ ] Windows of derived series fill from the first Sample, even if only used in an End Condition
-- [ ] No allocation per Sample
+- [x] `rate`, `rising`, `falling` and further averages on averages
+- [x] Derived series undefined while warming up; previous value = value at the source's previous update
+- [x] Windows of derived series fill from the first Sample, even if only used in an End Condition
+- [x] No allocation per Sample
