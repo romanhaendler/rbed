@@ -63,6 +63,11 @@ public final class Detector implements AutoCloseable {
     if (samples > 0) for (Rule rule : rules) rule.close(this, lastTimestamp);
   }
 
+  /** Current (held) values of all Channels that have received one. */
+  Map<String, Double> values() {
+    return values;
+  }
+
   double channelValue(String channel) {
     Double v = values.get(channel);
     return v == null ? Double.NaN : v;

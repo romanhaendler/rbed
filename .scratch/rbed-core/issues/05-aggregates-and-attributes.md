@@ -4,9 +4,9 @@
 
 **Blocked by:** 01 (Walking skeleton)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `event.aggregates(channel)` exposes min, max, mean and count
-- [ ] Aggregates cover the specified Sample range, using held values for Channels absent in a Sample
-- [ ] `attribute(name, fn)` values appear in `event.attributes()` on Ended Events
-- [ ] Aggregates are available on Confirmed snapshots (so far) and final on Ended
+- [x] `event.aggregates(channel)` exposes min, max, mean and count
+- [x] Aggregates cover the specified Sample range, using held values for Channels absent in a Sample
+- [x] `attribute(name, fn)` values appear in `event.attributes()` on Ended Events
+- [x] Aggregates are available on Confirmed snapshots (so far) and final on Ended

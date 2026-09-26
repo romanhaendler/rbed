@@ -1,6 +1,10 @@
 package rbed;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.OptionalLong;
+import java.util.function.Function;
 
 /** Runtime state machine of one Rule inside one Detector. */
 final class Rule {
@@ -14,6 +18,7 @@ final class Rule {
   private final int endSamples;
   private final long endMillis;
   private final long maxGap;
+  private final Map<String, Function<Event, Object>> attributes;
 
   private State state = State.IDLE;
   private long start;
@@ -22,6 +27,8 @@ final class Rule {
   private boolean inEndPhase;
   private long endPhaseStart;
   private int endCount;
+  private Accumulator aggregates;
+  private Accumulator endPhaseAggregates;
 
   Rule(String name, RuleBuilder b) {
     this.name = name;
@@ -32,6 +39,7 @@ final class Rule {
     this.endSamples = b.endSamples;
     this.endMillis = b.endMillis;
     this.maxGap = b.maxGap;
+    this.attributes = new LinkedHashMap<>(b.attributes);
   }
 
   /**
@@ -43,6 +51,7 @@ final class Rule {
     if (state == State.PENDING) {
       if (holds(when, d)) {
         count++;
+        aggregates.add(d.values());
         confirmIfReady(d, now);
       } else {
         discard(d);
@@ -52,6 +61,8 @@ final class Rule {
       start = now;
       count = 1;
       truncatedStart = previous == null;
+      aggregates = new Accumulator();
+      aggregates.add(d.values());
       d.listener.onPending(snapshot(OptionalLong.empty(), false));
       confirmIfReady(d, now);
     }
@@ -60,24 +71,37 @@ final class Rule {
   /** Stops observation: Discards a Pending Event and truncates a Confirmed one at {@code last}. */
   void close(Detector d, long last) {
     if (state == State.PENDING) discard(d);
-    if (state == State.CONFIRMED) end(d, last, true);
+    if (state == State.CONFIRMED) {
+      leaveEndPhase();
+      end(d, last, true);
+    }
+  }
+
+  /** The End Condition stopped holding: its Samples belong to the Event after all. */
+  private void leaveEndPhase() {
+    if (inEndPhase) aggregates.addAll(endPhaseAggregates);
+    inEndPhase = false;
   }
 
   private void stepConfirmed(Detector d, long now) {
     if (endWhen == null) {
-      if (!holds(when, d)) end(d, now, false);
+      if (holds(when, d)) aggregates.add(d.values());
+      else end(d, now, false);
       return;
     }
     if (!holds(endWhen, d)) {
-      inEndPhase = false;
+      leaveEndPhase();
+      aggregates.add(d.values());
       return;
     }
     if (!inEndPhase) {
       inEndPhase = true;
       endPhaseStart = now;
       endCount = 0;
+      endPhaseAggregates = new Accumulator();
     }
     endCount++;
+    endPhaseAggregates.add(d.values());
     if (endCount >= endSamples && now - endPhaseStart >= endMillis) end(d, endPhaseStart, false);
   }
 
@@ -96,7 +120,11 @@ final class Rule {
 
   private void end(Detector d, long end, boolean truncated) {
     state = State.IDLE;
-    d.listener.onEnded(snapshot(OptionalLong.of(end), truncated));
+    Event ended = snapshot(OptionalLong.of(end), truncated);
+    Map<String, Object> values = new LinkedHashMap<>();
+    attributes.forEach((key, fn) -> values.put(key, fn.apply(ended)));
+    d.listener.onEnded(new Event(ended.name(), ended.start(), ended.end(), ended.truncatedStart(),
+        ended.truncatedEnd(), ended.aggregates(), Collections.unmodifiableMap(values)));
   }
 
   private static boolean holds(Condition c, Detector d) {
@@ -104,6 +132,7 @@ final class Rule {
   }
 
   private Event snapshot(OptionalLong end, boolean truncatedEnd) {
-    return new Event(name, start, end, truncatedStart, truncatedEnd);
+    return new Event(
+        name, start, end, truncatedStart, truncatedEnd, aggregates.snapshot(), Map.of());
   }
 }

@@ -1,6 +1,9 @@
 package rbed;
 
 import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.function.Function;
 
 /**
  * Configures one Rule inside {@link Detector.Builder#rule}. {@link #forSamples} and {@link
@@ -14,6 +17,7 @@ public final class RuleBuilder {
   int endSamples;
   long endMillis = -1;
   long maxGap = Long.MAX_VALUE;
+  final Map<String, Function<Event, Object>> attributes = new LinkedHashMap<>();
   private boolean configuringEnd;
 
   RuleBuilder() {}
@@ -69,5 +73,14 @@ public final class RuleBuilder {
   /** See {@link #maxGap(long)}. */
   public RuleBuilder maxGap(Duration duration) {
     return maxGap(duration.toMillis());
+  }
+
+  /**
+   * Adds an attribute computed when the Event Ends, e.g. to classify it from its Aggregates. The
+   * function receives the Ended Event (without attributes).
+   */
+  public RuleBuilder attribute(String name, Function<Event, Object> fn) {
+    attributes.put(name, fn);
+    return this;
   }
 }
