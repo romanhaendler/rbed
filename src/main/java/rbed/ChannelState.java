@@ -10,8 +10,11 @@ final class ChannelState extends Series {
     this.name = name;
   }
 
-  /** Makes a Pulse Channel undefined unless the Sample at {@code timestamp} carried it. */
+  /** Makes a Pulse Channel absent unless the Sample at {@code timestamp} carried it. */
   void endPulse(long timestamp) {
-    if (time != timestamp) value = Double.NaN;
+    if (time != timestamp) {
+      value = Double.NaN;
+      absent = true;
+    }
   }
 }

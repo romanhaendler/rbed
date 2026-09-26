@@ -17,6 +17,14 @@ public abstract class Expression {
   interface Bound {
     /** The current value, or NaN when undefined. */
     double value();
+
+    /**
+     * True for a Pulse Channel in a moment that does not carry it: comparisons on it are false,
+     * not undefined, because the absence of a pulse is known.
+     */
+    default boolean absent() {
+      return false;
+    }
   }
 
   /** True when this value is strictly greater than {@code limit}. */
@@ -133,8 +141,8 @@ public abstract class Expression {
         Expression.Bound x = left.bind(detector);
         Expression.Bound y = right.bind(detector);
         return greater
-            ? () -> Truth.greater(x.value(), y.value())
-            : () -> Truth.less(x.value(), y.value());
+            ? () -> x.absent() || y.absent() ? Truth.FALSE : Truth.greater(x.value(), y.value())
+            : () -> x.absent() || y.absent() ? Truth.FALSE : Truth.less(x.value(), y.value());
       }
     };
   }

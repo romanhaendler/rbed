@@ -13,6 +13,8 @@ class Series {
   double previous = Double.NaN;
   /** The value of the last update; differs from {@link #value} only for Pulse Channels. */
   private double last = Double.NaN;
+  /** A Pulse Channel that the current moment does not carry. */
+  boolean absent;
   /** When {@link #value} was last updated. */
   long time;
   private long previousTime;
@@ -24,6 +26,7 @@ class Series {
     previousTime = time;
     last = v;
     value = v;
+    absent = false;
     time = t;
     updated = true;
     for (Averaged series : derived) series.update(t, v);

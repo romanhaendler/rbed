@@ -16,13 +16,10 @@ import rbed.Event;
  *
  * <ul>
  *   <li>Trip: moving faster than 1 m/s for 10 s, over after standing still for 3 minutes. Its
- *       distance is estimated as mean speed x duration.
+ *       distance is the integral of speed over time.
  *   <li>HarshBraking: decelerating faster than 4 m/s².
  *   <li>Idling: standing with the engine running for 2 minutes.
  * </ul>
- *
- * <p>Gap: the mean in Aggregates weights every Sample equally. With irregular sampling, a
- * time-weighted mean (or an integral, i.e. the distance itself) would be needed.
  */
 class FleetTelematicsExample {
 
@@ -40,8 +37,7 @@ class FleetTelematicsExample {
         .rule("Trip", r -> r
             .when(channel("speed").above(1)).forDuration(10 * SECOND)
             .endWhen(channel("speed").below(0.5)).forDuration(3 * MINUTE)
-            .attribute("km", e -> Math.round(e.aggregates("speed").mean()
-                * (e.end().getAsLong() - e.start()) / 1000 / 10) / 100.0))
+            .attribute("km", e -> e.aggregates("speed").integral() / 1000))
         .rule("HarshBraking", r -> r.when(channel("speed").rate().below(-4)))
         .rule("Idling", r -> r
             .when(channel("speed").below(0.5).and(channel("rpm").above(600)))
@@ -54,7 +50,7 @@ class FleetTelematicsExample {
     assertEquals(List.of(
             "Idling 60..301",
             "HarshBraking 901..905",
-            // Samples 301..903 s: 603 Samples, mean 11940/603 m/s, over 603 s
+            // each speed from 301 to 903 s holds for 1 s: 11940 m
             "Trip 301..904 {km=11.94}",
             "Idling 904..1499 truncatedEnd"), // last Sample at 1499 s
         Series.describe(events, SECOND));

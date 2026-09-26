@@ -17,12 +17,10 @@ import rbed.Sample;
  *
  * <ul>
  *   <li>FloodWarning: above 300 cm and still rising faster than 10 cm/h for 30 minutes; lifted
- *       only once below 250 cm for 2 hours. Reports more than 2 hours apart interrupt it.
+ *       only once below 250 cm for 2 hours. Reports more than 2 hours apart interrupt it. The
+ *       rate is taken of the average of the last 4 reports, so a noisy gauge would not flicker.
  *   <li>Receding: falling while still above 300 cm.
  * </ul>
- *
- * <p>Gap: {@code rate()} uses the last two raw values, so on a noisy gauge it would flicker. A
- * rate of a moving average (smoothed slope) is not available.
  */
 class FloodWarningExample {
 
@@ -35,7 +33,7 @@ class FloodWarningExample {
     Detector detector = Detector.builder()
         .rule("FloodWarning", r -> r
             .when(channel("level").above(300)
-                .and(channel("level").rate().above(10.0 / HOUR)))  // cm per ms -> per s below
+                .and(channel("level").averageOverSamples(4).rate().above(10.0 / (HOUR / 1000))))
             .forDuration(HOUR / 2)
             .endWhen(channel("level").below(250)).forDuration(2 * HOUR)
             .maxGap(2 * HOUR))

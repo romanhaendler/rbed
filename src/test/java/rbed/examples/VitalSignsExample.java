@@ -5,16 +5,19 @@ import static rbed.Conditions.channel;
 import static rbed.Conditions.during;
 import static rbed.examples.Series.SECOND;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import rbed.Detector;
 import rbed.Event;
+import rbed.EventListener;
 import rbed.Sample;
 
 /**
  * Healthcare: heart rate and oxygen saturation from a bedside monitor at 1 Hz, with a 20 s sensor
- * dropout.
+ * dropout. While no data arrives, the monitor's clock advances the Detector every second, so the
+ * dropout is noticed while it lasts, not only once data resumes.
  *
  * <ul>
  *   <li>Tachycardia: heart rate above 100 for 30 s, over below 95 for 30 s. A dropout longer than
@@ -22,12 +25,14 @@ import rbed.Sample;
  *       truncated because nobody knows what happened in between.
  *   <li>Desaturation: SpO2 below 90 % for 10 s, over at 92 % or more.
  *   <li>HypoxicTachycardia: both at the same time.
+ *   <li>SensorLost: no heart rate for more than 5 s.
  * </ul>
  */
 class VitalSignsExample {
 
   @Test
   void detectsCombinedAlarmsAndHandlesSensorDropout() {
+    List<Event> ended = new ArrayList<>();
     Detector detector = Detector.builder()
         .rule("Tachycardia", r -> r
             .when(channel("hr").above(100)).forDuration(30 * SECOND)
@@ -38,21 +43,29 @@ class VitalSignsExample {
             .endWhen(channel("spo2").below(92).not()))
         .rule("HypoxicTachycardia", r -> r
             .when(during("Tachycardia").and(during("Desaturation"))))
+        .rule("SensorLost", r -> r.when(channel("hr").age().above(5 * SECOND)))
+        .listener(new EventListener() {
+          @Override public void onEnded(Event e) {
+            ended.add(e);
+          }
+        })
         .build();
 
-    List<Sample> series = Series.every(1, 0, 600, SECOND, s -> Map.of(
-            "hr", s < 60 ? 80.0 : s < 300 ? 120.0 : 85.0,
-            "spo2", s < 120 ? 97.0 : s < 200 ? 86.0 : 96.0))
-        .stream()
-        .filter(sample -> sample.timestamp() < 150 * SECOND || sample.timestamp() >= 170 * SECOND)
-        .toList();
-    List<Event> events = detector.detect(series);
+    for (Sample sample : Series.every(1, 0, 600, SECOND, s -> Map.of(
+        "hr", s < 60 ? 80.0 : s < 300 ? 120.0 : 85.0,
+        "spo2", s < 120 ? 97.0 : s < 200 ? 86.0 : 96.0))) {
+      boolean dropout = sample.timestamp() >= 150 * SECOND && sample.timestamp() < 170 * SECOND;
+      if (dropout) detector.advanceTo(sample.timestamp());
+      else detector.push(sample.timestamp(), sample.values());
+    }
+    detector.close();
 
     assertEquals(List.of(
-            "Tachycardia 60..149 truncatedEnd",   // dropout after 149 s
-            "HypoxicTachycardia 130..170",        // Tachycardia only Pending again after dropout
+            "Tachycardia 60..149 truncatedEnd",   // noticed at 160 s, 11 s after the last Sample
+            "HypoxicTachycardia 130..160",        // Tachycardia interrupted
+            "SensorLost 155..170",                // 6 s without heart rate until data resumes
             "Desaturation 120..200",
             "Tachycardia 170..300 truncatedStart"),
-        Series.describe(events, SECOND));
+        Series.describe(ended, SECOND));
   }
 }

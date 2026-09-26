@@ -3,6 +3,7 @@ package rbed.examples;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static rbed.Conditions.after;
 import static rbed.Conditions.channel;
+import static rbed.Conditions.count;
 import static rbed.examples.Series.MINUTE;
 import static rbed.examples.Series.SECOND;
 
@@ -22,10 +23,10 @@ import rbed.EventListener;
  * <ul>
  *   <li>Sprint: faster than 6 m/s for 5 s, over below 4 m/s.
  *   <li>Recovered: heart rate below 120 within 2 minutes after a Sprint.
+ *   <li>SessionDone: the third Sprint was Confirmed.
  * </ul>
  *
- * <p>Recovery time (from the end of a Sprint to Recovered) and the rep count are computed by a
- * listener. Gap: they involve two Events, and no Rule can use values of an earlier Event.
+ * <p>The recovery time (from the end of a Sprint to Recovered) is computed by a listener.
  */
 class IntervalTrainingExample {
 
@@ -44,6 +45,7 @@ class IntervalTrainingExample {
             .endWhen(channel("speed").below(4)))
         .rule("Recovered", r -> r
             .when(after("Sprint").within(2 * MINUTE).and(channel("hr").below(120))))
+        .rule("SessionDone", r -> r.when(count("Sprint").above(2)))
         .listener(new EventListener() {
           private long lastSprintEnd;
 
@@ -66,7 +68,8 @@ class IntervalTrainingExample {
     assertEquals(List.of(
             "Sprint 60..90", "Recovered 141..180",
             "Sprint 180..210", "Recovered 261..300",
-            "Sprint 300..330", "Recovered 381..419 truncatedEnd"),
+            "Sprint 300..330", "Recovered 381..419 truncatedEnd",
+            "SessionDone 305..419 truncatedEnd"), // third Sprint Confirmed at 305 s
         Series.describe(events, SECOND));
     assertEquals(List.of(51L, 51L, 51L), recoverySeconds);
   }

@@ -65,15 +65,20 @@ A new Event of a Rule only starts after its `when` Condition has stopped holding
     .attribute("load", e -> e.aggregates("weight").mean() < 1500 ? "pallet" : "container"))
 ```
 
-Events carry Aggregates (min, max, mean, count) for the Channels their Rule's Conditions use. Request more with `.aggregate("height", ...)`. Reading any other Channel's Aggregates throws, so a missing declaration is never mistaken for "no data".
+Events carry Aggregates for the Channels their Rule's Conditions use: min, max, mean and count over Samples, plus `timeWeightedMean` and `integral` (value x seconds, e.g. distance from speed), which weight each value by how long it held. Request more with `.aggregate("height", ...)`. Reading any other Channel's Aggregates throws, so a missing declaration is never mistaken for "no data".
 
 Conditions (`import static rbed.Conditions.*`):
 
 - `channel("x").above(v)`, `.below(v)`, `.between(lo, hi)`. Each also accepts another expression, e.g. `channel("weight").above(channel("ratedLoad"))`.
-- `channel("x").rising()`, `.falling()`, `.rate()` (per second), `.averageOverSamples(n)`, `.averageOverDuration(ms)`.
+- Arithmetic: `.plus(...)`, `.minus(...)`, `.times(...)`, `.dividedBy(...)` (with an expression or a number) and `.abs()`, e.g. `channel("supply").minus(channel("return")).above(5)`.
+- `channel("x").rising()`, `.falling()`, `.rate()` (per second) and `.age()` (ms since the last value).
+- Moving averages: `.averageOverSamples(n)` and `.averageOverDuration(ms)`. These support the same functions again, so a smoothed slope is `channel("level").averageOverSamples(4).rate()`.
 - `a.and(b)`, `a.or(b)`, `a.not()`.
 - `during("A")`: an A Event is Confirmed and has not Ended yet.
 - `after("A")`: an A Event has Ended. Narrow it with `.unless("C", ...)` (no C Confirmed since then) and `.within(ms)`.
+- `count("A")`: how many A Events were Confirmed, optionally `.within(ms)` a sliding window, e.g. `count("Run").within(Duration.ofHours(1)).above(3)`.
+- `totalDuration("A")`: the summed duration of all A Events in ms, including a running one.
+- `latest("A").mean("x")`, `.min("x")`, `.max("x")`, `.duration()`: values of the latest Confirmed A Event, running or Ended. For example, a partial set-down is `channel("weight").below(latest("LoadLifted").max("weight").times(0.5))`.
 
 A Channel with no value yet, or an average that is still warming up, makes a comparison *undefined*. Undefined counts as false, also under `not()`. A Sample may contain any subset of Channels: missing ones keep their last value. A Rule may only reference Rules declared before it.
 
@@ -87,6 +92,12 @@ List<Event> events = detector.detect(List.of(
 
 For regularly sampled data without timestamps, configure `.samplingRate(hz)` on the builder (at most 1000 Hz, since timestamps are milliseconds) and use `push(values)` / `detectValues(listOfMaps)`.
 
+## Silent sensors and markers
+
+When no Samples arrive, call `advanceTo(timestamp)` from your clock. Rules are evaluated at that moment: durations can be reached, `maxGap` is noticed, and `channel("x").age()` grows. So `when(channel("hr").age().above(10_000))` raises an Event while a sensor is silent. An advance is not a Sample: it does not count for `forSamples` or Aggregates.
+
+Declare markers such as deployments with `.pulse("deploy")` on the builder. A Pulse Channel's value exists only in the Sample carrying it. Otherwise it is absent: comparisons on it are false, so `channel("deploy").above(0.5).not()` means "no deployment now".
+
 ## Restarts
 
 Pass Events stored before a restart with `.history(events)`, so that `after(...)` Rules keep working. They must have been Confirmed and have Ended before the first Sample.
@@ -97,16 +108,16 @@ Runnable end-to-end examples from different domains, each a test with its expect
 
 | Domain           | Example                                                           | Shows                                                    |
 | ---------------- | ----------------------------------------------------------------- | -------------------------------------------------------- |
-| Cranes           | `src/test/java/rbed/CraneScenarioTest.java`                       | hysteresis, `during`, classifying a load via attributes  |
+| Cranes           | `src/test/java/rbed/CraneScenarioTest.java`                       | hysteresis, `during`, classifying a load, partial set-down via `latest` |
 | Manufacturing    | `src/test/java/rbed/examples/MachineToolOverheatExample.java`     | sampling-rate mode, `rate`, combined `during`s           |
-| Building services | `src/test/java/rbed/examples/HvacShortCyclingExample.java`       | `after().within()`, classifying by Event duration        |
-| Healthcare       | `src/test/java/rbed/examples/VitalSignsExample.java`              | `maxGap` on sensor dropout, Truncated Events             |
-| Automotive       | `src/test/java/rbed/examples/FleetTelematicsExample.java`         | deceleration via `rate`, trips, idling                   |
+| Building services | `src/test/java/rbed/examples/HvacShortCyclingExample.java`       | `after().within()`, `count().within()`                   |
+| Healthcare       | `src/test/java/rbed/examples/VitalSignsExample.java`              | `advanceTo` and `age()` for a silent sensor, `maxGap`    |
+| Automotive       | `src/test/java/rbed/examples/FleetTelematicsExample.java`         | deceleration via `rate`, distance via `integral`         |
 | Finance          | `src/test/java/rbed/examples/TradingSignalsExample.java`          | moving-average crosses, truncated start after warm-up    |
-| Logistics        | `src/test/java/rbed/examples/ColdChainExample.java`               | attributing a cause with `after`, listener-side totals   |
-| Environment      | `src/test/java/rbed/examples/FloodWarningExample.java`            | rising and falling levels, irregular reports             |
-| Sports           | `src/test/java/rbed/examples/IntervalTrainingExample.java`        | reps and recovery times computed by a listener           |
-| IT operations    | `src/test/java/rbed/examples/DeploymentRegressionExample.java`    | error spikes after a deployment marker                   |
+| Logistics        | `src/test/java/rbed/examples/ColdChainExample.java`               | attributing a cause with `after`, `totalDuration` limit  |
+| Environment      | `src/test/java/rbed/examples/FloodWarningExample.java`            | smoothed rate of a moving average, hysteresis            |
+| Sports           | `src/test/java/rbed/examples/IntervalTrainingExample.java`        | `after`, rep count via `count`, listener-side timing     |
+| IT operations    | `src/test/java/rbed/examples/DeploymentRegressionExample.java`    | a Pulse Channel as deployment marker                     |
 
 ## Performance
 
@@ -116,9 +127,9 @@ Measured with `mvn test -Pperformance` (Apple M2, JDK 21):
 
 | Scenario                                                  | Throughput             |
 | --------------------------------------------------------- | ---------------------- |
-| One threshold Rule, Events every 100 Samples              | ~45 million Samples/s  |
-| Realistic Rule set (durations, End Condition, during, after/unless, rate, moving averages) | ~11 million Samples/s |
-| 50 Rules x 20 Channels, Events every 40 Samples           | ~1.5 million Samples/s |
+| One threshold Rule, Events every 100 Samples              | ~40-45 million Samples/s |
+| Realistic Rule set: 11 Rules using every feature           | ~5.7 million Samples/s |
+| 50 Rules x 20 Channels, Events every 40 Samples           | ~1.2-1.5 million Samples/s |
 
 A running Event keeps Aggregates only for the Channels its Rule uses (plus those requested with `.aggregate(...)`), at about 1 ns per Channel per Sample.
 

@@ -26,7 +26,15 @@ public final class ChannelExpression extends Expression {
   @Override
   Bound bind(Detector detector) {
     Series s = series.apply(detector);
-    return () -> s.value;
+    return new Bound() {
+      @Override public double value() {
+        return s.value;
+      }
+
+      @Override public boolean absent() {
+        return s.absent;
+      }
+    };
   }
 
   /** True when the last value is greater than the previous one. */
@@ -34,7 +42,7 @@ public final class ChannelExpression extends Expression {
     return new Condition() {
       @Override Bound bind(Detector detector) {
         Series s = series.apply(detector);
-        return () -> Truth.greater(s.value, s.previous);
+        return () -> s.absent ? Truth.FALSE : Truth.greater(s.value, s.previous);
       }
     };
   }
@@ -44,7 +52,7 @@ public final class ChannelExpression extends Expression {
     return new Condition() {
       @Override Bound bind(Detector detector) {
         Series s = series.apply(detector);
-        return () -> Truth.less(s.value, s.previous);
+        return () -> s.absent ? Truth.FALSE : Truth.less(s.value, s.previous);
       }
     };
   }

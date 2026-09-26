@@ -4,7 +4,7 @@
 
 **Blocked by:** 01–09
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Every gap in `gaps.md` has a resolved example or is marked as still open with a reason
-- [ ] README documents all new API
+- [x] Every gap in `gaps.md` has a resolved example or is marked as still open with a reason
+- [x] README documents all new API

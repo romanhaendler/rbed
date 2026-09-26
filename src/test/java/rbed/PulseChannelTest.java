@@ -11,7 +11,7 @@ class PulseChannelTest {
   final Recorder rec = new Recorder();
 
   @Test
-  void pulseIsUndefinedInSamplesThatDoNotCarryIt() {
+  void pulseIsAbsentInSamplesThatDoNotCarryIt() {
     Detector d = Detector.builder()
         .pulse("deploy")
         .rule("Deploying", r -> r.when(channel("deploy").above(0.5)))
@@ -21,7 +21,9 @@ class PulseChannelTest {
     d.push(0, Map.of("deploy", 1.0, "normal", 1.0));
     d.push(1, Map.of("other", 0.0));
     d.close();
+    // absent: "deploy above 0.5" is false, so its negation is true
     assertEquals(List.of("ended Deploying 0..1 truncatedStart",
+        "ended NotDeploying 1..1 truncatedEnd",
         "ended Held 0..1 truncatedStart truncatedEnd"), rec.endedLines());
   }
 
@@ -32,10 +34,23 @@ class PulseChannelTest {
         .rule("Rising", r -> r.when(channel("p").rising()))
         .listener(rec).build();
     d.push(0, Map.of("p", 1.0));
-    d.push(1, Map.of());          // undefined, but 1 stays the previous carried value
+    d.push(1, Map.of());          // absent: not rising; 1 stays the previous carried value
     d.push(2, Map.of("p", 3.0));  // 3 > 1
     d.push(3, Map.of());
-    assertEquals(List.of("ended Rising 2..3 truncatedStart"), rec.endedLines());
+    assertEquals(List.of("ended Rising 2..3"), rec.endedLines());
+  }
+
+  @Test
+  void computingWithAnAbsentPulseIsUndefinedAndAgeKeepsCounting() {
+    Detector d = Detector.builder()
+        .pulse("p")
+        .rule("Sum", r -> r.when(channel("p").plus(1).above(0).or(channel("p").plus(1).above(0).not())))
+        .rule("Quiet", r -> r.when(channel("p").age().above(5)))
+        .listener(rec).build();
+    d.push(0, Map.of("p", 1.0));
+    d.push(10, Map.of());
+    assertEquals(List.of("pending Sum 0", "confirmed Sum 0", "ended Sum 0..10 truncatedStart",
+        "pending Quiet 10", "confirmed Quiet 10"), rec.log);
   }
 
   @Test

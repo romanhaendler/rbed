@@ -5,6 +5,7 @@ import static rbed.Conditions.after;
 import static rbed.Conditions.channel;
 import static rbed.examples.Series.MINUTE;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -12,8 +13,8 @@ import rbed.Detector;
 import rbed.Event;
 
 /**
- * IT operations: per-minute metrics of a web service (errors per minute, CPU %) and a marker
- * Channel for deployments.
+ * IT operations: per-minute metrics of a web service (errors per minute, CPU %) and a deployment
+ * marker, declared as a Pulse Channel so it is only set in the Sample that carries it.
  *
  * <ul>
  *   <li>Deployment: the marker is set.
@@ -22,10 +23,6 @@ import rbed.Event;
  *       it.
  *   <li>HighCpu: CPU above 90 % for 5 minutes.
  * </ul>
- *
- * <p>Gap: Channels hold their last value, so a marker must be reset explicitly (deploy = 0 on the
- * next Sample), or it would read as "deploying" forever. Pulse Channels, whose value only exists
- * in the Sample that carries it, are not supported.
  */
 class DeploymentRegressionExample {
 
@@ -38,6 +35,7 @@ class DeploymentRegressionExample {
   @Test
   void attributesErrorSpikesToDeployments() {
     Detector detector = Detector.builder()
+        .pulse("deploy")
         .rule("Deployment", r -> r.when(channel("deploy").above(0.5)))
         .rule("ErrorSpike", r -> r.when(channel("errors").above(5)).forDuration(2 * MINUTE))
         .rule("Regression", r -> r
@@ -46,10 +44,13 @@ class DeploymentRegressionExample {
         .rule("HighCpu", r -> r.when(channel("cpu").above(90)).forDuration(5 * MINUTE))
         .build();
 
-    List<Event> events = detector.detect(Series.every(1, 0, 120, MINUTE, m -> Map.of(
-        "deploy", m == 10 ? 1.0 : 0.0,
-        "errors", errors(m),
-        "cpu", m >= 90 && m < 100 ? 95.0 : 50.0)));
+    List<Event> events = detector.detect(Series.every(1, 0, 120, MINUTE, m -> {
+      Map<String, Double> values = new HashMap<>(Map.of(
+          "errors", errors(m),
+          "cpu", m >= 90 && m < 100 ? 95.0 : 50.0));
+      if (m == 10) values.put("deploy", 1.0); // sent once, never reset
+      return values;
+    }));
 
     assertEquals(List.of(
             "Deployment 10..11",

@@ -3,6 +3,7 @@ package rbed.examples;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static rbed.Conditions.after;
 import static rbed.Conditions.channel;
+import static rbed.Conditions.totalDuration;
 import static rbed.examples.Series.MINUTE;
 
 import java.util.List;
@@ -10,7 +11,6 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import rbed.Detector;
 import rbed.Event;
-import rbed.EventListener;
 
 /**
  * Logistics: a refrigerated truck carrying vaccines (2-8 °C), temperature and door sensor every
@@ -21,10 +21,9 @@ import rbed.EventListener;
  *   <li>DoorOpen: the door sensor reads 1.
  *   <li>ExcursionAfterDoor: above 8 °C within 30 minutes after the door closed, to attribute the
  *       cause.
+ *   <li>CumulativeLimit: regulations limit the total time above 8 °C over the trip to 45
+ *       minutes, across all Excursions.
  * </ul>
- *
- * <p>Gap: regulations limit the <i>cumulative</i> time above 8 °C over the whole trip. That spans
- * several Events and cannot be a Rule; here a listener adds up the Excursions.
  */
 class ColdChainExample {
 
@@ -36,7 +35,6 @@ class ColdChainExample {
 
   @Test
   void detectsExcursionsAndTheirCause() {
-    long[] minutesAbove8 = {0};
     Detector detector = Detector.builder()
         .rule("Excursion", r -> r
             .when(channel("temp").above(8)).forDuration(15 * MINUTE)
@@ -44,13 +42,7 @@ class ColdChainExample {
         .rule("DoorOpen", r -> r.when(channel("door").above(0.5)))
         .rule("ExcursionAfterDoor", r -> r
             .when(after("DoorOpen").within(30 * MINUTE).and(channel("temp").above(8))))
-        .listener(new EventListener() {
-          @Override public void onEnded(Event e) {
-            if (e.name().equals("Excursion")) {
-              minutesAbove8[0] += (e.end().getAsLong() - e.start()) / MINUTE;
-            }
-          }
-        })
+        .rule("CumulativeLimit", r -> r.when(totalDuration("Excursion").above(45 * MINUTE)))
         .build();
 
     List<Event> events = detector.detect(Series.every(1, 0, 480, MINUTE, m -> Map.of(
@@ -61,8 +53,9 @@ class ColdChainExample {
             "DoorOpen 60..65",
             "Excursion 62..90",
             "ExcursionAfterDoor 65..90", // from the moment the door closed
-            "Excursion 300..330"),       // unrelated to the door: too long after it closed
+            "Excursion 300..330",        // unrelated to the door: too long after it closed
+            // 28 minutes from the first; the second, Confirmed at 315, adds up to 46 at 318
+            "CumulativeLimit 318..479 truncatedEnd"),
         Series.describe(events, MINUTE));
-    assertEquals(28 + 30, minutesAbove8[0]);
   }
 }

@@ -3,6 +3,7 @@ package rbed.examples;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static rbed.Conditions.after;
 import static rbed.Conditions.channel;
+import static rbed.Conditions.count;
 import static rbed.examples.Series.MINUTE;
 import static rbed.examples.Series.SECOND;
 
@@ -20,10 +21,8 @@ import rbed.Event;
  *   <li>Run: above 500 W for 30 s, over below 100 W for 30 s. A Run shorter than 5 minutes is
  *       classified as a short cycle via an attribute.
  *   <li>QuickRestart: a Run beginning within 3 minutes after the previous one Ended.
+ *   <li>FrequentStarts: more than 2 Runs Confirmed within an hour.
  * </ul>
- *
- * <p>Gap: "more than 3 Runs within an hour" (counting Events in a window) cannot be expressed as a
- * Rule; a listener has to count.
  */
 class HvacShortCyclingExample {
 
@@ -43,6 +42,7 @@ class HvacShortCyclingExample {
             .when(after("Run").within(3 * MINUTE).and(channel("power").above(500)))
             .forDuration(30 * SECOND)
             .endWhen(channel("power").below(100)))
+        .rule("FrequentStarts", r -> r.when(count("Run").within(60 * MINUTE).above(2)))
         .build();
 
     List<Event> events = detector.detect(
@@ -53,7 +53,9 @@ class HvacShortCyclingExample {
             // QuickRestart Ends at once below 100 W (920 s); Run waits 30 s to confirm its end
             "QuickRestart 800..920",           // 100 s after the first Run Ended
             "Run 800..920 {shortCycle=true}",
-            "Run 1600..2200 {shortCycle=false}"),
+            "Run 1600..2200 {shortCycle=false}",
+            // Runs Confirmed at 130, 830 and 1630 s; the window keeps all three until the end
+            "FrequentStarts 1630..2390 truncatedEnd"),
         Series.describe(events, SECOND));
   }
 }

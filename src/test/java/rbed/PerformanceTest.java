@@ -3,7 +3,10 @@ package rbed;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static rbed.Conditions.after;
 import static rbed.Conditions.channel;
+import static rbed.Conditions.count;
 import static rbed.Conditions.during;
+import static rbed.Conditions.latest;
+import static rbed.Conditions.totalDuration;
 
 import com.sun.management.ThreadMXBean;
 import java.lang.management.ManagementFactory;
@@ -23,10 +26,10 @@ import org.junit.jupiter.api.Test;
  *
  * <ul>
  *   <li><b>Allocation checks</b> are deterministic and the real regression guard: in steady state
- *       (no Event starting or ending) pushing a Sample must not allocate, apart from the iterator
- *       over the caller's value map. This is what keeps GC pressure at zero on endless streams and
- *       proves that memory stays bounded however long an Event lasts or however large a
- *       moving-average window is.
+ *       (no Event starting or ending) pushing a Sample must not allocate at all. The Detector
+ *       walks the caller's HashMap with {@code forEach}, so this does not depend on the JIT's
+ *       escape analysis. This keeps GC pressure at zero on endless streams and proves that memory
+ *       stays bounded however long an Event lasts or however large a moving-average window is.
  *   <li><b>Throughput checks</b> measure Samples per second for representative Rule sets. Their
  *       floors are roughly 10x below what a current laptop achieves, so they only catch
  *       order-of-magnitude regressions. The measured numbers are printed for comparison.
@@ -40,8 +43,8 @@ class PerformanceTest {
   private static final int WARM_UP_SAMPLES = 2_000_000;
   private static final int MEASURED_SAMPLES = 5_000_000;
   private static final int RUNS = 5;
-  /** The iterator over a HashMap's entries; the only allocation per Sample we accept. */
-  private static final long ACCEPTED_BYTES_PER_SAMPLE = 64;
+  /** Nothing per Sample; the tolerance only absorbs one-off allocations of the JVM itself. */
+  private static final double ACCEPTED_BYTES_PER_SAMPLE = 1;
 
   // ----------------------------------------------------------------------------------------------
   // Scenarios
@@ -55,8 +58,9 @@ class PerformanceTest {
 
   /**
    * A realistic Rule set over 3 Channels that exercises every feature on the hot path: durations,
-   * an End Condition, max gap, a Channel-vs-Channel comparison, during, after/unless/within, rate
-   * and both kinds of moving average.
+   * an End Condition, max gap, a Channel-vs-Channel comparison, during, after/unless/within, rate,
+   * both kinds of moving average, a smoothed rate, arithmetic, count, totalDuration, latest and
+   * age.
    */
   static Detector realisticRuleSet() {
     return Detector.builder()
@@ -73,6 +77,16 @@ class PerformanceTest {
         .rule("LiftAfterOverload", r -> r
             .when(after("Overload").unless("Lift").within(60_000)
                 .and(channel("weight").rising())))
+        .rule("NearLimit", r -> r
+            .when(channel("limit").minus(channel("weight")).abs().below(100)))
+        .rule("SmoothRise", r -> r
+            .when(channel("weight").averageOverSamples(10).rate().above(100)))
+        .rule("FrequentLifts", r -> r.when(count("Lift").within(60_000).above(3)))
+        .rule("LongLifting", r -> r.when(totalDuration("Lift").above(3_600_000)))
+        .rule("PartialSetDown", r -> r
+            .when(during("Lift")
+                .and(channel("weight").below(latest("Lift").max("weight").times(0.5)))))
+        .rule("AngleSensorSilent", r -> r.when(channel("angle").age().above(5_000)))
         .build();
   }
 

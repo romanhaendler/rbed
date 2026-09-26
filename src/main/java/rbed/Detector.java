@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.UnaryOperator;
 
 /**
@@ -37,6 +38,15 @@ public final class Detector implements AutoCloseable {
   private long samples;
   private boolean closed;
   private List<Event> collected;
+  /** Timestamp of the Sample being applied, for {@link #applyValue}. */
+  private long applying;
+  /**
+   * Callbacks for {@link Map#forEach}, created once: iterating a HashMap this way needs no
+   * iterator, so pushing a Sample allocates nothing regardless of what the JIT inlines.
+   */
+  private final BiConsumer<String, Double> validateValue = Detector::validate;
+  private final BiConsumer<String, Double> applyValue =
+      (channel, value) -> channel(channel).add(applying, value);
 
   /** While binding Rules: the Rule being bound, the names it must not reference, and the
    * Channels its Conditions look up. */
@@ -155,21 +165,20 @@ public final class Detector implements AutoCloseable {
   }
 
   private void accept(long timestamp, Map<String, Double> values) {
-    // validate everything first, so a rejected Sample leaves no trace
-    for (Map.Entry<String, Double> value : values.entrySet()) {
-      Double v = value.getValue();
-      if (value.getKey() == null || v == null || !Double.isFinite(v)) {
-        throw new IllegalArgumentException("Invalid value " + v + " of channel " + value.getKey());
-      }
-    }
+    values.forEach(validateValue); // first, so a rejected Sample leaves no trace
     moveTo(timestamp);
-    for (Map.Entry<String, Double> value : values.entrySet()) {
-      channel(value.getKey()).add(timestamp, value.getValue());
-    }
+    applying = timestamp;
+    values.forEach(applyValue);
     for (ChannelState pulse : pulses) pulse.endPulse(timestamp);
     for (Rule rule : rules) rule.step(timestamp, lastSample, samples > 0, true);
     lastSample = timestamp;
     samples++;
+  }
+
+  private static void validate(String channel, Double value) {
+    if (channel == null || value == null || !Double.isFinite(value)) {
+      throw new IllegalArgumentException("Invalid value " + value + " of channel " + channel);
+    }
   }
 
   private void moveTo(long timestamp) {
@@ -266,7 +275,9 @@ public final class Detector implements AutoCloseable {
 
     /**
      * Declares Pulse Channels, such as deployment markers: their value exists only in the Sample
-     * that carries it and is undefined in all other Samples, instead of holding.
+     * that carries it instead of holding. In other Samples the pulse is absent: comparisons on it
+     * (and {@code rising}/{@code falling}) are false, so {@code not()} of them is true, while
+     * computing with it is undefined. {@code age()} gives the time since the last pulse.
      */
     public Builder pulse(String... channels) {
       for (String channel : channels) pulses.add(Objects.requireNonNull(channel, "channel"));
