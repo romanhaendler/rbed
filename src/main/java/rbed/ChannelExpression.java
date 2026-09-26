@@ -58,6 +58,19 @@ public final class ChannelExpression extends Expression {
     };
   }
 
+  /**
+   * Milliseconds since the last value, at the current Sample or time advance; undefined before
+   * the first value. Together with {@link Detector#advanceTo} this detects silent sensors.
+   */
+  public Expression age() {
+    return new Expression() {
+      @Override Bound bind(Detector detector) {
+        Series s = series.apply(detector);
+        return () -> s.age(detector.now());
+      }
+    };
+  }
+
   /** Mean of the last {@code n} values; undefined until {@code n} values exist. */
   public ChannelExpression averageOverSamples(int n) {
     if (n < 1) throw new IllegalArgumentException("averageOverSamples needs n >= 1: " + n);

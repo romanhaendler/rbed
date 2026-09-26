@@ -65,27 +65,31 @@ final class Rule {
   }
 
   /**
-   * Processes the current Sample.
+   * Processes the current moment: a Sample, or a time advance without one. Advances do not count
+   * for {@code forSamples} or Aggregates.
    *
-   * @param previous timestamp of the previous Sample; ignored when {@code first}
+   * @param lastSample timestamp of the latest Sample before this moment; ignored if there is none
    */
-  void step(long now, long previous, boolean first) {
-    if (!first && now - previous > maxGap) {
-      close(previous);
+  void step(long now, long lastSample, boolean hasLastSample, boolean isSample) {
+    if (hasLastSample && now - lastSample > maxGap) {
+      close(lastSample);
       armed = true;
       seenFalse = false;
+      if (!isSample) return; // values are stale until the next Sample
     }
     switch (state) {
       case IDLE -> {
         Truth holds = when.test();
         if (holds != Truth.TRUE) stoppedHolding(holds);
-        else if (armed) begin(now);
+        else if (armed) begin(now, isSample);
       }
       case PENDING -> {
         Truth holds = when.test();
         if (holds == Truth.TRUE) {
-          holding.advance();
-          aggregates.add(aggregated, aggregatedCount);
+          if (isSample) {
+            holding.advance();
+            aggregates.add(aggregated, aggregatedCount);
+          }
           confirmIfReached(now);
         } else {
           discard();
@@ -93,8 +97,8 @@ final class Rule {
         }
       }
       case CONFIRMED -> {
-        if (end == null) stepUntilWhenStops(now);
-        else stepUntilEndCondition(now);
+        if (end == null) stepUntilWhenStops(now, isSample);
+        else stepUntilEndCondition(now, isSample);
       }
     }
   }
@@ -119,13 +123,13 @@ final class Rule {
     if (holds == Truth.FALSE) seenFalse = true;
   }
 
-  private void begin(long now) {
+  private void begin(long now, boolean isSample) {
     state = State.PENDING;
     armed = false;
     truncatedStart = !seenFalse;
-    holding.begin(now);
+    holding.begin(now, isSample);
     aggregates.clear();
-    aggregates.add(aggregated, aggregatedCount);
+    if (isSample) aggregates.add(aggregated, aggregatedCount);
     detector.listener.onPending(snapshot(OptionalLong.empty(), false));
     confirmIfReached(now);
   }
@@ -139,30 +143,30 @@ final class Rule {
     detector.listener.onConfirmed(snapshot(OptionalLong.empty(), false));
   }
 
-  private void stepUntilWhenStops(long now) {
+  private void stepUntilWhenStops(long now, boolean isSample) {
     Truth holds = when.test();
     if (holds == Truth.TRUE) {
-      aggregates.add(aggregated, aggregatedCount);
+      if (isSample) aggregates.add(aggregated, aggregatedCount);
     } else {
       finish(now, false);
       stoppedHolding(holds);
     }
   }
 
-  private void stepUntilEndCondition(long now) {
+  private void stepUntilEndCondition(long now, boolean isSample) {
     if (end.test() != Truth.TRUE) {
       leaveEndPhase();
-      aggregates.add(aggregated, aggregatedCount);
+      if (isSample) aggregates.add(aggregated, aggregatedCount);
       return;
     }
-    if (inEndPhase) {
-      ending.advance();
-    } else {
+    if (!inEndPhase) {
       inEndPhase = true;
-      ending.begin(now);
+      ending.begin(now, isSample);
       endPhaseAggregates.clear();
+    } else if (isSample) {
+      ending.advance();
     }
-    endPhaseAggregates.add(aggregated, aggregatedCount);
+    if (isSample) endPhaseAggregates.add(aggregated, aggregatedCount);
     if (ending.reached(now)) finish(ending.since, false);
   }
 

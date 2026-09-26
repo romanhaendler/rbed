@@ -10,9 +10,10 @@ final class Progress {
     this.phase = phase;
   }
 
-  void begin(long timestamp) {
+  /** @param counted whether the moment it began is a Sample (not a time advance) */
+  void begin(long timestamp, boolean counted) {
     since = timestamp;
-    count = 1;
+    count = counted ? 1 : 0;
   }
 
   void advance() {

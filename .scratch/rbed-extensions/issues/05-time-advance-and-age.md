@@ -4,9 +4,9 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `advanceTo` with strictly increasing timestamps; `IllegalStateException` in sampling-rate mode or after close
-- [ ] A SensorLost Rule on `age()` fires via `advanceTo` while no Samples arrive
-- [ ] `forDuration` confirmations and End-Condition durations complete on an advance; `maxGap` truncation fires on an advance
-- [ ] `forSamples` counts and Aggregates' counts are unaffected by advances
+- [x] `advanceTo` with strictly increasing timestamps; `IllegalStateException` in sampling-rate mode or after close
+- [x] A SensorLost Rule on `age()` fires via `advanceTo` while no Samples arrive
+- [x] `forDuration` confirmations and End-Condition durations complete on an advance; `maxGap` truncation fires on an advance
+- [x] `forSamples` counts and Aggregates' counts are unaffected by advances

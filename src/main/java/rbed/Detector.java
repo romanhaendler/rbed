@@ -29,7 +29,10 @@ public final class Detector implements AutoCloseable {
   private final long latestHistoryEnd;
   private final Rule[] rules;
   private final ChannelState[] pulses;
+  /** The latest moment observed: a Sample or a time advance. */
   private long now;
+  private boolean observed;
+  private long lastSample;
   private long samples;
   private boolean closed;
   private List<Event> collected;
@@ -117,24 +120,36 @@ public final class Detector implements AutoCloseable {
   public void close() {
     if (closed) return;
     closed = true;
-    if (samples > 0) for (Rule rule : rules) rule.close(now);
+    if (observed) for (Rule rule : rules) rule.close(now);
   }
 
   private List<Event> batch(Runnable pushAll) {
-    if (samples > 0 || closed) throw new IllegalStateException("Detector has already been used");
+    if (observed || closed) throw new IllegalStateException("Detector has already been used");
     collected = new ArrayList<>();
     pushAll.run();
     close();
     return collected;
   }
 
-  private void accept(long timestamp, Map<String, Double> values) {
-    if (closed) throw new IllegalStateException("Detector is closed");
-    boolean first = samples == 0;
-    if (first ? hasHistory && timestamp <= latestHistoryEnd : timestamp <= now) {
-      throw new IllegalArgumentException("Timestamp " + timestamp + " is not after "
-          + (first ? "the end of the History, " + latestHistoryEnd : "the previous one, " + now));
+  /**
+   * Tells this Detector that time has passed up to {@code timestamp} without new Samples. Rules
+   * are evaluated at that moment with every Channel holding its value (Pulse Channels are
+   * undefined): durations can be reached, max gaps noticed, and {@code age()} grows. An advance is
+   * not a Sample, so it does not count for {@code forSamples} or Aggregates.
+   *
+   * @param timestamp milliseconds; must be strictly greater than the previous Sample or advance
+   * @throws IllegalStateException if a sampling rate was configured, or after {@link #close}
+   */
+  public void advanceTo(long timestamp) {
+    if (samplingRate > 0) {
+      throw new IllegalStateException("Detector has a sampling rate: time advances with Samples");
     }
+    moveTo(timestamp);
+    for (ChannelState pulse : pulses) pulse.endPulse(timestamp);
+    for (Rule rule : rules) rule.step(timestamp, lastSample, samples > 0, false);
+  }
+
+  private void accept(long timestamp, Map<String, Double> values) {
     // validate everything first, so a rejected Sample leaves no trace
     for (Map.Entry<String, Double> value : values.entrySet()) {
       Double v = value.getValue();
@@ -142,17 +157,28 @@ public final class Detector implements AutoCloseable {
         throw new IllegalArgumentException("Invalid value " + v + " of channel " + value.getKey());
       }
     }
+    moveTo(timestamp);
     for (Map.Entry<String, Double> value : values.entrySet()) {
       channel(value.getKey()).add(timestamp, value.getValue());
     }
     for (ChannelState pulse : pulses) pulse.endPulse(timestamp);
-    long previous = now;
-    now = timestamp;
-    for (Rule rule : rules) rule.step(timestamp, previous, first);
+    for (Rule rule : rules) rule.step(timestamp, lastSample, samples > 0, true);
+    lastSample = timestamp;
     samples++;
   }
 
-  /** Timestamp of the latest Sample. */
+  private void moveTo(long timestamp) {
+    if (closed) throw new IllegalStateException("Detector is closed");
+    if (observed ? timestamp <= now : hasHistory && timestamp <= latestHistoryEnd) {
+      throw new IllegalArgumentException("Timestamp " + timestamp + " is not after " + (observed
+          ? "the previous one, " + now
+          : "the end of the History, " + latestHistoryEnd));
+    }
+    now = timestamp;
+    observed = true;
+  }
+
+  /** Timestamp of the latest Sample or time advance. */
   long now() {
     return now;
   }
