@@ -52,6 +52,10 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <version>3.5.2</version>
         <configuration>
+          <includes>
+            <include>**/*Test.java</include>
+            <include>**/*Example.java</include>
+          </includes>
           <groups>${surefire.groups}</groups>
           <excludedGroups>${surefire.excludedGroups}</excludedGroups>
           <!-- lets the performance tests measure allocations via the platform MXBean -->

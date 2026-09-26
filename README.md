@@ -89,6 +89,23 @@ For regularly sampled data without timestamps, configure `.samplingRate(hz)` on 
 
 Pass Events stored before a restart with `.history(events)`, so that `after(...)` Rules keep working. They must have been Confirmed and have Ended before the first Sample.
 
+## Examples
+
+Runnable end-to-end examples from different domains, each a test with its expected Events:
+
+| Domain           | Example                                                           | Shows                                                    |
+| ---------------- | ----------------------------------------------------------------- | -------------------------------------------------------- |
+| Cranes           | `src/test/java/rbed/CraneScenarioTest.java`                       | hysteresis, `during`, classifying a load via attributes  |
+| Manufacturing    | `src/test/java/rbed/examples/MachineToolOverheatExample.java`     | sampling-rate mode, `rate`, combined `during`s           |
+| Building services | `src/test/java/rbed/examples/HvacShortCyclingExample.java`       | `after().within()`, classifying by Event duration        |
+| Healthcare       | `src/test/java/rbed/examples/VitalSignsExample.java`              | `maxGap` on sensor dropout, Truncated Events             |
+| Automotive       | `src/test/java/rbed/examples/FleetTelematicsExample.java`         | deceleration via `rate`, trips, idling                   |
+| Finance          | `src/test/java/rbed/examples/TradingSignalsExample.java`          | moving-average crosses, truncated start after warm-up    |
+| Logistics        | `src/test/java/rbed/examples/ColdChainExample.java`               | attributing a cause with `after`, listener-side totals   |
+| Environment      | `src/test/java/rbed/examples/FloodWarningExample.java`            | rising and falling levels, irregular reports             |
+| Sports           | `src/test/java/rbed/examples/IntervalTrainingExample.java`        | reps and recovery times computed by a listener           |
+| IT operations    | `src/test/java/rbed/examples/DeploymentRegressionExample.java`    | error spikes after a deployment marker                   |
+
 ## Performance
 
 Conditions are bound to the Detector once, in `build()`. After that, pushing a Sample does not look anything up by name. In steady state (no Event starting or ending) it allocates nothing, so memory stays bounded however long an Event lasts. Moving averages use fixed ring buffers with compensated sums, so they neither allocate nor drift.
