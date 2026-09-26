@@ -4,9 +4,9 @@
 
 **Blocked by:** 02 (Condition vocabulary and sample-and-hold), 03 (Durations and the Pending phase)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `during`, `after`, `unless` and `within` behave as specified in the spec
-- [ ] A Rule sees effects of earlier Rules on the same Sample
-- [ ] Self or forward references throw `IllegalArgumentException` at `build()`; names no Rule produces are allowed
-- [ ] History Events enable `after` from the first Sample and are not passed to the listener
+- [x] `during`, `after`, `unless` and `within` behave as specified in the spec
+- [x] A Rule sees effects of earlier Rules on the same Sample
+- [x] Self or forward references throw `IllegalArgumentException` at `build()`; names no Rule produces are allowed
+- [x] History Events enable `after` from the first Sample and are not passed to the listener

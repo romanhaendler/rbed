@@ -1,11 +1,14 @@
 package rbed;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.UnaryOperator;
 
 /**
@@ -19,12 +22,18 @@ public final class Detector implements AutoCloseable {
   private final Map<String, Double> values = new HashMap<>();
   private final Map<String, ChannelState> channels = new HashMap<>();
   private final Map<MovingAverage, MovingAverage.Window> windows = new IdentityHashMap<>();
+  private final Map<String, Long> lastEnd = new HashMap<>();
+  private final Map<String, Long> lastConfirmed = new HashMap<>();
+  private final Set<String> running = new HashSet<>();
   private long samples;
   private long lastTimestamp;
+  private long now;
   private boolean closed;
 
   private Detector(Builder b) {
     listener = b.listener;
+    lastEnd.putAll(b.historyEnd);
+    lastConfirmed.putAll(b.historyConfirmed);
     rules = new ArrayList<>();
     b.rules.forEach((name, rb) -> {
       rules.add(new Rule(name, rb));
@@ -64,6 +73,7 @@ public final class Detector implements AutoCloseable {
     });
     values.putAll(channelValues);
     channelValues.forEach((channel, v) -> channel(channel).add(timestamp, v));
+    now = timestamp;
     Long previous = samples == 0 ? null : lastTimestamp;
     for (Rule rule : rules) rule.step(this, timestamp, previous);
     lastTimestamp = timestamp;
@@ -81,6 +91,33 @@ public final class Detector implements AutoCloseable {
   /** Current (held) values of all Channels that have received one. */
   Map<String, Double> values() {
     return values;
+  }
+
+  /** Timestamp of the Sample being processed. */
+  long now() {
+    return now;
+  }
+
+  void confirmed(String event, long timestamp) {
+    running.add(event);
+    lastConfirmed.put(event, timestamp);
+  }
+
+  void ended(String event, long end) {
+    running.remove(event);
+    lastEnd.put(event, end);
+  }
+
+  boolean isRunning(String event) {
+    return running.contains(event);
+  }
+
+  Long lastEnd(String event) {
+    return lastEnd.get(event);
+  }
+
+  Long lastConfirmed(String event) {
+    return lastConfirmed.get(event);
   }
 
   ChannelState channel(String name) {
@@ -112,6 +149,8 @@ public final class Detector implements AutoCloseable {
   public static final class Builder {
     private final Map<String, RuleBuilder> rules = new java.util.LinkedHashMap<>();
     private EventListener listener = new EventListener() {};
+    private final Map<String, Long> historyEnd = new HashMap<>();
+    private final Map<String, Long> historyConfirmed = new HashMap<>();
 
     private Builder() {}
 
@@ -130,7 +169,45 @@ public final class Detector implements AutoCloseable {
       return this;
     }
 
+    /**
+     * Supplies Events known from before this Detector started (e.g. stored before a restart), so
+     * that {@link Conditions#after} and {@link After#unless} see them. They are not reported to
+     * the listener. Their confirmation time is taken to be their start.
+     */
+    public Builder history(Collection<Event> events) {
+      for (Event e : events) {
+        if (e.end().isEmpty()) {
+          throw new IllegalArgumentException("History Event " + e.name() + " has not Ended");
+        }
+        historyEnd.merge(e.name(), e.end().getAsLong(), Math::max);
+        historyConfirmed.merge(e.name(), e.start(), Math::max);
+      }
+      return this;
+    }
+
+    /**
+     * @throws IllegalArgumentException if a Rule references itself or a Rule declared after it
+     */
     public Detector build() {
+      List<String> names = new ArrayList<>(rules.keySet());
+      for (int i = 0; i < names.size(); i++) {
+        String rule = names.get(i);
+        List<String> later = names.subList(i, names.size());
+        RuleBuilder rb = rules.get(rule);
+        for (Condition c : new Condition[] {rb.when, rb.endWhen}) {
+          if (c == null) continue;
+          c.visit(node -> {
+            List<String> refs = node instanceof During du ? List.of(du.name)
+                : node instanceof After af ? af.referencedEvents() : List.of();
+            for (String ref : refs) {
+              if (later.contains(ref)) {
+                throw new IllegalArgumentException("Rule " + rule + " references " + ref
+                    + ", which is not declared before it");
+              }
+            }
+          });
+        }
+      }
       return new Detector(this);
     }
   }

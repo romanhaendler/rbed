@@ -109,6 +109,7 @@ final class Rule {
     if (count >= whenSamples && now - start >= whenMillis) {
       state = State.CONFIRMED;
       inEndPhase = false;
+      d.confirmed(name, now);
       d.listener.onConfirmed(snapshot(OptionalLong.empty(), false));
     }
   }
@@ -120,6 +121,7 @@ final class Rule {
 
   private void end(Detector d, long end, boolean truncated) {
     state = State.IDLE;
+    d.ended(name, end);
     Event ended = snapshot(OptionalLong.of(end), truncated);
     Map<String, Object> values = new LinkedHashMap<>();
     attributes.forEach((key, fn) -> values.put(key, fn.apply(ended)));
