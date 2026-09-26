@@ -88,7 +88,7 @@ final class Rule {
         if (holds == Truth.TRUE) {
           if (isSample) {
             holding.advance();
-            aggregates.add(aggregated, aggregatedCount);
+            aggregates.add(aggregated, aggregatedCount, now);
           }
           confirmIfReached(now);
         } else {
@@ -129,7 +129,7 @@ final class Rule {
     truncatedStart = !seenFalse;
     holding.begin(now, isSample);
     aggregates.clear();
-    if (isSample) aggregates.add(aggregated, aggregatedCount);
+    if (isSample) aggregates.add(aggregated, aggregatedCount, now);
     detector.listener.onPending(snapshot(OptionalLong.empty(), false));
     confirmIfReached(now);
   }
@@ -146,7 +146,7 @@ final class Rule {
   private void stepUntilWhenStops(long now, boolean isSample) {
     Truth holds = when.test();
     if (holds == Truth.TRUE) {
-      if (isSample) aggregates.add(aggregated, aggregatedCount);
+      if (isSample) aggregates.add(aggregated, aggregatedCount, now);
     } else {
       finish(now, false);
       stoppedHolding(holds);
@@ -156,7 +156,7 @@ final class Rule {
   private void stepUntilEndCondition(long now, boolean isSample) {
     if (end.test() != Truth.TRUE) {
       leaveEndPhase();
-      if (isSample) aggregates.add(aggregated, aggregatedCount);
+      if (isSample) aggregates.add(aggregated, aggregatedCount, now);
       return;
     }
     if (!inEndPhase) {
@@ -166,7 +166,7 @@ final class Rule {
     } else if (isSample) {
       ending.advance();
     }
-    if (isSample) endPhaseAggregates.add(aggregated, aggregatedCount);
+    if (isSample) endPhaseAggregates.add(aggregated, aggregatedCount, now);
     if (ending.reached(now)) finish(ending.since, false);
   }
 
@@ -179,7 +179,8 @@ final class Rule {
   private void finish(long endTimestamp, boolean truncated) {
     state = State.IDLE;
     events.end(endTimestamp);
-    Event ended = snapshot(OptionalLong.of(confirmedAt), OptionalLong.of(endTimestamp), truncated);
+    Event ended = snapshot(
+        OptionalLong.of(confirmedAt), OptionalLong.of(endTimestamp), truncated, endTimestamp);
     if (!attributes.isEmpty()) {
       Map<String, Object> values = new LinkedHashMap<>();
       for (Map.Entry<String, Function<Event, Object>> a : attributes.entrySet()) {
@@ -190,14 +191,16 @@ final class Rule {
     detector.ended(ended);
   }
 
+  /** A Pending, Confirmed or Discarded Event, with Aggregates up to the current moment. */
   private Event snapshot(OptionalLong end, boolean truncatedEnd) {
     OptionalLong confirmed =
         state == State.CONFIRMED ? OptionalLong.of(confirmedAt) : OptionalLong.empty();
-    return snapshot(confirmed, end, truncatedEnd);
+    return snapshot(confirmed, end, truncatedEnd, detector.now());
   }
 
-  private Event snapshot(OptionalLong confirmed, OptionalLong end, boolean truncatedEnd) {
+  private Event snapshot(
+      OptionalLong confirmed, OptionalLong end, boolean truncatedEnd, long aggregatesUntil) {
     return new Event(name, holding.since, confirmed, end, truncatedStart, truncatedEnd,
-        aggregates.snapshot(aggregated, aggregatedCount), Map.of());
+        aggregates.snapshot(aggregated, aggregatedCount, aggregatesUntil), Map.of());
   }
 }

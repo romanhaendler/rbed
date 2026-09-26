@@ -48,6 +48,6 @@ class PulseChannelTest {
     d.push(1, Map.of("x", 1.0));
     d.push(2, Map.of("x", 1.0, "p", 6.0));
     d.push(3, Map.of("x", 0.0));
-    assertEquals(new Aggregates(4, 6, 5, 2), rec.ended.get(0).aggregates("p"));
+    assertEquals(Recorder.stats(4, 6, 5, 2), Recorder.stats(rec.ended.get(0).aggregates("p")));
   }
 }

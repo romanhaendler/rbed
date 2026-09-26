@@ -4,8 +4,8 @@
 
 **Blocked by:** 01 (Aggregates only for the Channels a Rule uses)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Worked examples with irregular sampling for both values
-- [ ] Correct with End Conditions (end phase excluded, and merged back when it resets), Truncated ends and advances
-- [ ] Zero-span Events give NaN time-weighted mean
+- [x] Worked examples with irregular sampling for both values
+- [x] Correct with End Conditions (end phase excluded, and merged back when it resets), Truncated ends and advances
+- [x] Zero-span Events give NaN time-weighted mean

@@ -23,9 +23,9 @@ class AggregatesTest {
     d.push(3, Map.of("weight", 650.0));
     d.push(4, Map.of("weight", 100.0, "height", 9.0));
     Event e = rec.ended.get(0);
-    assertEquals(new Aggregates(600, 700, 650, 3), e.aggregates("weight"));
+    assertEquals(Recorder.stats(600, 700, 650, 3), Recorder.stats(e.aggregates("weight")));
     // height is held at 1 for the Sample at 1, then 5 for the Samples at 2 and 3
-    assertEquals(new Aggregates(1, 5, 11.0 / 3, 3), e.aggregates("height"));
+    assertEquals(Recorder.stats(1, 5, 11.0 / 3, 3), Recorder.stats(e.aggregates("height")));
   }
 
   @Test
@@ -49,7 +49,7 @@ class AggregatesTest {
         .listener(rec).build();
     double[] ws = {0, 600, 300, 40, 600, 30, 20};
     for (int i = 0; i < ws.length; i++) d.push(i, Map.of("weight", ws[i]));
-    assertEquals(new Aggregates(40, 600, 385, 4), rec.ended.get(0).aggregates("weight"));
+    assertEquals(Recorder.stats(40, 600, 385, 4), Recorder.stats(rec.ended.get(0).aggregates("weight")));
   }
 
   @Test
@@ -60,7 +60,7 @@ class AggregatesTest {
     d.push(0, Map.of("weight", 600.0));
     d.push(1, Map.of("weight", 800.0));
     d.close();
-    assertEquals(new Aggregates(600, 800, 700, 2), rec.ended.get(0).aggregates("weight"));
+    assertEquals(Recorder.stats(600, 800, 700, 2), Recorder.stats(rec.ended.get(0).aggregates("weight")));
   }
 
   @Test
@@ -74,7 +74,7 @@ class AggregatesTest {
     d.push(0, Map.of("weight", 0.0));
     d.push(1, Map.of("weight", 600.0));
     d.push(2, Map.of("weight", 800.0));
-    assertEquals(new Aggregates(600, 800, 700, 2), confirmed.get(0).aggregates("weight"));
+    assertEquals(Recorder.stats(600, 800, 700, 2), Recorder.stats(confirmed.get(0).aggregates("weight")));
   }
 
   @Test

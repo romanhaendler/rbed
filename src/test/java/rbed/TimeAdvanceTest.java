@@ -78,7 +78,7 @@ class TimeAdvanceTest {
     assertEquals(List.of("pending E 10"), rec.log);
     d.push(40, Map.of("x", 7.0));
     d.push(50, Map.of("x", 0.0));
-    assertEquals(new Aggregates(5, 7, 6, 2), rec.ended.get(0).aggregates("x"));
+    assertEquals(Recorder.stats(5, 7, 6, 2), Recorder.stats(rec.ended.get(0).aggregates("x")));
   }
 
   @Test
