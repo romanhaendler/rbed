@@ -4,9 +4,9 @@
 
 **Blocked by:** 01 (Aggregates only for the Channels a Rule uses), 02 (Arithmetic on Expressions)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Values of a running Event update as it runs; after it Ends they stay until the next one is Confirmed
-- [ ] Undefined before any Confirmed Event; History gives `duration()` but no channel values
-- [ ] Self/forward references rejected at build
-- [ ] Partial set-down crane test
+- [x] Values of a running Event update as it runs; after it Ends they stay until the next one is Confirmed
+- [x] Undefined before any Confirmed Event; History gives `duration()` but no channel values
+- [x] Self/forward references rejected at build
+- [x] Partial set-down crane test

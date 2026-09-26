@@ -100,6 +100,18 @@ final class Accumulator {
         span > 0 ? valueMillis / span : Double.NaN, valueMillis / 1000);
   }
 
+  enum Statistic { MIN, MAX, MEAN }
+
+  /** A Sample-based statistic of Channel {@code i}; NaN if it had no value. */
+  double statistic(int i, Statistic statistic) {
+    if (i >= count.length || count[i] == 0) return Double.NaN;
+    return switch (statistic) {
+      case MIN -> min[i];
+      case MAX -> max[i];
+      case MEAN -> sum[i] / count[i];
+    };
+  }
+
   private void grow(int n) {
     int old = count.length;
     min = Arrays.copyOf(min, n);

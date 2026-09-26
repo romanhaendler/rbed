@@ -13,6 +13,9 @@ final class EventState {
   long lastConfirmed;
   /** Events Confirmed so far. */
   long count;
+  /** The Rule producing these Events; null for names only known from History. */
+  Rule producer;
+  private long lastDuration;
   private long runningStart;
   private long endedDuration;
   /** Confirmation times within the largest window any count(...).within(...) needs. */
@@ -35,14 +38,18 @@ final class EventState {
     confirmed = false;
     hasEnded = true;
     lastEnd = timestamp;
-    endedDuration += timestamp - runningStart;
+    lastDuration = timestamp - runningStart;
+    endedDuration += lastDuration;
   }
 
   /** Records an Ended Event from History; History must be given in order of confirmation. */
   void remember(Event event) {
     long end = event.end().getAsLong();
     recordConfirmation(event.confirmed().getAsLong());
-    lastEnd = hasEnded ? Math.max(lastEnd, end) : end;
+    if (!hasEnded || end >= lastEnd) {
+      lastEnd = end;
+      lastDuration = end - event.start();
+    }
     hasEnded = true;
     endedDuration += end - event.start();
   }
@@ -51,6 +58,12 @@ final class EventState {
   int confirmedWithin(long now, long window) {
     confirmations.dropOlderThan(now, countWindow);
     return confirmations.countWithin(now, window);
+  }
+
+  /** Duration of the latest Confirmed Event, running up to {@code now}; NaN if there is none. */
+  double latestDuration(long now) {
+    if (confirmed) return now - runningStart;
+    return hasEnded ? lastDuration : Double.NaN;
   }
 
   /** Summed duration of all Ended Events plus the running one up to {@code now}. */

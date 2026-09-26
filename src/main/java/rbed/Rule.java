@@ -26,7 +26,10 @@ final class Rule {
   /** The Channels this Rule aggregates; the first {@link #aggregatedCount} are used. */
   private ChannelState[] aggregated = new ChannelState[4];
   private int aggregatedCount;
-  private final Accumulator aggregates = new Accumulator();
+  private Accumulator aggregates = new Accumulator();
+  /** Aggregates of the latest Ended Event, for {@link LatestEvent}; swapped, never copied. */
+  private Accumulator latestEnded = new Accumulator();
+  private boolean hasEnded;
   private final Accumulator endPhaseAggregates = new Accumulator();
 
   private State state = State.IDLE;
@@ -43,6 +46,7 @@ final class Rule {
     this.detector = detector;
     this.name = name;
     this.events = detector.event(name);
+    events.producer = this;
     detector.recordChannelLookups();
     this.when = spec.when.condition().bind(detector);
     this.holding = new Progress(spec.when);
@@ -62,6 +66,12 @@ final class Rule {
     }
     aggregated[aggregatedCount] = channel;
     return aggregatedCount++;
+  }
+
+  /** A statistic of the latest Confirmed Event, running or Ended; NaN if there is none. */
+  double latest(int channelIndex, Accumulator.Statistic statistic) {
+    if (state == State.CONFIRMED) return aggregates.statistic(channelIndex, statistic);
+    return hasEnded ? latestEnded.statistic(channelIndex, statistic) : Double.NaN;
   }
 
   /**
@@ -188,6 +198,10 @@ final class Rule {
       }
       ended = ended.withAttributes(Collections.unmodifiableMap(values));
     }
+    Accumulator spare = latestEnded;
+    latestEnded = aggregates;
+    aggregates = spare; // cleared when the next Event begins
+    hasEnded = true;
     detector.ended(ended);
   }
 

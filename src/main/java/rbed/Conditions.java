@@ -49,4 +49,12 @@ public final class Conditions {
       }
     };
   }
+
+  /**
+   * Values of the most recent Confirmed Event with the given name, running or Ended, such as
+   * {@code latest("LoadLifted").max("weight")}.
+   */
+  public static LatestEvent latest(String eventName) {
+    return new LatestEvent(eventName);
+  }
 }
