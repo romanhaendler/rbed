@@ -2,7 +2,6 @@ package rbed;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
 import java.util.function.Function;
@@ -23,7 +22,6 @@ final class Rule {
   private final Progress ending;
   private final long maxGap;
   private final Map<String, Function<Event, Object>> attributes;
-  private final List<ChannelState> channels;
   private final Accumulator aggregates = new Accumulator();
   private final Accumulator endPhaseAggregates = new Accumulator();
 
@@ -47,7 +45,6 @@ final class Rule {
     this.ending = spec.end == null ? null : new Progress(spec.end);
     this.maxGap = spec.maxGap;
     this.attributes = new LinkedHashMap<>(spec.attributes);
-    this.channels = detector.channels();
   }
 
   /**
@@ -71,7 +68,7 @@ final class Rule {
         Truth holds = when.test();
         if (holds == Truth.TRUE) {
           holding.advance();
-          aggregates.add(channels);
+          aggregates.add(detector.channels(), detector.channelCount());
           confirmIfReached(now);
         } else {
           discard();
@@ -111,7 +108,7 @@ final class Rule {
     truncatedStart = !seenFalse;
     holding.begin(now);
     aggregates.clear();
-    aggregates.add(channels);
+    aggregates.add(detector.channels(), detector.channelCount());
     detector.listener.onPending(snapshot(OptionalLong.empty(), false));
     confirmIfReached(now);
   }
@@ -128,7 +125,7 @@ final class Rule {
   private void stepUntilWhenStops(long now) {
     Truth holds = when.test();
     if (holds == Truth.TRUE) {
-      aggregates.add(channels);
+      aggregates.add(detector.channels(), detector.channelCount());
     } else {
       finish(now, false);
       stoppedHolding(holds);
@@ -138,7 +135,7 @@ final class Rule {
   private void stepUntilEndCondition(long now) {
     if (end.test() != Truth.TRUE) {
       leaveEndPhase();
-      aggregates.add(channels);
+      aggregates.add(detector.channels(), detector.channelCount());
       return;
     }
     if (inEndPhase) {
@@ -148,7 +145,7 @@ final class Rule {
       ending.begin(now);
       endPhaseAggregates.clear();
     }
-    endPhaseAggregates.add(channels);
+    endPhaseAggregates.add(detector.channels(), detector.channelCount());
     if (ending.reached(now)) finish(ending.since, false);
   }
 
@@ -180,6 +177,6 @@ final class Rule {
 
   private Event snapshot(OptionalLong confirmed, OptionalLong end, boolean truncatedEnd) {
     return new Event(name, holding.since, confirmed, end, truncatedStart, truncatedEnd,
-        aggregates.snapshot(channels), Map.of());
+        aggregates.snapshot(detector.channels()), Map.of());
   }
 }

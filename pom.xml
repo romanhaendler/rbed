@@ -13,6 +13,9 @@
   <properties>
     <maven.compiler.release>17</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <!-- Timing-based tests are opt-in: mvn test -Pperformance -->
+    <surefire.excludedGroups>performance</surefire.excludedGroups>
+    <surefire.groups></surefire.groups>
   </properties>
 
   <dependencies>
@@ -30,12 +33,41 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
         <version>3.13.0</version>
+        <executions>
+          <execution>
+            <id>default-testCompile</id>
+            <configuration>
+              <compilerArgs>
+                <arg>--add-modules</arg>
+                <arg>jdk.management</arg>
+                <arg>--add-reads</arg>
+                <arg>rbed=jdk.management,java.management</arg>
+              </compilerArgs>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <version>3.5.2</version>
+        <configuration>
+          <groups>${surefire.groups}</groups>
+          <excludedGroups>${surefire.excludedGroups}</excludedGroups>
+          <!-- lets the performance tests measure allocations via the platform MXBean -->
+          <argLine>--add-modules jdk.management --add-reads rbed=jdk.management,java.management</argLine>
+        </configuration>
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <id>performance</id>
+      <properties>
+        <surefire.excludedGroups></surefire.excludedGroups>
+        <surefire.groups>performance</surefire.groups>
+      </properties>
+    </profile>
+  </profiles>
 </project>

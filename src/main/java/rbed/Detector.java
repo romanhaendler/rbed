@@ -1,6 +1,7 @@
 package rbed;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -23,7 +24,9 @@ public final class Detector implements AutoCloseable {
   final EventListener listener;
   private final double samplingRate;
   private final Map<String, ChannelState> channelsByName = new HashMap<>();
-  private final List<ChannelState> channels = new ArrayList<>();
+  /** All Channels in the order they became known; the first {@link #channelCount} are used. */
+  private ChannelState[] channels = new ChannelState[8];
+  private int channelCount;
   private final Map<String, EventState> events = new HashMap<>();
   private final boolean hasHistory;
   private final long latestHistoryEnd;
@@ -156,9 +159,13 @@ public final class Detector implements AutoCloseable {
     listener.onEnded(event);
   }
 
-  /** All Channels, in the order they became known; index-aligned with {@link Accumulator}. */
-  List<ChannelState> channels() {
+  /** All Channels in the order they became known, index-aligned with {@link Accumulator}. */
+  ChannelState[] channels() {
     return channels;
+  }
+
+  int channelCount() {
+    return channelCount;
   }
 
   ChannelState channel(String name) {
@@ -166,7 +173,8 @@ public final class Detector implements AutoCloseable {
     if (state == null) {
       state = new ChannelState(name);
       channelsByName.put(name, state);
-      channels.add(state);
+      if (channelCount == channels.length) channels = Arrays.copyOf(channels, channelCount * 2);
+      channels[channelCount++] = state;
     }
     return state;
   }
