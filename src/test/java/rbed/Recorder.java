@@ -8,6 +8,11 @@ final class Recorder implements EventListener {
   final List<String> log = new ArrayList<>();
   final List<Event> ended = new ArrayList<>();
 
+  /** Only the "ended ..." lines of the log. */
+  List<String> endedLines() {
+    return log.stream().filter(line -> line.startsWith("ended")).toList();
+  }
+
   @Override public void onPending(Event e) { log.add("pending " + e.name() + " " + e.start()); }
   @Override public void onConfirmed(Event e) { log.add("confirmed " + e.name() + " " + e.start()); }
   @Override public void onDiscarded(Event e) { log.add("discarded " + e.name() + " " + e.start()); }

@@ -2,79 +2,154 @@ package rbed;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
 import java.util.function.Function;
 
-/** Runtime state machine of one Rule inside one Detector. */
+/**
+ * Runtime state machine of one Rule inside one Detector. Evaluates its {@code when} Condition at
+ * most once per Sample.
+ */
 final class Rule {
   private enum State { IDLE, PENDING, CONFIRMED }
 
+  private final Detector detector;
   private final String name;
-  private final Condition when;
-  private final int whenSamples;
-  private final long whenMillis;
-  private final Condition endWhen;
-  private final int endSamples;
-  private final long endMillis;
+  private final EventState events;
+  private final Condition.Bound when;
+  private final Progress holding;
+  private final Condition.Bound end;
+  private final Progress ending;
   private final long maxGap;
   private final Map<String, Function<Event, Object>> attributes;
+  private final List<ChannelState> channels;
+  private final Accumulator aggregates = new Accumulator();
+  private final Accumulator endPhaseAggregates = new Accumulator();
 
   private State state = State.IDLE;
-  private long start;
-  private int count;
+  /** {@code when} has stopped holding since the last Event started, so a new one may start. */
+  private boolean armed = true;
+  /** {@code when} was seen false since observation began or resumed after a gap. */
+  private boolean seenFalse;
   private boolean truncatedStart;
+  private long confirmedAt;
   private boolean inEndPhase;
-  private long endPhaseStart;
-  private int endCount;
-  private Accumulator aggregates;
-  private Accumulator endPhaseAggregates;
 
-  Rule(String name, RuleBuilder b) {
+  /** Binds the Rule's Conditions; the Detector must be ready to resolve their references. */
+  Rule(Detector detector, String name, RuleBuilder spec) {
+    this.detector = detector;
     this.name = name;
-    this.when = b.when;
-    this.whenSamples = b.whenSamples;
-    this.whenMillis = b.whenMillis;
-    this.endWhen = b.endWhen;
-    this.endSamples = b.endSamples;
-    this.endMillis = b.endMillis;
-    this.maxGap = b.maxGap;
-    this.attributes = new LinkedHashMap<>(b.attributes);
+    this.events = detector.event(name);
+    this.when = spec.when.condition().bind(detector);
+    this.holding = new Progress(spec.when);
+    this.end = spec.end == null ? null : spec.end.condition().bind(detector);
+    this.ending = spec.end == null ? null : new Progress(spec.end);
+    this.maxGap = spec.maxGap;
+    this.attributes = new LinkedHashMap<>(spec.attributes);
+    this.channels = detector.channels();
   }
 
   /**
-   * @param previous timestamp of the previous Sample, or null for the Detector's first Sample
+   * Processes the current Sample.
+   *
+   * @param previous timestamp of the previous Sample; ignored when {@code first}
    */
-  void step(Detector d, long now, Long previous) {
-    if (previous != null && now - previous > maxGap) close(d, previous);
-    if (state == State.CONFIRMED) stepConfirmed(d, now);
-    if (state == State.PENDING) {
-      if (holds(when, d)) {
-        count++;
-        aggregates.add(d.values());
-        confirmIfReady(d, now);
-      } else {
-        discard(d);
+  void step(long now, long previous, boolean first) {
+    if (!first && now - previous > maxGap) {
+      close(previous);
+      armed = true;
+      seenFalse = false;
+    }
+    switch (state) {
+      case IDLE -> {
+        Truth holds = when.test();
+        if (holds != Truth.TRUE) stoppedHolding(holds);
+        else if (armed) begin(now);
       }
-    } else if (state == State.IDLE && holds(when, d)) {
-      state = State.PENDING;
-      start = now;
-      count = 1;
-      truncatedStart = previous == null;
-      aggregates = new Accumulator();
-      aggregates.add(d.values());
-      d.listener.onPending(snapshot(OptionalLong.empty(), false));
-      confirmIfReady(d, now);
+      case PENDING -> {
+        Truth holds = when.test();
+        if (holds == Truth.TRUE) {
+          holding.advance();
+          aggregates.add(channels);
+          confirmIfReached(now);
+        } else {
+          discard();
+          stoppedHolding(holds);
+        }
+      }
+      case CONFIRMED -> {
+        if (end == null) stepUntilWhenStops(now);
+        else stepUntilEndCondition(now);
+      }
     }
   }
 
   /** Stops observation: Discards a Pending Event and truncates a Confirmed one at {@code last}. */
-  void close(Detector d, long last) {
-    if (state == State.PENDING) discard(d);
-    if (state == State.CONFIRMED) {
+  void close(long last) {
+    if (state == State.PENDING) {
+      discard();
+    } else if (state == State.CONFIRMED) {
       leaveEndPhase();
-      end(d, last, true);
+      finish(last, true);
     }
+  }
+
+  private void discard() {
+    state = State.IDLE;
+    detector.listener.onDiscarded(snapshot(OptionalLong.empty(), false));
+  }
+
+  private void stoppedHolding(Truth holds) {
+    armed = true;
+    if (holds == Truth.FALSE) seenFalse = true;
+  }
+
+  private void begin(long now) {
+    state = State.PENDING;
+    armed = false;
+    truncatedStart = !seenFalse;
+    holding.begin(now);
+    aggregates.clear();
+    aggregates.add(channels);
+    detector.listener.onPending(snapshot(OptionalLong.empty(), false));
+    confirmIfReached(now);
+  }
+
+  private void confirmIfReached(long now) {
+    if (!holding.reached(now)) return;
+    state = State.CONFIRMED;
+    confirmedAt = now;
+    inEndPhase = false;
+    events.confirm(now);
+    detector.listener.onConfirmed(snapshot(OptionalLong.empty(), false));
+  }
+
+  private void stepUntilWhenStops(long now) {
+    Truth holds = when.test();
+    if (holds == Truth.TRUE) {
+      aggregates.add(channels);
+    } else {
+      finish(now, false);
+      stoppedHolding(holds);
+    }
+  }
+
+  private void stepUntilEndCondition(long now) {
+    if (end.test() != Truth.TRUE) {
+      leaveEndPhase();
+      aggregates.add(channels);
+      return;
+    }
+    if (inEndPhase) {
+      ending.advance();
+    } else {
+      inEndPhase = true;
+      ending.begin(now);
+      endPhaseAggregates.clear();
+    }
+    endPhaseAggregates.add(channels);
+    if (ending.reached(now)) finish(ending.since, false);
   }
 
   /** The End Condition stopped holding: its Samples belong to the Event after all. */
@@ -83,57 +158,28 @@ final class Rule {
     inEndPhase = false;
   }
 
-  private void stepConfirmed(Detector d, long now) {
-    if (endWhen == null) {
-      if (holds(when, d)) aggregates.add(d.values());
-      else end(d, now, false);
-      return;
-    }
-    if (!holds(endWhen, d)) {
-      leaveEndPhase();
-      aggregates.add(d.values());
-      return;
-    }
-    if (!inEndPhase) {
-      inEndPhase = true;
-      endPhaseStart = now;
-      endCount = 0;
-      endPhaseAggregates = new Accumulator();
-    }
-    endCount++;
-    endPhaseAggregates.add(d.values());
-    if (endCount >= endSamples && now - endPhaseStart >= endMillis) end(d, endPhaseStart, false);
-  }
-
-  private void confirmIfReady(Detector d, long now) {
-    if (count >= whenSamples && now - start >= whenMillis) {
-      state = State.CONFIRMED;
-      inEndPhase = false;
-      d.confirmed(name, now);
-      d.listener.onConfirmed(snapshot(OptionalLong.empty(), false));
-    }
-  }
-
-  private void discard(Detector d) {
+  private void finish(long endTimestamp, boolean truncated) {
     state = State.IDLE;
-    d.listener.onDiscarded(snapshot(OptionalLong.empty(), false));
-  }
-
-  private void end(Detector d, long end, boolean truncated) {
-    state = State.IDLE;
-    Event ended = snapshot(OptionalLong.of(end), truncated);
-    Map<String, Object> values = new LinkedHashMap<>();
-    attributes.forEach((key, fn) -> values.put(key, fn.apply(ended)));
-    d.ended(new Event(ended.name(), ended.start(), ended.end(), ended.truncatedStart(),
-        ended.truncatedEnd(), ended.aggregates(), Collections.unmodifiableMap(values)));
-  }
-
-  private static boolean holds(Condition c, Detector d) {
-    return Boolean.TRUE.equals(c.test(d));
+    events.end(endTimestamp);
+    Event ended = snapshot(OptionalLong.of(confirmedAt), OptionalLong.of(endTimestamp), truncated);
+    if (!attributes.isEmpty()) {
+      Map<String, Object> values = new LinkedHashMap<>();
+      for (Map.Entry<String, Function<Event, Object>> a : attributes.entrySet()) {
+        values.put(a.getKey(), a.getValue().apply(ended));
+      }
+      ended = ended.withAttributes(Collections.unmodifiableMap(values));
+    }
+    detector.ended(ended);
   }
 
   private Event snapshot(OptionalLong end, boolean truncatedEnd) {
-    return new Event(
-        name, start, end, truncatedStart, truncatedEnd, aggregates.snapshot(), Map.of());
+    OptionalLong confirmed =
+        state == State.CONFIRMED ? OptionalLong.of(confirmedAt) : OptionalLong.empty();
+    return snapshot(confirmed, end, truncatedEnd);
+  }
+
+  private Event snapshot(OptionalLong confirmed, OptionalLong end, boolean truncatedEnd) {
+    return new Event(name, holding.since, confirmed, end, truncatedStart, truncatedEnd,
+        aggregates.snapshot(channels), Map.of());
   }
 }

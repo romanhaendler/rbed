@@ -15,7 +15,7 @@ class ConditionVocabularyTest {
     Detector d = Detector.builder().rule("E", r -> r.when(c)).listener(rec).build();
     for (int i = 0; i < xs.length; i++) d.push(i, Map.of("x", xs[i]));
     d.close();
-    return rec.log.stream().filter(s -> s.startsWith("ended")).toList();
+    return rec.endedLines();
   }
 
   @Test

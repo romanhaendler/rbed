@@ -61,4 +61,22 @@ class DurationTest {
     d.close();
     assertEquals(List.of("pending E 1", "discarded E 1"), rec.log);
   }
+
+  @Test
+  void startIsTruncatedUntilTheConditionWasSeenFalse() {
+    Detector d = detector(r -> r.when(channel("x").above(0)));
+    d.push(0, Map.of("y", 1.0)); // x unknown: the Event may already be in progress
+    d.push(1, Map.of("x", 5.0));
+    d.close();
+    assertEquals("ended E 1..1 truncatedStart truncatedEnd", rec.log.get(2));
+  }
+
+  @Test
+  void startAfterAGapIsTruncated() {
+    Detector d = detector(r -> r.when(channel("x").above(0)).maxGap(10));
+    d.push(0, Map.of("x", 0.0));
+    d.push(100, Map.of("x", 5.0)); // became true at some point during the gap
+    d.push(101, Map.of("x", 0.0));
+    assertEquals("ended E 100..101 truncatedStart", rec.log.get(2));
+  }
 }

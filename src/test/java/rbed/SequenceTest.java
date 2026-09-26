@@ -15,7 +15,7 @@ class SequenceTest {
   final Recorder rec = new Recorder();
 
   List<String> ended() {
-    return rec.log.stream().filter(s -> s.startsWith("ended")).toList();
+    return rec.endedLines();
   }
 
   @Test
@@ -92,8 +92,7 @@ class SequenceTest {
 
   @Test
   void historyEnablesAfterFromTheFirstSampleAndIsNotReported() {
-    Event maintenance = new Event("Maintenance", -80, OptionalLong.of(-50), false, false,
-        Map.of(), Map.of());
+    Event maintenance = ended("Maintenance", -80, -70, -50);
     Detector d = Detector.builder()
         .rule("Start", r -> r.when(after("Maintenance").within(100)))
         .history(List.of(maintenance))
@@ -106,8 +105,37 @@ class SequenceTest {
 
   @Test
   void historyEventsMustHaveEnded() {
-    Event running = new Event("M", 0, OptionalLong.empty(), false, false, Map.of(), Map.of());
+    Event running = new Event("M", 0, OptionalLong.of(0), OptionalLong.empty(), false, false,
+        Map.of(), Map.of());
     assertThrows(IllegalArgumentException.class,
         () -> Detector.builder().history(List.of(running)));
+  }
+
+  static Event ended(String name, long start, long confirmed, long end) {
+    return new Event(name, start, OptionalLong.of(confirmed), OptionalLong.of(end), false, false,
+        Map.of(), Map.of());
+  }
+
+  @Test
+  void historyMustHaveEndedBeforeTheFirstSample() {
+    Detector d = Detector.builder()
+        .rule("B", r -> r.when(after("A")))
+        .history(List.of(ended("A", 0, 10, 5000))).build();
+    assertThrows(IllegalArgumentException.class, () -> d.push(1000, Map.of()));
+  }
+
+  @Test
+  void historyUnlessUsesConfirmationTime() {
+    Event a = ended("A", 0, 0, 100);
+    Condition bAfterA = after("A").unless("C");
+    Detector blocked = Detector.builder().rule("B", r -> r.when(bAfterA))
+        .history(List.of(a, ended("C", 50, 150, 300))).listener(rec).build();
+    blocked.push(400, Map.of());
+    assertEquals(List.of(), rec.log);
+
+    Detector notBlocked = Detector.builder().rule("B", r -> r.when(bAfterA))
+        .history(List.of(a, ended("C", 50, 60, 300))).listener(rec).build();
+    notBlocked.push(400, Map.of());
+    assertEquals(List.of("pending B 400", "confirmed B 400"), rec.log);
   }
 }

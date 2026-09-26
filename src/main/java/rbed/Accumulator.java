@@ -1,43 +1,63 @@
 package rbed;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
-/** Running per-Channel min/max/sum/count with constant memory per Channel. */
+/**
+ * Running per-Channel minimum, maximum, sum and count over the Samples of one Event. Indexed like
+ * the Detector's Channel list, so adding a Sample neither looks anything up nor allocates.
+ */
 final class Accumulator {
-  private final Map<String, double[]> stats = new LinkedHashMap<>(); // min, max, sum, count
+  private double[] min = new double[0];
+  private double[] max = new double[0];
+  private double[] sum = new double[0];
+  private long[] count = new long[0];
 
-  void add(Map<String, Double> values) {
-    values.forEach((channel, v) -> {
-      double[] s = stats.get(channel);
-      if (s == null) {
-        stats.put(channel, new double[] {v, v, v, 1});
-      } else {
-        s[0] = Math.min(s[0], v);
-        s[1] = Math.max(s[1], v);
-        s[2] += v;
-        s[3]++;
-      }
-    });
+  /** Adds the current value of every Channel that has one. */
+  void add(List<ChannelState> channels) {
+    ensureCapacity(channels.size());
+    for (int i = 0; i < channels.size(); i++) {
+      double v = channels.get(i).value;
+      if (!Double.isNaN(v)) include(i, v, v, v, 1);
+    }
   }
 
   void addAll(Accumulator other) {
-    other.stats.forEach((channel, o) -> {
-      double[] s = stats.get(channel);
-      if (s == null) {
-        stats.put(channel, o.clone());
-      } else {
-        s[0] = Math.min(s[0], o[0]);
-        s[1] = Math.max(s[1], o[1]);
-        s[2] += o[2];
-        s[3] += o[3];
-      }
-    });
+    ensureCapacity(other.count.length);
+    for (int i = 0; i < other.count.length; i++) {
+      if (other.count[i] > 0) include(i, other.min[i], other.max[i], other.sum[i], other.count[i]);
+    }
   }
 
-  Map<String, Aggregates> snapshot() {
+  void clear() {
+    Arrays.fill(sum, 0);
+    Arrays.fill(count, 0);
+  }
+
+  Map<String, Aggregates> snapshot(List<ChannelState> channels) {
     Map<String, Aggregates> out = new LinkedHashMap<>();
-    stats.forEach((c, s) -> out.put(c, new Aggregates(s[0], s[1], s[2] / s[3], (long) s[3])));
+    for (int i = 0; i < count.length; i++) {
+      if (count[i] > 0) {
+        out.put(channels.get(i).name, new Aggregates(min[i], max[i], sum[i] / count[i], count[i]));
+      }
+    }
     return Map.copyOf(out);
+  }
+
+  private void include(int i, double lowest, double highest, double total, long n) {
+    min[i] = count[i] == 0 ? lowest : Math.min(min[i], lowest);
+    max[i] = count[i] == 0 ? highest : Math.max(max[i], highest);
+    sum[i] += total;
+    count[i] += n;
+  }
+
+  private void ensureCapacity(int channels) {
+    if (channels <= count.length) return;
+    min = Arrays.copyOf(min, channels);
+    max = Arrays.copyOf(max, channels);
+    sum = Arrays.copyOf(sum, channels);
+    count = Arrays.copyOf(count, channels);
   }
 }

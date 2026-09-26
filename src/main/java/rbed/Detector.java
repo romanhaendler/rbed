@@ -3,11 +3,11 @@ package rbed;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.function.UnaryOperator;
 
@@ -17,39 +17,47 @@ import java.util.function.UnaryOperator;
  * data stream.
  */
 public final class Detector implements AutoCloseable {
+  /** Timestamps have millisecond resolution, so faster sampling would repeat timestamps. */
+  static final double MAX_SAMPLING_RATE = 1000;
+
   final EventListener listener;
-  private final List<Rule> rules;
-  private final Map<String, Double> values = new HashMap<>();
-  private final Map<String, ChannelState> channels = new HashMap<>();
-  private final Map<MovingAverage, MovingAverage.Window> windows = new IdentityHashMap<>();
-  private final Map<String, Long> lastEnd = new HashMap<>();
-  private final Map<String, Long> lastConfirmed = new HashMap<>();
-  private final Set<String> running = new HashSet<>();
-  private long samples;
-  private long lastTimestamp;
-  private long now;
-  private boolean closed;
   private final double samplingRate;
+  private final Map<String, ChannelState> channelsByName = new HashMap<>();
+  private final List<ChannelState> channels = new ArrayList<>();
+  private final Map<String, EventState> events = new HashMap<>();
+  private final boolean hasHistory;
+  private final long latestHistoryEnd;
+  private final Rule[] rules;
+  private long now;
+  private long samples;
+  private boolean closed;
   private List<Event> collected;
+
+  /** While binding Rules: the Rule being bound and the names it must not reference. */
+  private String bindingRule;
+  private Set<String> notDeclaredBefore;
 
   private Detector(Builder b) {
     listener = b.listener;
     samplingRate = b.samplingRate;
-    lastEnd.putAll(b.historyEnd);
-    lastConfirmed.putAll(b.historyConfirmed);
-    rules = new ArrayList<>();
-    b.rules.forEach((name, rb) -> {
-      rules.add(new Rule(name, rb));
-      for (Condition c : new Condition[] {rb.when, rb.endWhen}) {
-        if (c != null) c.visit(node -> {
-          if (node instanceof MovingAverage ma && !windows.containsKey(ma)) {
-            MovingAverage.Window w = ma.newWindow();
-            windows.put(ma, w);
-            channel(ma.channel.channel).windows.add(w);
-          }
-        });
-      }
-    });
+    long latest = Long.MIN_VALUE;
+    for (Event e : b.history) {
+      event(e.name()).remember(e);
+      latest = Math.max(latest, e.end().getAsLong());
+    }
+    hasHistory = !b.history.isEmpty();
+    latestHistoryEnd = latest;
+
+    notDeclaredBefore = new HashSet<>(b.rules.keySet());
+    rules = new Rule[b.rules.size()];
+    int i = 0;
+    for (Map.Entry<String, RuleBuilder> rule : b.rules.entrySet()) {
+      bindingRule = rule.getKey();
+      rules[i++] = new Rule(this, rule.getKey(), rule.getValue());
+      notDeclaredBefore.remove(rule.getKey());
+    }
+    notDeclaredBefore = null;
+    bindingRule = null;
   }
 
   public static Builder builder() {
@@ -59,32 +67,34 @@ public final class Detector implements AutoCloseable {
   /**
    * Processes one Sample.
    *
-   * @param timestamp milliseconds; must be strictly greater than the previous Sample's
-   * @param channelValues values of any subset of Channels; must be finite
+   * @param timestamp milliseconds; must be strictly greater than the previous Sample's and than
+   *     the end of every History Event
+   * @param values values of any subset of Channels; must be finite
+   * @throws IllegalStateException if a sampling rate was configured, or after {@link #close}
    */
-  public void push(long timestamp, Map<String, Double> channelValues) {
+  public void push(long timestamp, Map<String, Double> values) {
     if (samplingRate > 0) {
       throw new IllegalStateException("Detector has a sampling rate: push values only");
     }
-    accept(timestamp, channelValues);
+    accept(timestamp, values);
   }
 
   /**
    * Processes one Sample of a regularly sampled series; its timestamp is derived from the
    * sampling rate as {@code round(index * 1000 / hz)}.
    *
-   * @throws IllegalStateException if no sampling rate was configured
+   * @throws IllegalStateException if no sampling rate was configured, or after {@link #close}
    */
-  public void push(Map<String, Double> channelValues) {
-    if (samplingRate <= 0) {
+  public void push(Map<String, Double> values) {
+    if (samplingRate == 0) {
       throw new IllegalStateException("Detector has no sampling rate: push timestamps too");
     }
-    accept(Math.round(samples * 1000 / samplingRate), channelValues);
+    accept(Math.round(samples * 1000 / samplingRate), values);
   }
 
   /**
-   * Runs a whole recorded series through this Detector and closes it. The listener is still
-   * called.
+   * Runs a whole recorded series through this unused Detector and closes it. The listener is
+   * still called.
    *
    * @return all Ended Events in the order they Ended
    */
@@ -97,6 +107,14 @@ public final class Detector implements AutoCloseable {
     return batch(() -> series.forEach(this::push));
   }
 
+  /** Ends running Events as truncated and makes this Detector reject further Samples. */
+  @Override
+  public void close() {
+    if (closed) return;
+    closed = true;
+    if (samples > 0) for (Rule rule : rules) rule.close(now);
+  }
+
   private List<Event> batch(Runnable pushAll) {
     if (samples > 0 || closed) throw new IllegalStateException("Detector has already been used");
     collected = new ArrayList<>();
@@ -105,100 +123,81 @@ public final class Detector implements AutoCloseable {
     return collected;
   }
 
-  private void accept(long timestamp, Map<String, Double> channelValues) {
+  private void accept(long timestamp, Map<String, Double> values) {
     if (closed) throw new IllegalStateException("Detector is closed");
-    if (samples > 0 && timestamp <= lastTimestamp) {
-      throw new IllegalArgumentException(
-          "Timestamp " + timestamp + " is not after previous " + lastTimestamp);
+    boolean first = samples == 0;
+    if (first ? hasHistory && timestamp <= latestHistoryEnd : timestamp <= now) {
+      throw new IllegalArgumentException("Timestamp " + timestamp + " is not after "
+          + (first ? "the end of the History, " + latestHistoryEnd : "the previous one, " + now));
     }
-    channelValues.forEach((channel, v) -> {
-      Objects.requireNonNull(channel, "channel name");
-      if (v == null || !Double.isFinite(v)) {
-        throw new IllegalArgumentException("Value of channel '" + channel + "' is " + v);
+    // validate everything first, so a rejected Sample leaves no trace
+    for (Map.Entry<String, Double> value : values.entrySet()) {
+      Double v = value.getValue();
+      if (value.getKey() == null || v == null || !Double.isFinite(v)) {
+        throw new IllegalArgumentException("Invalid value " + v + " of channel " + value.getKey());
       }
-    });
-    values.putAll(channelValues);
-    channelValues.forEach((channel, v) -> channel(channel).add(timestamp, v));
+    }
+    for (Map.Entry<String, Double> value : values.entrySet()) {
+      channel(value.getKey()).add(timestamp, value.getValue());
+    }
+    long previous = now;
     now = timestamp;
-    Long previous = samples == 0 ? null : lastTimestamp;
-    for (Rule rule : rules) rule.step(this, timestamp, previous);
-    lastTimestamp = timestamp;
+    for (Rule rule : rules) rule.step(timestamp, previous, first);
     samples++;
   }
 
-  /** Ends running Events as truncated and makes this Detector reject further Samples. */
-  @Override
-  public void close() {
-    if (closed) return;
-    closed = true;
-    if (samples > 0) for (Rule rule : rules) rule.close(this, lastTimestamp);
-  }
-
-  /** Current (held) values of all Channels that have received one. */
-  Map<String, Double> values() {
-    return values;
-  }
-
-  /** Timestamp of the Sample being processed. */
+  /** Timestamp of the latest Sample. */
   long now() {
     return now;
   }
 
-  void confirmed(String event, long timestamp) {
-    running.add(event);
-    lastConfirmed.put(event, timestamp);
-  }
-
   void ended(Event event) {
-    running.remove(event.name());
-    lastEnd.put(event.name(), event.end().getAsLong());
     if (collected != null) collected.add(event);
     listener.onEnded(event);
   }
 
-  boolean isRunning(String event) {
-    return running.contains(event);
-  }
-
-  Long lastEnd(String event) {
-    return lastEnd.get(event);
-  }
-
-  Long lastConfirmed(String event) {
-    return lastConfirmed.get(event);
+  /** All Channels, in the order they became known; index-aligned with {@link Accumulator}. */
+  List<ChannelState> channels() {
+    return channels;
   }
 
   ChannelState channel(String name) {
-    return channels.computeIfAbsent(name, n -> new ChannelState());
-  }
-
-  MovingAverage.Window window(MovingAverage ma) {
-    return windows.get(ma);
-  }
-
-  /** Last two values of one Channel and the moving-average windows fed by it. */
-  static final class ChannelState {
-    double value = Double.NaN;
-    double previous = Double.NaN;
-    long time;
-    long previousTime;
-    final List<MovingAverage.Window> windows = new ArrayList<>();
-
-    void add(long t, double v) {
-      previous = value;
-      previousTime = time;
-      value = v;
-      time = t;
-      for (MovingAverage.Window w : windows) w.add(t, v);
+    ChannelState state = channelsByName.get(name);
+    if (state == null) {
+      state = new ChannelState(name);
+      channelsByName.put(name, state);
+      channels.add(state);
     }
+    return state;
+  }
+
+  EventState event(String name) {
+    EventState state = events.get(name);
+    if (state == null) {
+      state = new EventState();
+      events.put(name, state);
+    }
+    return state;
+  }
+
+  /**
+   * The state of Events a Condition refers to, while binding a Rule.
+   *
+   * @throws IllegalArgumentException if the Rule refers to itself or a Rule declared after it
+   */
+  EventState referencedEvent(String name) {
+    if (notDeclaredBefore != null && notDeclaredBefore.contains(name)) {
+      throw new IllegalArgumentException(
+          "Rule " + bindingRule + " references " + name + ", which is not declared before it");
+    }
+    return event(name);
   }
 
   /** Builds a {@link Detector}. */
   public static final class Builder {
-    private final Map<String, RuleBuilder> rules = new java.util.LinkedHashMap<>();
+    private final Map<String, RuleBuilder> rules = new LinkedHashMap<>();
+    private final List<Event> history = new ArrayList<>();
     private EventListener listener = new EventListener() {};
-    private final Map<String, Long> historyEnd = new HashMap<>();
-    private final Map<String, Long> historyConfirmed = new HashMap<>();
     private double samplingRate;
 
     private Builder() {}
@@ -207,24 +206,26 @@ public final class Detector implements AutoCloseable {
     public Builder rule(String name, UnaryOperator<RuleBuilder> config) {
       if (name == null || name.isEmpty()) throw new IllegalArgumentException("Rule name is empty");
       if (rules.containsKey(name)) throw new IllegalArgumentException("Duplicate rule " + name);
-      RuleBuilder rb = config.apply(new RuleBuilder());
-      if (rb.when == null) throw new IllegalArgumentException("Rule " + name + " has no when()");
-      rules.put(name, rb);
+      RuleBuilder rule = config.apply(new RuleBuilder());
+      if (rule == null || rule.when == null) {
+        throw new IllegalArgumentException("Rule " + name + " has no when()");
+      }
+      rules.put(name, rule);
       return this;
     }
 
     public Builder listener(EventListener listener) {
-      this.listener = Objects.requireNonNull(listener);
+      this.listener = Objects.requireNonNull(listener, "listener");
       return this;
     }
 
     /**
-     * Declares a regularly sampled series of {@code hz} Samples per second, so Samples are pushed
-     * without timestamps.
+     * Declares a regularly sampled series of {@code hz} Samples per second (at most 1000, the
+     * millisecond resolution of timestamps), so Samples are pushed without timestamps.
      */
     public Builder samplingRate(double hz) {
-      if (!(hz > 0) || Double.isInfinite(hz)) {
-        throw new IllegalArgumentException("Sampling rate must be positive: " + hz);
+      if (!(hz > 0 && hz <= MAX_SAMPLING_RATE)) {
+        throw new IllegalArgumentException("Sampling rate must be in (0, 1000] Hz: " + hz);
       }
       samplingRate = hz;
       return this;
@@ -232,16 +233,15 @@ public final class Detector implements AutoCloseable {
 
     /**
      * Supplies Events known from before this Detector started (e.g. stored before a restart), so
-     * that {@link Conditions#after} and {@link After#unless} see them. They are not reported to
-     * the listener. Their confirmation time is taken to be their start.
+     * that {@link Conditions#after} and {@link After#unless} see them. They must be Confirmed and
+     * Ended before the first Sample, and are not reported to the listener.
      */
     public Builder history(Collection<Event> events) {
       for (Event e : events) {
-        if (e.end().isEmpty()) {
+        if (e.confirmed().isEmpty() || e.end().isEmpty()) {
           throw new IllegalArgumentException("History Event " + e.name() + " has not Ended");
         }
-        historyEnd.merge(e.name(), e.end().getAsLong(), Math::max);
-        historyConfirmed.merge(e.name(), e.start(), Math::max);
+        history.add(e);
       }
       return this;
     }
@@ -250,25 +250,6 @@ public final class Detector implements AutoCloseable {
      * @throws IllegalArgumentException if a Rule references itself or a Rule declared after it
      */
     public Detector build() {
-      List<String> names = new ArrayList<>(rules.keySet());
-      for (int i = 0; i < names.size(); i++) {
-        String rule = names.get(i);
-        List<String> later = names.subList(i, names.size());
-        RuleBuilder rb = rules.get(rule);
-        for (Condition c : new Condition[] {rb.when, rb.endWhen}) {
-          if (c == null) continue;
-          c.visit(node -> {
-            List<String> refs = node instanceof During du ? List.of(du.name)
-                : node instanceof After af ? af.referencedEvents() : List.of();
-            for (String ref : refs) {
-              if (later.contains(ref)) {
-                throw new IllegalArgumentException("Rule " + rule + " references " + ref
-                    + ", which is not declared before it");
-              }
-            }
-          });
-        }
-      }
       return new Detector(this);
     }
   }

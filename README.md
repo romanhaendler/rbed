@@ -51,7 +51,9 @@ Each Rule has at most one Event in progress. The listener's methods are all opti
 | `onEnded`     | A Confirmed Event is over. It has its end, Aggregates and attributes. |
 | `onDiscarded` | A Pending Event stopped holding before it was Confirmed.              |
 
-`close()` Ends a running Event with `truncatedEnd()` and Discards a Pending one. An Event already in progress at the first Sample has `truncatedStart()`.
+`close()` Ends a Confirmed Event with `truncatedEnd()` and Discards a Pending one. An Event that may have begun before observation, because its Rule had not yet seen its Conditions not holding (at the start, during a warm-up, or after a data gap), has `truncatedStart()`.
+
+A new Event of a Rule only starts after its `when` Condition has stopped holding since the previous Event started. With an End Condition that overlaps `when`, a Rule therefore does not flicker.
 
 ## Building Rules
 
@@ -81,11 +83,11 @@ List<Event> events = detector.detect(List.of(
     new Sample(500, Map.of("weight", 1200.0)) /* ... */));
 ```
 
-For regularly sampled data without timestamps, configure `.samplingRate(hz)` on the builder and use `push(values)` / `detectValues(listOfMaps)`.
+For regularly sampled data without timestamps, configure `.samplingRate(hz)` on the builder (at most 1000 Hz, since timestamps are milliseconds) and use `push(values)` / `detectValues(listOfMaps)`.
 
 ## Restarts
 
-Pass Events stored before a restart with `.history(events)`, so that `after(...)` Rules keep working.
+Pass Events stored before a restart with `.history(events)`, so that `after(...)` Rules keep working. They must have been Confirmed and have Ended before the first Sample.
 
 ## Notes
 

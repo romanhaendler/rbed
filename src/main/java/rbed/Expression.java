@@ -1,22 +1,22 @@
 package rbed;
 
-/** A numeric value derived from the current Sample. Create Expressions with {@link Conditions}. */
+import java.util.Objects;
+
+/**
+ * A numeric value derived from the current Sample; undefined while the data it needs is not
+ * available. Create Expressions with {@link Conditions#channel}.
+ */
 public abstract class Expression {
-  private final Expression[] children;
+  Expression() {}
 
-  /** @param children the Expressions this one is built from */
-  Expression(Expression... children) {
-    this.children = children;
+  /** Resolves this Expression against one Detector's state, once, when the Detector is built. */
+  abstract Bound bind(Detector detector);
+
+  /** An Expression bound to one Detector. */
+  interface Bound {
+    /** The current value, or NaN when undefined. */
+    double value();
   }
-
-  /** Visits this node and, depth first, every Expression it is built from. */
-  void visit(java.util.function.Consumer<Object> visitor) {
-    visitor.accept(this);
-    for (Expression child : children) child.visit(visitor);
-  }
-
-  /** Returns the current value, or NaN when undefined. */
-  abstract double value(Detector d);
 
   /** True when this value is strictly greater than {@code limit}. */
   public Condition above(double limit) {
@@ -25,7 +25,7 @@ public abstract class Expression {
 
   /** True when this value is strictly greater than {@code other}. */
   public Condition above(Expression other) {
-    return compare(this, other, 1);
+    return comparison(this, other, true);
   }
 
   /** True when this value is strictly less than {@code limit}. */
@@ -35,27 +35,39 @@ public abstract class Expression {
 
   /** True when this value is strictly less than {@code other}. */
   public Condition below(Expression other) {
-    return compare(this, other, -1);
+    return comparison(this, other, false);
   }
 
   /** True when {@code low <= value <= high}. */
   public Condition between(double low, double high) {
-    return compare(this, constant(low), -1).not().and(compare(this, constant(high), 1).not());
+    requireFinite(low);
+    requireFinite(high);
+    if (low > high) throw new IllegalArgumentException("between: " + low + " > " + high);
+    return below(low).or(above(high)).not();
   }
 
-  static Expression constant(double c) {
+  private static Expression constant(double value) {
+    requireFinite(value);
     return new Expression() {
-      @Override double value(Detector d) { return c; }
+      @Override Bound bind(Detector detector) {
+        return () -> value;
+      }
     };
   }
 
-  static Condition compare(Expression a, Expression b, int sign) {
-    return new Condition(a, b) {
-      @Override Boolean test(Detector d) {
-        double x = a.value(d);
-        double y = b.value(d);
-        if (Double.isNaN(x) || Double.isNaN(y)) return null;
-        return Double.compare(x, y) == sign;
+  private static void requireFinite(double limit) {
+    if (!Double.isFinite(limit)) throw new IllegalArgumentException("Limit is " + limit);
+  }
+
+  private static Condition comparison(Expression left, Expression right, boolean greater) {
+    Objects.requireNonNull(right, "other");
+    return new Condition() {
+      @Override Bound bind(Detector detector) {
+        Expression.Bound x = left.bind(detector);
+        Expression.Bound y = right.bind(detector);
+        return greater
+            ? () -> Truth.greater(x.value(), y.value())
+            : () -> Truth.less(x.value(), y.value());
       }
     };
   }

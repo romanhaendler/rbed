@@ -2,8 +2,8 @@ package rbed;
 
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * True once an Event with the given name has Ended, optionally narrowed by {@link #unless} and
@@ -16,21 +16,21 @@ public final class After extends Condition {
   private final long within;
 
   After(String name, List<String> unless, long within) {
-    this.name = name;
+    this.name = Objects.requireNonNull(name, "eventName");
     this.unless = unless;
     this.within = within;
   }
 
   /** No Event with any of these names may have been Confirmed since the most recent one Ended. */
-  public After unless(String... names) {
+  public After unless(String... eventNames) {
     List<String> all = new ArrayList<>(unless);
-    all.addAll(Arrays.asList(names));
+    for (String n : eventNames) all.add(Objects.requireNonNull(n, "eventName"));
     return new After(name, List.copyOf(all), within);
   }
 
   /** The most recent Event must have Ended at most {@code millis} before the current Sample. */
   public After within(long millis) {
-    if (millis < 0) throw new IllegalArgumentException("within must be >= 0");
+    if (millis < 0) throw new IllegalArgumentException("within must be >= 0: " + millis);
     return new After(name, unless, millis);
   }
 
@@ -40,19 +40,20 @@ public final class After extends Condition {
   }
 
   @Override
-  Boolean test(Detector d) {
-    Long end = d.lastEnd(name);
-    if (end == null || d.now() - end > within) return false;
-    for (String u : unless) {
-      Long confirmed = d.lastConfirmed(u);
-      if (confirmed != null && confirmed > end) return false;
-    }
-    return true;
-  }
-
-  List<String> referencedEvents() {
-    List<String> all = new ArrayList<>(unless);
-    all.add(name);
-    return all;
+  Bound bind(Detector detector) {
+    EventState predecessor = detector.referencedEvent(name);
+    EventState[] interrupters =
+        unless.stream().map(detector::referencedEvent).toArray(EventState[]::new);
+    return () -> {
+      if (!predecessor.hasEnded || detector.now() - predecessor.lastEnd > within) {
+        return Truth.FALSE;
+      }
+      for (EventState interrupter : interrupters) {
+        if (interrupter.hasBeenConfirmed && interrupter.lastConfirmed > predecessor.lastEnd) {
+          return Truth.FALSE;
+        }
+      }
+      return Truth.TRUE;
+    };
   }
 }

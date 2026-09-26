@@ -65,4 +65,13 @@ class BatchTest {
     assertThrows(IllegalStateException.class, () -> used.detect(List.of()));
     assertThrows(IllegalArgumentException.class, () -> Detector.builder().samplingRate(0));
   }
+
+  @Test
+  void samplingRateIsLimitedToMillisecondResolution() {
+    assertThrows(IllegalArgumentException.class, () -> Detector.builder().samplingRate(1001));
+    Detector d = lift().samplingRate(1000).build();
+    d.push(Map.of("weight", 0.0));
+    d.push(Map.of("weight", 600.0));
+    assertEquals(List.of("pending Lift 1", "confirmed Lift 1"), rec.log);
+  }
 }

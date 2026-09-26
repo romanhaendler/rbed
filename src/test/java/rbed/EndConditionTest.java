@@ -71,4 +71,30 @@ class EndConditionTest {
     push(d, new long[] {0, 10, 90}, 0, 600, 600);
     assertEquals(List.of("pending Lift 10", "confirmed Lift 10"), rec.log);
   }
+
+  @Test
+  void newEventNeedsWhenToStopHoldingFirst() {
+    Detector d = Detector.builder()
+        .rule("E", r -> r.when(channel("x").above(10)).endWhen(channel("y").above(0)))
+        .listener(rec).build();
+    d.push(0, Map.of("x", 0.0, "y", 0.0));
+    d.push(1, Map.of("x", 20.0));
+    d.push(2, Map.of("y", 1.0));   // End Condition holds: Ended
+    d.push(3, Map.of("x", 30.0));  // when() still holds, but no new Event without an edge
+    d.push(4, Map.of("x", 0.0));   // when() stops holding: re-armed
+    d.push(5, Map.of("x", 20.0, "y", 0.0));
+    assertEquals(List.of("pending E 1", "confirmed E 1", "ended E 1..2",
+        "pending E 5", "confirmed E 5"), rec.log);
+  }
+
+  @Test
+  void maxGapDuringEndPhaseEndsTruncatedAtLastSampleBeforeGap() {
+    Detector d = detector(r -> r
+        .when(channel("weight").above(500))
+        .endWhen(channel("weight").below(50)).forSamples(3)
+        .maxGap(100));
+    push(d, new long[] {0, 10, 20, 30, 40, 500}, 0, 600, 600, 10, 10, 10);
+    assertEquals("ended Lift 10..40 truncatedEnd", rec.log.get(2));
+    assertEquals(305, rec.ended.get(0).aggregates("weight").mean());
+  }
 }

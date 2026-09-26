@@ -13,7 +13,7 @@ A named signal within a time series, such as "weight" or "hook height".
 _Avoid_: Signal, series, column, variable
 
 **Condition**:
-A statement about a single Sample that is either true or false, such as "weight above 500".
+A statement about the current Sample that is true, false or undefined (while the data it needs is not available yet), such as "weight above 500". Undefined never counts as true.
 _Avoid_: Predicate, check, filter
 
 **Rule**:
@@ -37,7 +37,7 @@ Per-Channel minimum, maximum and mean over the Samples of an Event, from its sta
 _Avoid_: Statistics, summary
 
 **Truncated**:
-Marks an Event whose true start or end lies outside the observed data, because observation began or stopped while it was in progress.
+Marks an Event whose true start or end may lie outside the observed data: it started before its Rule had seen its Conditions not holding (since observation began or resumed after a gap), or observation stopped while it was in progress.
 _Avoid_: Partial, incomplete, clipped
 
 **History**:
