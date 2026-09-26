@@ -121,11 +121,10 @@ final class Rule {
 
   private void end(Detector d, long end, boolean truncated) {
     state = State.IDLE;
-    d.ended(name, end);
     Event ended = snapshot(OptionalLong.of(end), truncated);
     Map<String, Object> values = new LinkedHashMap<>();
     attributes.forEach((key, fn) -> values.put(key, fn.apply(ended)));
-    d.listener.onEnded(new Event(ended.name(), ended.start(), ended.end(), ended.truncatedStart(),
+    d.ended(new Event(ended.name(), ended.start(), ended.end(), ended.truncatedStart(),
         ended.truncatedEnd(), ended.aggregates(), Collections.unmodifiableMap(values)));
   }
 

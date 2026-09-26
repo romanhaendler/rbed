@@ -4,9 +4,9 @@
 
 **Blocked by:** 01 (Walking skeleton)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `Sample` record and `detect(...)` for timestamped input
-- [ ] `samplingRate` enables timestamp-free `push(values)` and `detect(...)`
-- [ ] Mixing timestamped and untimestamped pushes throws
-- [ ] `detect` on a used Detector throws `IllegalStateException`; the listener is still called during `detect`
+- [x] `Sample` record and `detect(...)` for timestamped input
+- [x] `samplingRate` enables timestamp-free `push(values)` and `detectValues(...)`
+- [x] With a sampling rate only untimestamped pushes are allowed, without one only timestamped pushes (`IllegalStateException` otherwise)
+- [x] `detect` on a used Detector throws `IllegalStateException`; the listener is still called during `detect`

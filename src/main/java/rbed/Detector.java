@@ -29,9 +29,12 @@ public final class Detector implements AutoCloseable {
   private long lastTimestamp;
   private long now;
   private boolean closed;
+  private final double samplingRate;
+  private List<Event> collected;
 
   private Detector(Builder b) {
     listener = b.listener;
+    samplingRate = b.samplingRate;
     lastEnd.putAll(b.historyEnd);
     lastConfirmed.putAll(b.historyConfirmed);
     rules = new ArrayList<>();
@@ -60,6 +63,49 @@ public final class Detector implements AutoCloseable {
    * @param channelValues values of any subset of Channels; must be finite
    */
   public void push(long timestamp, Map<String, Double> channelValues) {
+    if (samplingRate > 0) {
+      throw new IllegalStateException("Detector has a sampling rate: push values only");
+    }
+    accept(timestamp, channelValues);
+  }
+
+  /**
+   * Processes one Sample of a regularly sampled series; its timestamp is derived from the
+   * sampling rate as {@code round(index * 1000 / hz)}.
+   *
+   * @throws IllegalStateException if no sampling rate was configured
+   */
+  public void push(Map<String, Double> channelValues) {
+    if (samplingRate <= 0) {
+      throw new IllegalStateException("Detector has no sampling rate: push timestamps too");
+    }
+    accept(Math.round(samples * 1000 / samplingRate), channelValues);
+  }
+
+  /**
+   * Runs a whole recorded series through this Detector and closes it. The listener is still
+   * called.
+   *
+   * @return all Ended Events in the order they Ended
+   */
+  public List<Event> detect(Iterable<Sample> series) {
+    return batch(() -> series.forEach(s -> push(s.timestamp(), s.values())));
+  }
+
+  /** Like {@link #detect}, for a regularly sampled series without timestamps. */
+  public List<Event> detectValues(Iterable<Map<String, Double>> series) {
+    return batch(() -> series.forEach(this::push));
+  }
+
+  private List<Event> batch(Runnable pushAll) {
+    if (samples > 0 || closed) throw new IllegalStateException("Detector has already been used");
+    collected = new ArrayList<>();
+    pushAll.run();
+    close();
+    return collected;
+  }
+
+  private void accept(long timestamp, Map<String, Double> channelValues) {
     if (closed) throw new IllegalStateException("Detector is closed");
     if (samples > 0 && timestamp <= lastTimestamp) {
       throw new IllegalArgumentException(
@@ -103,9 +149,11 @@ public final class Detector implements AutoCloseable {
     lastConfirmed.put(event, timestamp);
   }
 
-  void ended(String event, long end) {
-    running.remove(event);
-    lastEnd.put(event, end);
+  void ended(Event event) {
+    running.remove(event.name());
+    lastEnd.put(event.name(), event.end().getAsLong());
+    if (collected != null) collected.add(event);
+    listener.onEnded(event);
   }
 
   boolean isRunning(String event) {
@@ -151,6 +199,7 @@ public final class Detector implements AutoCloseable {
     private EventListener listener = new EventListener() {};
     private final Map<String, Long> historyEnd = new HashMap<>();
     private final Map<String, Long> historyConfirmed = new HashMap<>();
+    private double samplingRate;
 
     private Builder() {}
 
@@ -166,6 +215,18 @@ public final class Detector implements AutoCloseable {
 
     public Builder listener(EventListener listener) {
       this.listener = Objects.requireNonNull(listener);
+      return this;
+    }
+
+    /**
+     * Declares a regularly sampled series of {@code hz} Samples per second, so Samples are pushed
+     * without timestamps.
+     */
+    public Builder samplingRate(double hz) {
+      if (!(hz > 0) || Double.isInfinite(hz)) {
+        throw new IllegalArgumentException("Sampling rate must be positive: " + hz);
+      }
+      samplingRate = hz;
       return this;
     }
 
