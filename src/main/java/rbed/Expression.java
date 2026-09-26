@@ -9,7 +9,27 @@ public abstract class Expression {
 
   /** True when this value is strictly greater than {@code limit}. */
   public Condition above(double limit) {
-    return compare(this, constant(limit), 1);
+    return above(constant(limit));
+  }
+
+  /** True when this value is strictly greater than {@code other}. */
+  public Condition above(Expression other) {
+    return compare(this, other, 1);
+  }
+
+  /** True when this value is strictly less than {@code limit}. */
+  public Condition below(double limit) {
+    return below(constant(limit));
+  }
+
+  /** True when this value is strictly less than {@code other}. */
+  public Condition below(Expression other) {
+    return compare(this, other, -1);
+  }
+
+  /** True when {@code low <= value <= high}. */
+  public Condition between(double low, double high) {
+    return compare(this, constant(low), -1).not().and(compare(this, constant(high), 1).not());
   }
 
   static Expression constant(double c) {
@@ -18,7 +38,7 @@ public abstract class Expression {
     };
   }
 
-  static Condition compare(Expression a, Expression b, int sign) {
+  private static Condition compare(Expression a, Expression b, int sign) {
     return new Condition() {
       @Override Boolean test(Detector d) {
         double x = a.value(d);

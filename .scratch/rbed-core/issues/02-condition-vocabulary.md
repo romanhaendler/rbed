@@ -4,9 +4,9 @@
 
 **Blocked by:** 01 (Walking skeleton)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `below`, `between` (inclusive bounds) and expression-vs-expression comparisons work
-- [ ] `and`, `or` and `not` combine Conditions
-- [ ] Partial Samples use held values for missing Channels
-- [ ] Undefined comparisons are false, and `not` does not turn them true
+- [x] `below`, `between` (inclusive bounds) and expression-vs-expression comparisons work
+- [x] `and`, `or` and `not` combine Conditions
+- [x] Partial Samples use held values for missing Channels
+- [x] Undefined comparisons are false, and `not` does not turn them true
