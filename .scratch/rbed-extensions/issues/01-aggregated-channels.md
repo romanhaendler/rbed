@@ -4,10 +4,10 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Referenced Channels are aggregated automatically; `.aggregate("x", ...)` adds more
-- [ ] `event.aggregates("other")` throws `IllegalArgumentException` naming the Rule and Channel
-- [ ] Existing tests and examples updated where they read non-referenced Channels (e.g. crane `weight` is referenced; Aggregates test for `height` needs `.aggregate`)
-- [ ] Performance: a scenario with many Channels but few referenced ones; the 50x20 floor is re-measured and raised
-- [ ] Zero steady-state allocation still holds
+- [x] Referenced Channels are aggregated automatically; `.aggregate("x", ...)` adds more
+- [x] `event.aggregates("other")` throws `IllegalArgumentException` naming the Rule and Channel
+- [x] Existing tests and examples updated where they read non-referenced Channels (e.g. crane `weight` is referenced; Aggregates test for `height` needs `.aggregate`)
+- [x] Performance: a scenario with many Channels but few referenced ones; the 50x20 floor is re-measured and raised
+- [x] Zero steady-state allocation still holds

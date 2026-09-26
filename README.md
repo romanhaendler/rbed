@@ -65,6 +65,8 @@ A new Event of a Rule only starts after its `when` Condition has stopped holding
     .attribute("load", e -> e.aggregates("weight").mean() < 1500 ? "pallet" : "container"))
 ```
 
+Events carry Aggregates (min, max, mean, count) for the Channels their Rule's Conditions use. Request more with `.aggregate("height", ...)`. Reading any other Channel's Aggregates throws, so a missing declaration is never mistaken for "no data".
+
 Conditions (`import static rbed.Conditions.*`):
 
 - `channel("x").above(v)`, `.below(v)`, `.between(lo, hi)`. Each also accepts another expression, e.g. `channel("weight").above(channel("ratedLoad"))`.
@@ -116,9 +118,9 @@ Measured with `mvn test -Pperformance` (Apple M2, JDK 21):
 | --------------------------------------------------------- | ---------------------- |
 | One threshold Rule, Events every 100 Samples              | ~45 million Samples/s  |
 | Realistic Rule set (durations, End Condition, during, after/unless, rate, moving averages) | ~11 million Samples/s |
-| 50 Rules x 20 Channels, Events every 40 Samples           | ~0.37 million Samples/s |
+| 50 Rules x 20 Channels, Events every 40 Samples           | ~1.5 million Samples/s |
 
-Every running Event keeps Aggregates for all Channels, at about 1 ns per Event and Channel per Sample. With many Channels and many simultaneous Events, this dominates the cost.
+A running Event keeps Aggregates only for the Channels its Rule uses (plus those requested with `.aggregate(...)`), at about 1 ns per Channel per Sample.
 
 The performance tests are excluded from the default build because timings depend on the machine. The allocation checks among them are deterministic.
 

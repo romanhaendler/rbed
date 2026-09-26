@@ -15,7 +15,7 @@ class AggregatesTest {
   @Test
   void aggregatesCoverEventSamplesExcludingTheEndSample() {
     Detector d = Detector.builder()
-        .rule("Lift", r -> r.when(channel("weight").above(500)))
+        .rule("Lift", r -> r.when(channel("weight").above(500)).aggregate("height"))
         .listener(rec).build();
     d.push(0, Map.of("weight", 0.0, "height", 1.0));
     d.push(1, Map.of("weight", 600.0));
@@ -29,9 +29,9 @@ class AggregatesTest {
   }
 
   @Test
-  void unknownChannelHasEmptyAggregates() {
+  void requestedChannelWithoutValuesHasEmptyAggregates() {
     Detector d = Detector.builder()
-        .rule("Lift", r -> r.when(channel("weight").above(500)))
+        .rule("Lift", r -> r.when(channel("weight").above(500)).aggregate("nope"))
         .listener(rec).build();
     d.push(0, Map.of("weight", 600.0));
     d.close();

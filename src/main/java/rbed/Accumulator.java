@@ -5,9 +5,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Running per-Channel minimum, maximum, sum and count over the Samples of one Event. Indexed like
- * the Detector's Channels, so adding a Sample neither looks anything up nor allocates. This is the
- * innermost loop of the library (Confirmed Events x Channels per Sample), hence plain arrays.
+ * Running per-Channel minimum, maximum, sum and count over the Samples of one Event, for the
+ * Channels its Rule aggregates. Indexed like the Rule's aggregated Channels, so adding a Sample
+ * neither looks anything up nor allocates. This is the innermost loop of the library (running
+ * Events x aggregated Channels per Sample), hence plain arrays.
  */
 final class Accumulator {
   private double[] min = new double[0];
@@ -46,12 +47,14 @@ final class Accumulator {
     Arrays.fill(count, 0);
   }
 
-  Map<String, Aggregates> snapshot(ChannelState[] channels) {
+  /** Aggregates of the first {@code n} Channels, including those without values (count 0). */
+  Map<String, Aggregates> snapshot(ChannelState[] channels, int n) {
     Map<String, Aggregates> out = new LinkedHashMap<>();
-    for (int i = 0; i < count.length; i++) {
-      if (count[i] > 0) {
-        out.put(channels[i].name, new Aggregates(min[i], max[i], sum[i] / count[i], count[i]));
-      }
+    for (int i = 0; i < n; i++) {
+      boolean seen = i < count.length && count[i] > 0;
+      out.put(channels[i].name, seen
+          ? new Aggregates(min[i], max[i], sum[i] / count[i], count[i])
+          : Aggregates.EMPTY);
     }
     return Map.copyOf(out);
   }

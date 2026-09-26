@@ -1,10 +1,10 @@
 package rbed;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -23,10 +23,7 @@ public final class Detector implements AutoCloseable {
 
   final EventListener listener;
   private final double samplingRate;
-  private final Map<String, ChannelState> channelsByName = new HashMap<>();
-  /** All Channels in the order they became known; the first {@link #channelCount} are used. */
-  private ChannelState[] channels = new ChannelState[8];
-  private int channelCount;
+  private final Map<String, ChannelState> channels = new HashMap<>();
   private final Map<String, EventState> events = new HashMap<>();
   private final boolean hasHistory;
   private final long latestHistoryEnd;
@@ -36,9 +33,11 @@ public final class Detector implements AutoCloseable {
   private boolean closed;
   private List<Event> collected;
 
-  /** While binding Rules: the Rule being bound and the names it must not reference. */
+  /** While binding Rules: the Rule being bound, the names it must not reference, and the
+   * Channels its Conditions look up. */
   private String bindingRule;
   private Set<String> notDeclaredBefore;
+  private Set<ChannelState> channelLookups;
 
   private Detector(Builder b) {
     listener = b.listener;
@@ -159,24 +158,26 @@ public final class Detector implements AutoCloseable {
     listener.onEnded(event);
   }
 
-  /** All Channels in the order they became known, index-aligned with {@link Accumulator}. */
-  ChannelState[] channels() {
-    return channels;
-  }
-
-  int channelCount() {
-    return channelCount;
-  }
-
   ChannelState channel(String name) {
-    ChannelState state = channelsByName.get(name);
+    ChannelState state = channels.get(name);
     if (state == null) {
       state = new ChannelState(name);
-      channelsByName.put(name, state);
-      if (channelCount == channels.length) channels = Arrays.copyOf(channels, channelCount * 2);
-      channels[channelCount++] = state;
+      channels.put(name, state);
     }
+    if (channelLookups != null) channelLookups.add(state);
     return state;
+  }
+
+  /** Starts recording which Channels the Conditions being bound look up. */
+  void recordChannelLookups() {
+    channelLookups = new LinkedHashSet<>();
+  }
+
+  /** The Channels looked up since {@link #recordChannelLookups()}; stops recording. */
+  Set<ChannelState> recordedChannelLookups() {
+    Set<ChannelState> recorded = channelLookups;
+    channelLookups = null;
+    return recorded;
   }
 
   EventState event(String name) {

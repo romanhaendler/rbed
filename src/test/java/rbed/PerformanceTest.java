@@ -155,8 +155,8 @@ class PerformanceTest {
 
   /**
    * Stress case: 50 Rules over 20 Channels, every Rule's Event starting and ending every 40
-   * Samples. The cost is dominated by maintaining Aggregates for all 20 Channels in every running
-   * Event (about 1 ns per Event and Channel), so it scales with Events x Channels.
+   * Samples. Each Rule aggregates only the one Channel it uses; aggregating all 20 Channels in
+   * every running Event made this scenario about 4x slower.
    */
   @Test
   void throughputManyRulesAndChannels() {
@@ -166,7 +166,7 @@ class PerformanceTest {
       return values;
     });
     assertThroughput("50 rules x 20 channels", PerformanceTest::manyRulesAndChannels, feed,
-        40_000);
+        150_000);
   }
 
   // ----------------------------------------------------------------------------------------------

@@ -13,7 +13,7 @@ import java.util.OptionalLong;
  * @param truncatedStart it may have begun before its start: the Rule had not yet seen its
  *     Conditions not holding since observation began or resumed after a gap
  * @param truncatedEnd observation stopped (close or max gap) while it was in progress
- * @param aggregates per-Channel Aggregates over its Samples so far
+ * @param aggregates Aggregates over its Samples so far, for each Channel its Rule aggregates
  * @param attributes values of the Rule's attributes; empty until Ended
  */
 public record Event(
@@ -26,9 +26,18 @@ public record Event(
     Map<String, Aggregates> aggregates,
     Map<String, Object> attributes) {
 
-  /** Aggregates of one Channel; {@link Aggregates#count()} is 0 if it had no value. */
+  /**
+   * Aggregates of one Channel; {@link Aggregates#count()} is 0 if it had no value.
+   *
+   * @throws IllegalArgumentException if the Rule does not aggregate this Channel
+   */
   public Aggregates aggregates(String channel) {
-    return aggregates.getOrDefault(channel, Aggregates.EMPTY);
+    Aggregates a = aggregates.get(channel);
+    if (a == null) {
+      throw new IllegalArgumentException("Rule " + name + " does not aggregate channel " + channel
+          + "; add .aggregate(\"" + channel + "\")");
+    }
+    return a;
   }
 
   Event withAttributes(Map<String, Object> values) {

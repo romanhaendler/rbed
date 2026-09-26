@@ -2,7 +2,9 @@ package rbed;
 
 import java.time.Duration;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
@@ -17,6 +19,7 @@ public final class RuleBuilder {
   Phase end;
   long maxGap = Long.MAX_VALUE;
   final Map<String, Function<Event, Object>> attributes = new LinkedHashMap<>();
+  final Set<String> aggregated = new LinkedHashSet<>();
   private boolean durationsApplyToEnd;
 
   RuleBuilder() {}
@@ -79,6 +82,15 @@ public final class RuleBuilder {
    */
   public RuleBuilder attribute(String name, Function<Event, Object> fn) {
     attributes.put(Objects.requireNonNull(name, "name"), Objects.requireNonNull(fn, "fn"));
+    return this;
+  }
+
+  /**
+   * Also keeps Aggregates for these Channels. Channels referenced by the Rule's Conditions are
+   * aggregated anyway.
+   */
+  public RuleBuilder aggregate(String... channels) {
+    for (String channel : channels) aggregated.add(Objects.requireNonNull(channel, "channel"));
     return this;
   }
 

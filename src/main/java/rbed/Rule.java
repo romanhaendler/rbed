@@ -1,5 +1,6 @@
 package rbed;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -22,6 +23,9 @@ final class Rule {
   private final Progress ending;
   private final long maxGap;
   private final Map<String, Function<Event, Object>> attributes;
+  /** The Channels this Rule aggregates; the first {@link #aggregatedCount} are used. */
+  private ChannelState[] aggregated = new ChannelState[4];
+  private int aggregatedCount;
   private final Accumulator aggregates = new Accumulator();
   private final Accumulator endPhaseAggregates = new Accumulator();
 
@@ -39,12 +43,25 @@ final class Rule {
     this.detector = detector;
     this.name = name;
     this.events = detector.event(name);
+    detector.recordChannelLookups();
     this.when = spec.when.condition().bind(detector);
     this.holding = new Progress(spec.when);
     this.end = spec.end == null ? null : spec.end.condition().bind(detector);
+    for (ChannelState referenced : detector.recordedChannelLookups()) aggregate(referenced);
+    for (String channel : spec.aggregated) aggregate(detector.channel(channel));
     this.ending = spec.end == null ? null : new Progress(spec.end);
     this.maxGap = spec.maxGap;
     this.attributes = new LinkedHashMap<>(spec.attributes);
+  }
+
+  /** Keeps Aggregates for this Channel too; returns its index in the Accumulators. */
+  int aggregate(ChannelState channel) {
+    for (int i = 0; i < aggregatedCount; i++) if (aggregated[i] == channel) return i;
+    if (aggregatedCount == aggregated.length) {
+      aggregated = Arrays.copyOf(aggregated, aggregatedCount * 2);
+    }
+    aggregated[aggregatedCount] = channel;
+    return aggregatedCount++;
   }
 
   /**
@@ -68,7 +85,7 @@ final class Rule {
         Truth holds = when.test();
         if (holds == Truth.TRUE) {
           holding.advance();
-          aggregates.add(detector.channels(), detector.channelCount());
+          aggregates.add(aggregated, aggregatedCount);
           confirmIfReached(now);
         } else {
           discard();
@@ -108,7 +125,7 @@ final class Rule {
     truncatedStart = !seenFalse;
     holding.begin(now);
     aggregates.clear();
-    aggregates.add(detector.channels(), detector.channelCount());
+    aggregates.add(aggregated, aggregatedCount);
     detector.listener.onPending(snapshot(OptionalLong.empty(), false));
     confirmIfReached(now);
   }
@@ -125,7 +142,7 @@ final class Rule {
   private void stepUntilWhenStops(long now) {
     Truth holds = when.test();
     if (holds == Truth.TRUE) {
-      aggregates.add(detector.channels(), detector.channelCount());
+      aggregates.add(aggregated, aggregatedCount);
     } else {
       finish(now, false);
       stoppedHolding(holds);
@@ -135,7 +152,7 @@ final class Rule {
   private void stepUntilEndCondition(long now) {
     if (end.test() != Truth.TRUE) {
       leaveEndPhase();
-      aggregates.add(detector.channels(), detector.channelCount());
+      aggregates.add(aggregated, aggregatedCount);
       return;
     }
     if (inEndPhase) {
@@ -145,7 +162,7 @@ final class Rule {
       ending.begin(now);
       endPhaseAggregates.clear();
     }
-    endPhaseAggregates.add(detector.channels(), detector.channelCount());
+    endPhaseAggregates.add(aggregated, aggregatedCount);
     if (ending.reached(now)) finish(ending.since, false);
   }
 
@@ -177,6 +194,6 @@ final class Rule {
 
   private Event snapshot(OptionalLong confirmed, OptionalLong end, boolean truncatedEnd) {
     return new Event(name, holding.since, confirmed, end, truncatedStart, truncatedEnd,
-        aggregates.snapshot(detector.channels()), Map.of());
+        aggregates.snapshot(aggregated, aggregatedCount), Map.of());
   }
 }
