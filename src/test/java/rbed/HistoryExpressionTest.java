@@ -65,4 +65,14 @@ class HistoryExpressionTest {
                 .endWhen(channel("x").averageOverSamples(2).below(150))),
         new long[] {0, 1, 2, 3, 4, 5}, new double[] {5, 5, 200, 200, 200, 5}));
   }
+
+  /** A huge value leaving the window must not wipe out the small values that remain. */
+  @Test
+  void movingAveragesDoNotLosePrecisionWhenLargeValuesLeave() {
+    assertEquals(List.of("ended Samples 2..2 truncatedEnd",
+            "ended Time 2..2 truncatedEnd"), run(Detector.builder()
+            .rule("Samples", r -> r.when(channel("x").averageOverSamples(2).between(0.99, 1.01)))
+            .rule("Time", r -> r.when(channel("x").averageOverDuration(1).between(0.99, 1.01))),
+        new long[] {0, 1, 2}, new double[] {1e16, 1, 1}));
+  }
 }
