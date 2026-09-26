@@ -7,7 +7,21 @@ package rbed;
  * with {@link Conditions}.
  */
 public abstract class Condition {
-  Condition() {}
+  private final Object[] children;
+
+  /** @param children the Conditions and Expressions this one is built from */
+  Condition(Object... children) {
+    this.children = children;
+  }
+
+  /** Visits this node and, depth first, every Condition and Expression it is built from. */
+  void visit(java.util.function.Consumer<Object> visitor) {
+    visitor.accept(this);
+    for (Object child : children) {
+      if (child instanceof Condition c) c.visit(visitor);
+      else ((Expression) child).visit(visitor);
+    }
+  }
 
   /** Returns TRUE, FALSE or null for undefined. */
   abstract Boolean test(Detector d);
@@ -15,7 +29,7 @@ public abstract class Condition {
   /** True when both are true; false when either is false; otherwise undefined. */
   public Condition and(Condition other) {
     Condition self = this;
-    return new Condition() {
+    return new Condition(self, other) {
       @Override Boolean test(Detector d) {
         Boolean a = self.test(d);
         if (Boolean.FALSE.equals(a)) return false;
@@ -29,7 +43,7 @@ public abstract class Condition {
   /** True when either is true; false when both are false; otherwise undefined. */
   public Condition or(Condition other) {
     Condition self = this;
-    return new Condition() {
+    return new Condition(self, other) {
       @Override Boolean test(Detector d) {
         Boolean a = self.test(d);
         if (Boolean.TRUE.equals(a)) return true;
@@ -43,7 +57,7 @@ public abstract class Condition {
   /** Negation; undefined stays undefined. */
   public Condition not() {
     Condition self = this;
-    return new Condition() {
+    return new Condition(self) {
       @Override Boolean test(Detector d) {
         Boolean a = self.test(d);
         return a == null ? null : !a;

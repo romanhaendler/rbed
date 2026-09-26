@@ -2,6 +2,7 @@ package rbed;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -16,6 +17,8 @@ public final class Detector implements AutoCloseable {
   final EventListener listener;
   private final List<Rule> rules;
   private final Map<String, Double> values = new HashMap<>();
+  private final Map<String, ChannelState> channels = new HashMap<>();
+  private final Map<MovingAverage, MovingAverage.Window> windows = new IdentityHashMap<>();
   private long samples;
   private long lastTimestamp;
   private boolean closed;
@@ -23,7 +26,18 @@ public final class Detector implements AutoCloseable {
   private Detector(Builder b) {
     listener = b.listener;
     rules = new ArrayList<>();
-    b.rules.forEach((name, rb) -> rules.add(new Rule(name, rb)));
+    b.rules.forEach((name, rb) -> {
+      rules.add(new Rule(name, rb));
+      for (Condition c : new Condition[] {rb.when, rb.endWhen}) {
+        if (c != null) c.visit(node -> {
+          if (node instanceof MovingAverage ma && !windows.containsKey(ma)) {
+            MovingAverage.Window w = ma.newWindow();
+            windows.put(ma, w);
+            channel(ma.channel.channel).windows.add(w);
+          }
+        });
+      }
+    });
   }
 
   public static Builder builder() {
@@ -49,6 +63,7 @@ public final class Detector implements AutoCloseable {
       }
     });
     values.putAll(channelValues);
+    channelValues.forEach((channel, v) -> channel(channel).add(timestamp, v));
     Long previous = samples == 0 ? null : lastTimestamp;
     for (Rule rule : rules) rule.step(this, timestamp, previous);
     lastTimestamp = timestamp;
@@ -68,9 +83,29 @@ public final class Detector implements AutoCloseable {
     return values;
   }
 
-  double channelValue(String channel) {
-    Double v = values.get(channel);
-    return v == null ? Double.NaN : v;
+  ChannelState channel(String name) {
+    return channels.computeIfAbsent(name, n -> new ChannelState());
+  }
+
+  MovingAverage.Window window(MovingAverage ma) {
+    return windows.get(ma);
+  }
+
+  /** Last two values of one Channel and the moving-average windows fed by it. */
+  static final class ChannelState {
+    double value = Double.NaN;
+    double previous = Double.NaN;
+    long time;
+    long previousTime;
+    final List<MovingAverage.Window> windows = new ArrayList<>();
+
+    void add(long t, double v) {
+      previous = value;
+      previousTime = time;
+      value = v;
+      time = t;
+      for (MovingAverage.Window w : windows) w.add(t, v);
+    }
   }
 
   /** Builds a {@link Detector}. */
