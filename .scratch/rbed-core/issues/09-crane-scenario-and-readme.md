@@ -4,7 +4,7 @@
 
 **Blocked by:** 04, 05, 06, 07, 08
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The crane scenario test passes using only the public API
-- [ ] The README explains installation, a minimal Rule, the lifecycle, batch use and the crane example
+- [x] The crane scenario test passes using only the public API
+- [x] The README explains installation, a minimal Rule, the lifecycle, batch use and the crane example
