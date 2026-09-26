@@ -4,9 +4,9 @@
 
 **Blocked by:** 03 (Durations and the Pending phase)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] With `endWhen`, the Event continues while the start Condition is false but the End Condition is not yet satisfied
-- [ ] End Condition durations (Samples or time) are honoured, and the end phase resets on interruption
-- [ ] End = timestamp at which the end phase began
-- [ ] `maxGap` Discards Pending Events and truncates Confirmed ones as specified; evaluation continues with the current Sample
+- [x] With `endWhen`, the Event continues while the start Condition is false but the End Condition is not yet satisfied
+- [x] End Condition durations (Samples or time) are honoured, and the end phase resets on interruption
+- [x] End = timestamp at which the end phase began
+- [x] `maxGap` Discards Pending Events and truncates Confirmed ones as specified; evaluation continues with the current Sample

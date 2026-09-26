@@ -49,7 +49,8 @@ public final class Detector implements AutoCloseable {
       }
     });
     values.putAll(channelValues);
-    for (Rule rule : rules) rule.step(this, timestamp, samples == 0);
+    Long previous = samples == 0 ? null : lastTimestamp;
+    for (Rule rule : rules) rule.step(this, timestamp, previous);
     lastTimestamp = timestamp;
     samples++;
   }
