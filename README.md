@@ -292,25 +292,73 @@ A division by zero, or any other operation without a finite result, is undefined
 
 ### Trends: `rising`, `falling`, `rate`
 
+A threshold tells you *where* a signal is. Often it matters more *where it is going*: a bearing at 60 °C is fine, but not if it has been warming up for ten minutes straight; a tank at 80 % is fine, but not if it is emptying at a litre per second. Trend functions describe how a Channel changes, so Rules can react before a threshold is reached, or distinguish a signal that is recovering from one that is getting worse.
+
+**`rising()` and `falling()`** are Conditions: `rising()` holds when the Channel's latest value is greater than its previous one, `falling()` when it is less. An unchanged value is neither. A single step up says little in a noisy signal, so these are mostly used in one of three ways.
+
+*A sustained trend*, with `forSamples`. This Rule detects a temperature that has risen at five consecutive Samples, even while it is still far below any alarm threshold:
+
 ```java
-channel("pressure").rising()            // the latest value is greater than the previous one
-channel("pressure").falling()           // the latest value is less than the previous one
-channel("speed").rate()                 // change per second between the last two values
-channel("speed").rate().below(-4)       // hard braking: losing more than 4 m/s per second
+.rule("Warming", r -> r.when(channel("temp").rising()).forSamples(5))
 ```
 
-`rate()` is an Expression in units per second, computed from the two latest values and their timestamps. All three are undefined until the Channel has two values. They consider only the Samples that carried the Channel: if `pressure` is missing from a Sample, `rising()` still compares its two latest reported values.
+```java
+// temp:   40  41  42  42  43  44  45  46  47  45
+// time:    0   1   2   3   4   5   6   7   8   9  (s)
+// The plateau at 42 breaks the first run. The second run starts at 4 s and
+// is Confirmed at 8 s, its fifth rising Sample: Warming 4000..9000
+```
+
+*Level plus direction*, with `and`. A high value that is still climbing needs action; a high value that is already falling is recovering:
+
+```java
+.rule("PressureEscalating", r -> r.when(channel("pressure").above(8).and(channel("pressure").rising())))
+```
+
+*Peaks and troughs.* An Event of `rising()` lasts exactly as long as a climb. It Ends at the first Sample that is not higher, and its `max` Aggregate is the peak value:
+
+```java
+.rule("Climb", r -> r.when(channel("x").rising())
+    .attribute("peak", e -> e.aggregates("x").max()))
+// x: 1 2 5 9 7 3 1 at 0..6 s  ->  Climb 1000..4000, peak 9.0
+```
+
+**`rate()`** is an Expression: how fast the Channel changes, in its own units per second. It is computed from the two latest values and their timestamps, `(latest - previous) / seconds between them`, so irregular sampling is handled correctly. Unlike `rising()`, it says *how fast*, so you compare it with a limit:
+
+```java
+// hard braking: speed in m/s drops by more than 4 m/s per second
+.rule("HardBraking", r -> r.when(channel("speed").rate().below(-4)))
+
+// leak: the tank level falls faster than any consumer can draw, for a whole minute
+.rule("Leak", r -> r.when(channel("level").rate().below(-0.5)).forDuration(60_000))
+
+// heat treatment: heating faster than 2 °C per minute (rate is per second)
+.rule("RampTooSteep", r -> r.when(channel("furnaceTemp").rate().above(2.0 / 60)))
+```
+
+Because `rate()` looks at only two values, noise in the signal shows up in full in the rate. For noisy signals, take the rate of a [moving average](#moving-averages) instead: `channel("level").averageOverSamples(4).rate()`.
+
+All three are undefined until the Channel has two values. They use the Channel's own values, not Samples: if `pressure` is missing from a Sample, `rising()` still compares its two latest reported values, and `rate()` divides by the time between them.
+
+A fourth function about a Channel's history, **`age()`**, is the time since the Channel last reported. It detects sensors that went silent and is explained with [advancing time](#silent-sensors-advancing-time).
 
 ### Moving averages
 
-Noisy signals can be smoothed before comparing:
+Raw sensor data is noisy. A single outlier crosses a threshold, and a rate computed from two jittery values jumps around. A moving average replaces each value with the mean of the most recent ones, so Rules see the underlying trend instead of the noise. It is also how you compare "now" with "normally": a value against its own average over the last hour.
 
 ```java
 channel("level").averageOverSamples(5)                          // mean of the last 5 values
 channel("level").averageOverDuration(Duration.ofMinutes(10))    // mean of the last 10 minutes
 ```
 
-`averageOverSamples(n)` is defined once `n` values exist. `averageOverDuration(ms)` averages the values from the last `ms` milliseconds before the latest value and is defined once the values span that long.
+`averageOverSamples(n)` averages the last `n` values and is defined once `n` values exist. Use it for regularly sampled data. `averageOverDuration(ms)` averages the values from the last `ms` milliseconds before the latest value and is defined once the values span that long. Use it when Samples arrive irregularly, or when the window has a meaning in time ("the last 10 minutes").
+
+A longer window smooths more but reacts later. Compare with the raw value to find sudden deviations from the recent normal:
+
+```java
+// a reading 20 % above its own 1-hour average
+channel("power").above(channel("power").averageOverDuration(Duration.ofHours(1)).times(1.2))
+```
 
 A moving average supports everything a Channel does, including another average, `rising`, `falling`, `rate` and `age`. A smoothed slope, for example, is:
 
@@ -329,10 +377,22 @@ While an average warms up it is undefined, so Events of such a Rule that start r
 
 ### Logic: `and`, `or`, `not`
 
+Single comparisons rarely describe a real situation. Combine them:
+
+- **`and`**: all criteria must hold. It makes a Rule specific: "hot" alone may be normal under load, "hot while the fan is off" is a cooling failure.
+- **`or`**: any criterion suffices. It merges several ways into the same situation, such as any of several doors being open.
+- **`not`**: the opposite. It expresses "outside a band", "at least" (`below(80).not()` is `>= 80`) and "no pulse now" for [Pulse Channels](#pulse-channels).
+
 ```java
-channel("temp").above(80).and(channel("fan").below(0.5))           // hot and the fan is off
-channel("door").above(0.5).or(channel("window").above(0.5))
-channel("temp").between(18, 24).not()                              // outside the comfort band
+channel("temp").above(80).and(channel("fan").below(0.5))            // cooling failure
+channel("doorA").above(0.5).or(channel("doorB").above(0.5))          // any door open
+channel("temp").between(18, 24).not()                               // outside the comfort band
+```
+
+There is no operator precedence to remember: calls nest explicitly. This holds when the machine runs and at least one of the two warning signs is present:
+
+```java
+channel("rpm").above(100).and(channel("vibration").above(4).or(channel("temp").above(80)))
 ```
 
 ### Undefined values
@@ -351,7 +411,18 @@ Rules can refer to the Events of Rules declared before them. This composes simpl
 
 ### `during`: while another Event runs
 
-`during("A")` holds while an A Event is Confirmed and has not Ended:
+`during("A")` holds while an A Event is Confirmed and has not Ended. It turns an Event into a state that other Rules can use. Two uses are common.
+
+*Restricting a Rule to a phase.* Many criteria only make sense in a certain operating state. Vibration of a stopped machine is irrelevant, and a Rule for it would fire on every truck driving past. Define the phase once as a Rule and refer to it:
+
+```java
+.rule("Running", r -> r.when(channel("rpm").above(100)).forDuration(10_000))
+.rule("RoughRunning", r -> r.when(during("Running").and(channel("vibration").above(4))))
+```
+
+`RoughRunning` Ends at the latest when `Running` Ends. The phase Rule brings its own timing, here ten seconds of start-up during which vibration is ignored, which a plain `channel("rpm").above(100)` could not express.
+
+*Combining Events that have their own timing.* Each part keeps its own duration, End Condition and hysteresis, and the combination holds while both are Confirmed:
 
 ```java
 .rule("Tachycardia", r -> r.when(channel("hr").above(100)).forDuration(30_000))
