@@ -51,9 +51,24 @@ Each Rule has at most one Event in progress. The listener's methods are all opti
 | `onEnded`     | A Confirmed Event is over. It has its end, Aggregates and attributes. |
 | `onDiscarded` | A Pending Event stopped holding before it was Confirmed.              |
 
-`close()` Ends a Confirmed Event with `truncatedEnd()` and Discards a Pending one. An Event that may have begun before observation, because its Rule had not yet seen its Conditions not holding (at the start, during a warm-up, or after a data gap), has `truncatedStart()`.
+Without a duration, an Event is Pending and Confirmed at the same Sample. `close()` Ends a Confirmed Event with `truncatedEnd()` and Discards a Pending one. An Event that may have begun before observation, because its Rule had not yet seen its Conditions not holding (at the start, during a warm-up, or after a data gap), has `truncatedStart()`.
 
 A new Event of a Rule only starts after its `when` Condition has stopped holding since the previous Event started. With an End Condition that overlaps `when`, a Rule therefore does not flicker.
+
+## Events
+
+An `Event` is an immutable record:
+
+| Field                      | Meaning                                                                        |
+| -------------------------- | ------------------------------------------------------------------------------ |
+| `name()`                   | The name of the Rule that produced it.                                         |
+| `start()`                  | Timestamp (ms) of the first moment (Sample or advance) at which `when` held.   |
+| `confirmed()`              | When it was Confirmed; empty while Pending or if Discarded.                    |
+| `end()`                    | When it Ended; empty until then.                                               |
+| `truncatedStart()`         | It may have begun earlier than `start()` (see above).                          |
+| `truncatedEnd()`           | Observation stopped while it ran: `close()` or a `maxGap`.                     |
+| `aggregates("x")`          | Aggregates of Channel `x` so far (see below).                                  |
+| `attributes()`             | Values of the Rule's attributes; empty until Ended.                            |
 
 ## Building Rules
 
@@ -62,25 +77,67 @@ A new Event of a Rule only starts after its `when` Condition has stopped holding
     .when(channel("weight").above(500)).forDuration(Duration.ofSeconds(2))   // or .forSamples(5)
     .endWhen(channel("weight").below(50)).forDuration(Duration.ofSeconds(1)) // hysteresis
     .maxGap(Duration.ofSeconds(5))            // a longer data gap interrupts the Event
+    .aggregate("height")                      // also keep Aggregates of a Channel not in the Conditions
     .attribute("load", e -> e.aggregates("weight").mean() < 1500 ? "pallet" : "container"))
 ```
 
-Events carry Aggregates for the Channels their Rule's Conditions use: min, max, mean and count over Samples, plus `timeWeightedMean` and `integral` (value x seconds, e.g. distance from speed), which weight each value by how long it held. Request more with `.aggregate("height", ...)`. Reading any other Channel's Aggregates throws, so a missing declaration is never mistaken for "no data".
+| Method                   | Effect                                                                                                                  |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `when(c)`                | Required. An Event starts when `c` holds and, without `endWhen`, continues while it holds.                              |
+| `forDuration(ms)`        | The preceding `when` or `endWhen` must hold at least this long (`long` ms or `Duration`).                               |
+| `forSamples(n)`          | The preceding `when` or `endWhen` must hold for at least `n` consecutive Samples. Combined with `forDuration`, both must be met. |
+| `endWhen(c)`             | End Condition: once Confirmed, the Event runs until `c` holds for its own duration, whatever `when` does. The Event's end is where `c` started holding. |
+| `maxGap(ms)`             | If Samples are further apart, a Pending Event is Discarded and a Confirmed one Ends, truncated, at the last moment evaluated before the gap. |
+| `aggregate("x", ...)`    | Also keep Aggregates of these Channels.                                                                                  |
+| `attribute(name, fn)`    | Computed from the Ended Event (Aggregates, duration, ...) when it Ends, e.g. to classify it.                            |
 
-Conditions (`import static rbed.Conditions.*`):
+The Rule's name becomes the name of its Events. Rules are evaluated in declaration order, and a Rule may only reference Rules declared before it.
 
-- `channel("x").above(v)`, `.below(v)`, `.between(lo, hi)`. Each also accepts another expression, e.g. `channel("weight").above(channel("ratedLoad"))`.
-- Arithmetic: `.plus(...)`, `.minus(...)`, `.times(...)`, `.dividedBy(...)` (with an expression or a number) and `.abs()`, e.g. `channel("supply").minus(channel("return")).above(5)`.
-- `channel("x").rising()`, `.falling()`, `.rate()` (per second) and `.age()` (ms since the last value).
-- Moving averages: `.averageOverSamples(n)` and `.averageOverDuration(ms)`. These support the same functions again, so a smoothed slope is `channel("level").averageOverSamples(4).rate()`.
+## Aggregates
+
+Events carry Aggregates for the Channels their Rule's Conditions use, plus those requested with `.aggregate(...)`. Reading any other Channel's Aggregates throws, so a missing declaration is never mistaken for "no data".
+
+| Component          | Meaning                                                                                              |
+| ------------------ | ---------------------------------------------------------------------------------------------------- |
+| `min`, `max`, `mean` | Over the Samples of the Event in which the Channel had a value.                                    |
+| `count`            | The number of those Samples. With 0, the three above are NaN.                                        |
+| `timeWeightedMean` | Each value weighted by how long it held (until the next Sample, time advance or the Event's end).    |
+| `integral`         | Value x seconds, e.g. distance from speed or energy from power. Time-weighted like the mean.        |
+
+The time-weighted values are NaN if the Channel had no value during the Event; the time-weighted mean also for a zero span.
+
+## Conditions and Expressions
+
+Import `static rbed.Conditions.*`. An Expression is a number, a Condition is true, false or *undefined*. Everything can be combined freely.
+
+**Channels and comparisons**
+
+- `channel("x")`: the last known value of Channel `x`. A Sample may contain any subset of Channels: missing ones keep their last value.
+- `.above(v)` and `.below(v)` are strict; `.between(lo, hi)` includes both bounds. `above` and `below` also accept another Expression, e.g. `channel("weight").above(channel("ratedLoad"))`.
+- Arithmetic: `.plus(...)`, `.minus(...)`, `.times(...)`, `.dividedBy(...)` (with an Expression or a number) and `.abs()`, e.g. `channel("supply").minus(channel("return")).above(5)`.
+
+**How a Channel develops**
+
+- `.rising()` and `.falling()`: the latest value is greater or less than the previous one.
+- `.rate()`: change per second between the last two values.
+- `.age()`: ms since the latest value, at the current Sample or time advance (see below).
+- `.averageOverSamples(n)`: mean of the last `n` values. `.averageOverDuration(ms)`: mean of the values of the last `ms` before the latest value, defined once they span that long. Both support the same functions again, so a smoothed slope is `channel("level").averageOverSamples(4).rate()`.
+
+These functions use the Channel's own values, not the Samples in which it was missing.
+
+**Logic**
+
 - `a.and(b)`, `a.or(b)`, `a.not()`.
-- `during("A")`: an A Event is Confirmed and has not Ended yet.
-- `after("A")`: an A Event has Ended. Narrow it with `.unless("C", ...)` (no C Confirmed since then) and `.within(ms)`.
-- `count("A")`: how many A Events were Confirmed, optionally `.within(ms)` a sliding window, e.g. `count("Run").within(Duration.ofHours(1)).above(3)`.
-- `totalDuration("A")`: the summed duration of all A Events in ms, including a running one.
-- `latest("A").mean("x")`, `.min("x")`, `.max("x")`, `.duration()`: values of the latest Confirmed A Event, running or Ended. For example, a partial set-down is `channel("weight").below(latest("LoadLifted").max("weight").times(0.5))`.
 
-A Channel with no value yet, or an average that is still warming up, makes a comparison *undefined*. Undefined counts as false, also under `not()`. A Sample may contain any subset of Channels: missing ones keep their last value. A Rule may only reference Rules declared before it.
+**Other Rules' Events**
+
+- `during("A")`: an A Event is Confirmed and has not Ended yet.
+- `after("A")`: an A Event has Ended. Narrow it with `.unless("C", "D")` (no C or D Confirmed since then) and `.within(ms)` (it Ended at most `ms` ago). See [ADR-0002](docs/adr/0002-explicit-unless-for-sequences.md).
+- `count("A")`: how many A Events were Confirmed, optionally `.within(ms)` a sliding window, e.g. `count("Run").within(Duration.ofHours(1)).above(3)`.
+- `totalDuration("A")`: the summed duration of all A Events in ms, including a running one up to now.
+- `latest("A").mean("x")`, `.min("x")`, `.max("x")`, `.duration()`: values of the latest Confirmed A Event, running (so far) or Ended; undefined while there is none. For example, a partial set-down is `channel("weight").below(latest("LoadLifted").max("weight").times(0.5))`.
+
+**Undefined values.** A Channel with no value yet, an average that is still warming up, or a `rate` before two values makes an Expression undefined, and so every comparison on it. Undefined counts as false, also under `not()`.
 
 ## Batch
 
@@ -90,17 +147,19 @@ List<Event> events = detector.detect(List.of(
     new Sample(500, Map.of("weight", 1200.0)) /* ... */));
 ```
 
-For regularly sampled data without timestamps, configure `.samplingRate(hz)` on the builder (at most 1000 Hz, since timestamps are milliseconds) and use `push(values)` / `detectValues(listOfMaps)`.
+`detect` runs a whole series through an unused Detector, closes it and returns all Ended Events in the order they Ended. The listener is still called.
+
+For regularly sampled data without timestamps, configure `.samplingRate(hz)` on the builder (at most 1000 Hz, since timestamps are milliseconds) and use `push(values)` / `detectValues(listOfMaps)`. Sample `i` then has timestamp `round(i * 1000 / hz)`. With a sampling rate, `push(timestamp, values)` and `advanceTo` throw; without one, `push(values)` throws.
 
 ## Silent sensors and Pulse Channels
 
-When no Samples arrive, call `advanceTo(timestamp)` from your clock. Rules are evaluated at that moment: durations can be reached, `maxGap` is noticed, and `channel("x").age()` grows. So `when(channel("hr").age().above(10_000))` raises an Event while a sensor is silent. An advance is not a Sample: it does not count for `forSamples` or Aggregates.
+When no Samples arrive, call `advanceTo(timestamp)` from your clock. Rules are evaluated at that moment: durations can be reached, `maxGap` is noticed, and `channel("x").age()` grows. So `when(channel("hr").age().above(10_000))` raises an Event while a sensor is silent. An advance is not a Sample: it does not count for `forSamples` or Sample-based Aggregates.
 
-Declare one-off reports, such as deployments, as Pulse Channels with `.pulse("deploy")` on the builder. A Pulse Channel's value exists only in the Sample carrying it. Otherwise it is absent: comparisons on it are false, so `channel("deploy").above(0.5).not()` means "no deployment now".
+Declare one-off reports, such as deployments, as Pulse Channels with `.pulse("deploy")` on the builder. A Pulse Channel's value exists only in the Sample carrying it. Otherwise it is absent: comparisons, `rising` and `falling` on it are false, so `channel("deploy").above(0.5).not()` means "no deployment now". Arithmetic on an absent pulse is undefined, and `age()` gives the time since the last pulse.
 
 ## Restarts
 
-Pass Events stored before a restart with `.history(events)`, so that `after(...)` Rules keep working. They must have been Confirmed and have Ended before the first Sample.
+Pass Events stored before a restart with `.history(events)`. They must have been Confirmed and have Ended before the first Sample. `after`, `unless`, `count`, `totalDuration` and `latest(...).duration()` see them; they have no Aggregates for `latest`, and they are not reported to the listener.
 
 ## Examples
 
@@ -137,6 +196,7 @@ The performance tests are excluded from the default build because timings depend
 
 ## Notes
 
-- A Detector is single-use and not thread-safe. Use one per data stream.
-- Timestamps must strictly increase, and values must be finite. Otherwise `push` throws `IllegalArgumentException`.
-- A complete worked example is the crane scenario test in `src/test/java/rbed/CraneScenarioTest.java`.
+- A Detector is single-use and not thread-safe. Use one per data stream. It is `AutoCloseable`, so try-with-resources closes it.
+- Timestamps (of Samples and advances) must strictly increase and come after the History's latest end. Values must be finite. Otherwise `push` throws `IllegalArgumentException`. After `close()`, it throws `IllegalStateException`.
+- `build()` and the builders reject mistakes early: a duplicate Rule name, a Rule without `when`, a reference to the Rule itself or one declared later, negative durations, and a sampling rate outside (0, 1000] Hz.
+- The library is the Java module `rbed`.
