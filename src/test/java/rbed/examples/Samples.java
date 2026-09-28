@@ -30,13 +30,12 @@ final class Samples {
     return samples;
   }
 
-  /** "Name start..end" with times in the given unit, plus Truncated flags and attributes. */
+  /** "Name start..end" with times in the given unit, plus Truncated flags. */
   static String describe(Event e, long unit) {
     StringBuilder s = new StringBuilder(e.name()).append(' ').append(format(e.start(), unit))
         .append("..").append(e.end().isPresent() ? format(e.end().getAsLong(), unit) : "?");
     if (e.truncatedStart()) s.append(" truncatedStart");
     if (e.truncatedEnd()) s.append(" truncatedEnd");
-    if (!e.attributes().isEmpty()) s.append(' ').append(e.attributes());
     return s.toString();
   }
 

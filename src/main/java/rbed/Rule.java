@@ -1,10 +1,6 @@
 package rbed;
 
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.OptionalLong;
-import java.util.function.Function;
 
 /**
  * Runtime state machine of one Rule inside one Detector. Evaluates its {@code when} Condition at
@@ -21,7 +17,6 @@ final class Rule {
   private final Condition.Bound end;
   private final Progress ending;
   private final long maxGap;
-  private final Map<String, Function<Event, Object>> attributes;
   private final AggregatedChannels channels = new AggregatedChannels();
   private Accumulator aggregates = new Accumulator();
   private final Accumulator endPhaseAggregates = new Accumulator();
@@ -54,7 +49,6 @@ final class Rule {
     for (ChannelState referenced : detector.recordedChannelLookups()) aggregate(referenced);
     for (String channel : spec.aggregated) aggregate(detector.channel(channel));
     this.maxGap = spec.maxGap;
-    this.attributes = new LinkedHashMap<>(spec.attributes);
   }
 
   /** Keeps Aggregates for this Channel too; returns its index in the Accumulators. */
@@ -196,13 +190,6 @@ final class Rule {
     events.end(endTimestamp);
     Event ended = snapshot(
         OptionalLong.of(confirmedAt), OptionalLong.of(endTimestamp), truncated, endTimestamp);
-    if (!attributes.isEmpty()) {
-      Map<String, Object> values = new LinkedHashMap<>();
-      for (Map.Entry<String, Function<Event, Object>> a : attributes.entrySet()) {
-        values.put(a.getKey(), a.getValue().apply(ended));
-      }
-      ended = ended.withAttributes(Collections.unmodifiableMap(values));
-    }
     Accumulator recycled = latestEnded;
     latestEnded = aggregates;
     aggregates = recycled; // cleared when the next Event begins
@@ -220,6 +207,6 @@ final class Rule {
   private Event snapshot(
       OptionalLong confirmed, OptionalLong end, boolean truncatedEnd, long aggregatesUntil) {
     return new Event(name, holding.since, confirmed, end, truncatedStart, truncatedEnd,
-        aggregates.snapshot(channels, aggregatesUntil), Map.of());
+        aggregates.snapshot(channels, aggregatesUntil));
   }
 }

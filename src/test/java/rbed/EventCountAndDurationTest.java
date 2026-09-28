@@ -16,7 +16,7 @@ class EventCountAndDurationTest {
 
   static Event ended(String name, long start, long confirmed, long end) {
     return new Event(name, start, OptionalLong.of(confirmed), OptionalLong.of(end), false, false,
-        Map.of(), Map.of());
+        Map.of());
   }
 
   void push(Detector d, long[] ts, double... values) {

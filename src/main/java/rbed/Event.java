@@ -14,7 +14,6 @@ import java.util.OptionalLong;
  *     Conditions not holding since observation began or resumed after a gap
  * @param truncatedEnd observation stopped (close or max gap) while it was in progress
  * @param aggregates Aggregates over its Samples so far, for each Channel its Rule aggregates
- * @param attributes values of the Rule's attributes; empty until Ended
  */
 public record Event(
     String name,
@@ -23,8 +22,7 @@ public record Event(
     OptionalLong end,
     boolean truncatedStart,
     boolean truncatedEnd,
-    Map<String, Aggregates> aggregates,
-    Map<String, Object> attributes) {
+    Map<String, Aggregates> aggregates) {
 
   /**
    * Aggregates of one Channel; {@link Aggregates#count()} is 0 if it had no value.
@@ -38,10 +36,5 @@ public record Event(
           + "; add .aggregate(\"" + channel + "\")");
     }
     return a;
-  }
-
-  Event withAttributes(Map<String, Object> values) {
-    return new Event(
-        name, start, confirmed, end, truncatedStart, truncatedEnd, aggregates, values);
   }
 }

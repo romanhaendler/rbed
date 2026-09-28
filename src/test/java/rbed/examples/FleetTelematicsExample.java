@@ -16,7 +16,7 @@ import rbed.Event;
  *
  * <ul>
  *   <li>Trip: moving faster than 1 m/s for 10 s, over after standing still for 3 minutes. Its
- *       distance is the integral of speed over time.
+ *       distance is the integral of speed over time, see {@link #km}.
  *   <li>HarshBraking: decelerating faster than 4 m/s².
  *   <li>Idling: standing with the engine running for 2 minutes.
  * </ul>
@@ -31,13 +31,17 @@ class FleetTelematicsExample {
     return 0;
   }
 
+  /** Distance of a Trip in km: the integral of speed (m/s) over time. */
+  static double km(Event trip) {
+    return trip.aggregates("speed").integral() / 1000;
+  }
+
   @Test
   void detectsTripsHarshBrakingAndIdling() {
     Detector detector = Detector.builder()
         .rule("Trip", r -> r
             .when(channel("speed").above(1)).forDuration(10 * SECOND)
-            .endWhen(channel("speed").below(0.5)).forDuration(3 * MINUTE)
-            .attribute("km", e -> e.aggregates("speed").integral() / 1000))
+            .endWhen(channel("speed").below(0.5)).forDuration(3 * MINUTE))
         .rule("HarshBraking", r -> r.when(channel("speed").rate().below(-4)))
         .rule("Idling", r -> r
             .when(channel("speed").below(0.5).and(channel("rpm").above(600)))
@@ -50,9 +54,10 @@ class FleetTelematicsExample {
     assertEquals(List.of(
             "Idling 60..301",
             "HarshBraking 901..905",
-            // each speed from 301 to 903 s holds for 1 s: 11940 m
-            "Trip 301..904 {km=11.94}",
+            "Trip 301..904",
             "Idling 904..1499 truncatedEnd"), // last Sample at 1499 s
         Samples.describe(events, SECOND));
+    // each speed from 301 to 903 s holds for 1 s: 11940 m
+    assertEquals(11.94, km(events.get(2)), 1e-9);
   }
 }

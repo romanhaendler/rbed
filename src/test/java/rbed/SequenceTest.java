@@ -106,14 +106,14 @@ class SequenceTest {
   @Test
   void historyEventsMustHaveEnded() {
     Event running = new Event("M", 0, OptionalLong.of(0), OptionalLong.empty(), false, false,
-        Map.of(), Map.of());
+        Map.of());
     assertThrows(IllegalArgumentException.class,
         () -> Detector.builder().history(List.of(running)));
   }
 
   static Event ended(String name, long start, long confirmed, long end) {
     return new Event(name, start, OptionalLong.of(confirmed), OptionalLong.of(end), false, false,
-        Map.of(), Map.of());
+        Map.of());
   }
 
   @Test

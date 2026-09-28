@@ -76,20 +76,4 @@ class AggregatesTest {
     d.push(2, Map.of("weight", 800.0));
     assertEquals(Recorder.stats(600, 800, 700, 2), Recorder.stats(confirmed.get(0).aggregates("weight")));
   }
-
-  @Test
-  void attributesAreComputedOnEnd() {
-    Detector d = Detector.builder()
-        .rule("Lift", r -> r
-            .when(channel("weight").above(500))
-            .attribute("load", e -> e.aggregates("weight").mean() > 1000 ? "container" : "pallet"))
-        .listener(rec).build();
-    d.push(0, Map.of("weight", 0.0));
-    d.push(1, Map.of("weight", 600.0));
-    d.push(2, Map.of("weight", 0.0));
-    d.push(3, Map.of("weight", 2000.0));
-    d.push(4, Map.of("weight", 0.0));
-    assertEquals(Map.of("load", "pallet"), rec.ended.get(0).attributes());
-    assertEquals(Map.of("load", "container"), rec.ended.get(1).attributes());
-  }
 }

@@ -19,7 +19,7 @@ import rbed.Event;
  *
  * <ul>
  *   <li>Run: above 500 W for 30 s, over below 100 W for 30 s. A Run shorter than 5 minutes is
- *       classified as a short cycle via an attribute.
+ *       classified as a short cycle by a plain method.
  *   <li>QuickRestart: a Run beginning within 3 minutes after the previous one Ended.
  *   <li>FrequentStarts: more than 2 Runs Confirmed within an hour.
  * </ul>
@@ -31,13 +31,17 @@ class HvacShortCyclingExample {
     return on ? 2_000 : 20;
   }
 
+  /** A Run shorter than 5 minutes. */
+  static boolean shortCycle(Event run) {
+    return run.end().getAsLong() - run.start() < 5 * MINUTE;
+  }
+
   @Test
   void detectsShortCyclesAndQuickRestarts() {
     Detector detector = Detector.builder()
         .rule("Run", r -> r
             .when(channel("power").above(500)).forDuration(30 * SECOND)
-            .endWhen(channel("power").below(100)).forDuration(30 * SECOND)
-            .attribute("shortCycle", e -> e.end().getAsLong() - e.start() < 5 * MINUTE))
+            .endWhen(channel("power").below(100)).forDuration(30 * SECOND))
         .rule("QuickRestart", r -> r
             .when(after("Run").within(3 * MINUTE).and(channel("power").above(500)))
             .forDuration(30 * SECOND)
@@ -49,13 +53,15 @@ class HvacShortCyclingExample {
         Samples.every(10, 0, 2400, SECOND, s -> Map.of("power", power(s))));
 
     assertEquals(List.of(
-            "Run 100..700 {shortCycle=false}",
+            "Run 100..700",
             // QuickRestart Ends at once below 100 W (920 s); Run waits 30 s to confirm its end
             "QuickRestart 800..920",           // 100 s after the first Run Ended
-            "Run 800..920 {shortCycle=true}",
-            "Run 1600..2200 {shortCycle=false}",
+            "Run 800..920",
+            "Run 1600..2200",
             // Runs Confirmed at 130, 830 and 1630 s; the window keeps all three until the end
             "FrequentStarts 1630..2390 truncatedEnd"),
         Samples.describe(events, SECOND));
+    assertEquals(List.of(false, true, false), events.stream()
+        .filter(e -> e.name().equals("Run")).map(HvacShortCyclingExample::shortCycle).toList());
   }
 }

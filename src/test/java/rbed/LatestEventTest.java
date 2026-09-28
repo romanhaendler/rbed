@@ -64,7 +64,7 @@ class LatestEventTest {
   @Test
   void historyGivesDurationButNoChannelValues() {
     Event a = new Event("A", -2000, OptionalLong.of(-1900), OptionalLong.of(-100), false, false,
-        Map.of(), Map.of());
+        Map.of());
     Detector d = Detector.builder()
         .rule("Long", r -> r.when(latest("A").duration().above(1500)))
         .rule("Mean", r -> r.when(latest("A").mean("y").above(-1e9).or(

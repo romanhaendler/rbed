@@ -11,7 +11,7 @@ Vocabulary (Sample, Channel, Condition, Rule, Event, Detector, ...) is defined i
 - [Samples and Channels](#samples-and-channels)
 - [The Event lifecycle](#the-event-lifecycle)
 - [Events](#events)
-- [Building Rules](#building-rules): durations, End Conditions, data gaps, attributes
+- [Building Rules](#building-rules): durations, End Conditions, data gaps, derived values
 - [Conditions and Expressions](#conditions-and-expressions): comparisons, arithmetic, trends, moving averages, logic
 - [Referring to other Rules](#referring-to-other-rules): `during`, `after`, `count`, `totalDuration`, `latest`
 - [Aggregates](#aggregates)
@@ -90,7 +90,7 @@ An Event goes through up to four stages, and the listener is told about each. Al
 | ------------- | --------------------------------------------------------------------- |
 | `onPending`   | The Conditions started holding; the required duration is not reached. |
 | `onConfirmed` | The Conditions held long enough. Only Confirmed Events count.         |
-| `onEnded`     | A Confirmed Event is over. It has its end, Aggregates and attributes. |
+| `onEnded`     | A Confirmed Event is over. It has its end and Aggregates.             |
 | `onDiscarded` | A Pending Event stopped holding before it was Confirmed.              |
 
 The distinction between Pending and Confirmed matters when a Rule requires a duration. Here a temperature must stay above 80 for two seconds:
@@ -142,7 +142,6 @@ An `Event` is an immutable record. The listener receives a fresh snapshot at eac
 | `truncatedStart()` | It may have begun earlier than `start()`.                                      |
 | `truncatedEnd()`   | Observation stopped while it ran: `close()` or a data gap.                     |
 | `aggregates("x")`  | [Aggregates](#aggregates) of Channel `x` over the Event so far.                |
-| `attributes()`     | Values of the Rule's [attributes](#attributes); empty until Ended.             |
 
 The duration of an Ended Event is `e.end().getAsLong() - e.start()`.
 
@@ -155,8 +154,7 @@ A Rule is configured in a lambda that receives a `RuleBuilder`. A complete Rule 
     .when(channel("weight").above(500)).forDuration(Duration.ofSeconds(2))
     .endWhen(channel("weight").below(50)).forDuration(Duration.ofSeconds(1))
     .maxGap(Duration.ofSeconds(5))
-    .aggregate("height")
-    .attribute("load", e -> e.aggregates("weight").mean() < 1500 ? "pallet" : "container"))
+    .aggregate("height"))
 ```
 
 Every time value accepts either a `long` in milliseconds or a `java.time.Duration`.
@@ -221,24 +219,19 @@ Each Event carries [Aggregates](#aggregates) (min, max, mean, ...) of the Channe
     .aggregate("height", "windSpeed"))   // weight is aggregated anyway
 ```
 
-### Attributes
+### Derived values
 
-An attribute is a value computed once, when the Event Ends, from the Ended Event itself: its Aggregates, start, end, flags. Use it to classify Events or to attach derived figures:
-
-```java
-.rule("Run", r -> r
-    .when(channel("power").above(500))
-    .attribute("shortCycle", e -> e.end().getAsLong() - e.start() < 5 * 60_000)
-    .attribute("peakKw", e -> e.aggregates("power").max() / 1000))
-```
+To classify an Ended Event or derive a figure from it, write a plain method of the Event: its Aggregates, start, end and flags are all there, and the result is typed.
 
 ```java
+static boolean shortCycle(Event run) {
+  return run.end().getAsLong() - run.start() < 5 * 60_000;
+}
+
 @Override public void onEnded(Event e) {
-  if ((Boolean) e.attributes().get("shortCycle")) { /* ... */ }
+  if (shortCycle(e)) { /* ... */ }
 }
 ```
-
-Attributes appear only on the Ended Event; `attributes()` is empty in the Pending and Confirmed snapshots. They are computed in declaration order and are of any type.
 
 ### Rule order
 
@@ -318,9 +311,8 @@ A threshold tells you *where* a signal is. Often it matters more *where it is go
 *Peaks and troughs.* An Event of `rising()` lasts exactly as long as a climb. It Ends at the first Sample that is not higher, and its `max` Aggregate is the peak value:
 
 ```java
-.rule("Climb", r -> r.when(channel("x").rising())
-    .attribute("peak", e -> e.aggregates("x").max()))
-// x: 1 2 5 9 7 3 1 at 0..6 s  ->  Climb 1000..4000, peak 9.0
+.rule("Climb", r -> r.when(channel("x").rising()))
+// x: 1 2 5 9 7 3 1 at 0..6 s  ->  Climb 1000..4000, e.aggregates("x").max() is 9.0
 ```
 
 **`rate()`** is an Expression: how fast the Channel changes, in its own units per second. It is computed from the two latest values and their timestamps, `(latest - previous) / seconds between them`, so irregular sampling is handled correctly. Unlike `rising()`, it says *how fast*, so you compare it with a limit:

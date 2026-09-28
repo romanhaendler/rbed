@@ -18,7 +18,7 @@ import rbed.Sample;
  *
  * <ul>
  *   <li>Overheat: above 80 °C for 30 s, over only once below 70 °C for a minute (hysteresis),
- *       with the peak temperature as attribute.
+ *       with its peak temperature from the Aggregates.
  *   <li>HighLoad: load above 80 % for 10 s, over below 60 %.
  *   <li>OverheatUnderLoad: both at once ({@code during} combined with {@code and}).
  *   <li>FastHeating: heating faster than 0.5 °C/s for 5 consecutive Samples.
@@ -51,8 +51,7 @@ class MachineToolOverheatExample {
             .endWhen(channel("load").below(60)))
         .rule("Overheat", r -> r
             .when(channel("temp").above(80)).forDuration(30 * SECOND)
-            .endWhen(channel("temp").below(70)).forDuration(60 * SECOND)
-            .attribute("peak", e -> e.aggregates("temp").max()))
+            .endWhen(channel("temp").below(70)).forDuration(60 * SECOND))
         .rule("OverheatUnderLoad", r -> r.when(during("Overheat").and(during("HighLoad"))))
         .rule("FastHeating", r -> r.when(channel("temp").rate().above(0.5)).forSamples(5))
         .build();
@@ -63,9 +62,10 @@ class MachineToolOverheatExample {
 
     assertEquals(List.of(
             "FastHeating 101..141",           // rate is 1 °C/s from 101 s until 140 s
-            "Overheat 121..331 {peak=100.0}", // 81 °C at 121 s; below 70 °C from 331 s
+            "Overheat 121..331",              // 81 °C at 121 s; below 70 °C from 331 s
             "OverheatUnderLoad 151..391",     // Overheat Confirmed at 151 s, End confirmed 391 s
             "HighLoad 100..400"),
         Samples.describe(events, SECOND));
+    assertEquals(100.0, events.get(1).aggregates("temp").max()); // peak temperature
   }
 }

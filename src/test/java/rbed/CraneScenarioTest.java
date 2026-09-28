@@ -28,6 +28,11 @@ class CraneScenarioTest {
     return 0;
   }
 
+  /** Classifies a lifted load by its mean weight. */
+  static String load(Event lift) {
+    return lift.aggregates("weight").mean() < 1500 ? "pallet" : "container";
+  }
+
   @Test
   void liftsOverloadAndSetDownsWithClassifiedLoads() {
     List<String> pickedUp = new ArrayList<>();
@@ -35,8 +40,7 @@ class CraneScenarioTest {
         .rule("LoadLifted", r -> r
             .when(channel("weight").above(500)).forDuration(Duration.ofSeconds(2))
             .endWhen(channel("weight").below(50)).forDuration(Duration.ofSeconds(1))
-            .maxGap(Duration.ofSeconds(5))
-            .attribute("load", e -> e.aggregates("weight").mean() < 1500 ? "pallet" : "container"))
+            .maxGap(Duration.ofSeconds(5)))
         .rule("Overload", r -> r
             .when(channel("weight").above(channel("ratedLoad")).and(during("LoadLifted")))
             .forSamples(2))
@@ -63,14 +67,15 @@ class CraneScenarioTest {
     assertEquals(List.of("LoadLifted@1500", "LoadLifted@8500", "Overload@10500",
         "PartialSetDown@11500"), pickedUp);
     assertEquals(List.of(
-            "LoadLifted 1500..6500 {load=pallet}",
-            "Overload 10500..11500 {}",
+            "LoadLifted 1500..6500 pallet",
+            "Overload 10500..11500",
             // below half of the 6000 kg maximum from 11500 ms until fully set down
-            "PartialSetDown 11500..12500 {}",
+            "PartialSetDown 11500..12500",
             // mean of 6 Samples at 6000 kg and 2 at 2500 kg: 5125 kg
-            "LoadLifted 8500..12500 {load=container}"),
+            "LoadLifted 8500..12500 container"),
         events.stream()
-            .map(e -> e.name() + " " + e.start() + ".." + e.end().getAsLong() + " " + e.attributes())
+            .map(e -> e.name() + " " + e.start() + ".." + e.end().getAsLong()
+                + (e.name().equals("LoadLifted") ? " " + load(e) : ""))
             .toList());
   }
 }
