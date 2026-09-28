@@ -1,13 +1,13 @@
 package rbed.examples;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static rbed.Conditions.channel;
 import static rbed.examples.Samples.MINUTE;
 import static rbed.examples.Samples.SECOND;
 
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import rbed.Channel;
 import rbed.Detector;
 import rbed.Event;
 
@@ -22,6 +22,8 @@ import rbed.Event;
  * </ul>
  */
 class FleetTelematicsExample {
+  static final Channel RPM = Channel.named("rpm");
+  static final Channel SPEED = Channel.named("speed");
 
   static double speed(double s) {
     if (s < 300) return 0;
@@ -33,23 +35,23 @@ class FleetTelematicsExample {
 
   /** Distance of a Trip in km: the integral of speed (m/s) over time. */
   static double km(Event trip) {
-    return trip.aggregates("speed").integral() / 1000;
+    return trip.aggregates(SPEED).integral() / 1000;
   }
 
   @Test
   void detectsTripsHarshBrakingAndIdling() {
     Detector detector = Detector.builder()
         .rule("Trip", r -> r
-            .when(channel("speed").above(1)).forDuration(10 * SECOND)
-            .endWhen(channel("speed").below(0.5)).forDuration(3 * MINUTE))
-        .rule("HarshBraking", r -> r.when(channel("speed").rate().below(-4)))
+            .when(SPEED.above(1)).forDuration(10 * SECOND)
+            .endWhen(SPEED.below(0.5)).forDuration(3 * MINUTE))
+        .rule("HarshBraking", r -> r.when(SPEED.rate().below(-4)))
         .rule("Idling", r -> r
-            .when(channel("speed").below(0.5).and(channel("rpm").above(600)))
+            .when(SPEED.below(0.5).and(RPM.above(600)))
             .forDuration(2 * MINUTE))
         .build();
 
     List<Event> events = detector.detect(Samples.every(1, 0, 1500, SECOND,
-        s -> Map.of("speed", speed(s), "rpm", s < 60 ? 0.0 : 800.0)));
+        s -> Map.of(SPEED, speed(s), RPM, s < 60 ? 0.0 : 800.0)));
 
     assertEquals(List.of(
             "Idling 60..301",

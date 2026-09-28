@@ -2,7 +2,6 @@ package rbed.examples;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static rbed.Conditions.after;
-import static rbed.Conditions.channel;
 import static rbed.Conditions.count;
 import static rbed.examples.Samples.MINUTE;
 import static rbed.examples.Samples.SECOND;
@@ -11,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import rbed.Channel;
 import rbed.Detector;
 import rbed.Event;
 import rbed.EventListener;
@@ -29,6 +29,8 @@ import rbed.EventListener;
  * <p>The recovery time (from the end of a Sprint to Recovered) is computed by a listener.
  */
 class IntervalTrainingExample {
+  static final Channel HR = Channel.named("hr");
+  static final Channel SPEED = Channel.named("speed");
 
   static double heartRate(double s) {
     if (s < 60) return 100;
@@ -41,10 +43,10 @@ class IntervalTrainingExample {
     List<Long> recoverySeconds = new ArrayList<>();
     Detector detector = Detector.builder()
         .rule("Sprint", r -> r
-            .when(channel("speed").above(6)).forDuration(5 * SECOND)
-            .endWhen(channel("speed").below(4)))
+            .when(SPEED.above(6)).forDuration(5 * SECOND)
+            .endWhen(SPEED.below(4)))
         .rule("Recovered", r -> r
-            .when(after("Sprint").within(2 * MINUTE).and(channel("hr").below(120))))
+            .when(after("Sprint").within(2 * MINUTE).and(HR.below(120))))
         .rule("SessionDone", r -> r.when(count("Sprint").above(2)))
         .listener(new EventListener() {
           private long lastSprintEnd;
@@ -62,8 +64,8 @@ class IntervalTrainingExample {
         .build();
 
     List<Event> events = detector.detect(Samples.every(1, 0, 420, SECOND, s -> Map.of(
-        "speed", s >= 60 && (s - 60) % 120 < 30 ? 7.0 : 2.0,
-        "hr", heartRate(s))));
+        SPEED, s >= 60 && (s - 60) % 120 < 30 ? 7.0 : 2.0,
+        HR, heartRate(s))));
 
     assertEquals(List.of(
             "Sprint 60..90", "Recovered 141..180",

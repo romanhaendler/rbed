@@ -2,13 +2,13 @@ package rbed.examples;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static rbed.Conditions.after;
-import static rbed.Conditions.channel;
 import static rbed.examples.Samples.MINUTE;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import rbed.Channel;
 import rbed.Detector;
 import rbed.Event;
 
@@ -25,6 +25,9 @@ import rbed.Event;
  * </ul>
  */
 class DeploymentRegressionExample {
+  static final Channel CPU = Channel.named("cpu");
+  static final Channel DEPLOY = Channel.pulse("deploy");
+  static final Channel ERRORS = Channel.named("errors");
 
   static double errors(double m) {
     if (m >= 25 && m < 35) return 12;
@@ -35,20 +38,19 @@ class DeploymentRegressionExample {
   @Test
   void attributesErrorSpikesToDeployments() {
     Detector detector = Detector.builder()
-        .pulse("deploy")
-        .rule("Deployment", r -> r.when(channel("deploy").above(0.5)))
-        .rule("ErrorSpike", r -> r.when(channel("errors").above(5)).forDuration(2 * MINUTE))
+        .rule("Deployment", r -> r.when(DEPLOY.above(0.5)))
+        .rule("ErrorSpike", r -> r.when(ERRORS.above(5)).forDuration(2 * MINUTE))
         .rule("Regression", r -> r
-            .when(after("Deployment").within(30 * MINUTE).and(channel("errors").above(5)))
+            .when(after("Deployment").within(30 * MINUTE).and(ERRORS.above(5)))
             .forDuration(2 * MINUTE))
-        .rule("HighCpu", r -> r.when(channel("cpu").above(90)).forDuration(5 * MINUTE))
+        .rule("HighCpu", r -> r.when(CPU.above(90)).forDuration(5 * MINUTE))
         .build();
 
     List<Event> events = detector.detect(Samples.every(1, 0, 120, MINUTE, m -> {
-      Map<String, Double> values = new HashMap<>(Map.of(
-          "errors", errors(m),
-          "cpu", m >= 90 && m < 100 ? 95.0 : 50.0));
-      if (m == 10) values.put("deploy", 1.0); // sent once, never reset
+      Map<Channel, Double> values = new HashMap<>(Map.of(
+          ERRORS, errors(m),
+          CPU, m >= 90 && m < 100 ? 95.0 : 50.0));
+      if (m == 10) values.put(DEPLOY, 1.0); // sent once, never reset
       return values;
     }));
 

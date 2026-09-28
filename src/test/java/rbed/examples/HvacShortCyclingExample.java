@@ -2,7 +2,6 @@ package rbed.examples;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static rbed.Conditions.after;
-import static rbed.Conditions.channel;
 import static rbed.Conditions.count;
 import static rbed.examples.Samples.MINUTE;
 import static rbed.examples.Samples.SECOND;
@@ -10,6 +9,7 @@ import static rbed.examples.Samples.SECOND;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import rbed.Channel;
 import rbed.Detector;
 import rbed.Event;
 
@@ -25,6 +25,7 @@ import rbed.Event;
  * </ul>
  */
 class HvacShortCyclingExample {
+  static final Channel POWER = Channel.named("power");
 
   static double power(double s) {
     boolean on = (s >= 100 && s < 700) || (s >= 800 && s < 920) || (s >= 1600 && s < 2200);
@@ -40,17 +41,17 @@ class HvacShortCyclingExample {
   void detectsShortCyclesAndQuickRestarts() {
     Detector detector = Detector.builder()
         .rule("Run", r -> r
-            .when(channel("power").above(500)).forDuration(30 * SECOND)
-            .endWhen(channel("power").below(100)).forDuration(30 * SECOND))
+            .when(POWER.above(500)).forDuration(30 * SECOND)
+            .endWhen(POWER.below(100)).forDuration(30 * SECOND))
         .rule("QuickRestart", r -> r
-            .when(after("Run").within(3 * MINUTE).and(channel("power").above(500)))
+            .when(after("Run").within(3 * MINUTE).and(POWER.above(500)))
             .forDuration(30 * SECOND)
-            .endWhen(channel("power").below(100)))
+            .endWhen(POWER.below(100)))
         .rule("FrequentStarts", r -> r.when(count("Run").within(60 * MINUTE).above(2)))
         .build();
 
     List<Event> events = detector.detect(
-        Samples.every(10, 0, 2400, SECOND, s -> Map.of("power", power(s))));
+        Samples.every(10, 0, 2400, SECOND, s -> Map.of(POWER, power(s))));
 
     assertEquals(List.of(
             "Run 100..700",

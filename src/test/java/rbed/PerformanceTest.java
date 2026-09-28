@@ -2,7 +2,6 @@ package rbed;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static rbed.Conditions.after;
-import static rbed.Conditions.channel;
 import static rbed.Conditions.count;
 import static rbed.Conditions.during;
 import static rbed.Conditions.latest;
@@ -40,6 +39,11 @@ import org.junit.jupiter.api.Test;
  */
 @Tag("performance")
 class PerformanceTest {
+  static final Channel ANGLE = Channel.named("angle");
+  static final Channel LIMIT = Channel.named("limit");
+  static final Channel WEIGHT = Channel.named("weight");
+  static final Channel X = Channel.named("x");
+
   private static final int WARM_UP_SAMPLES = 2_000_000;
   private static final int MEASURED_SAMPLES = 5_000_000;
   private static final int RUNS = 5;
@@ -52,7 +56,7 @@ class PerformanceTest {
   /** One Rule, one Channel: the minimum cost of a push. */
   static Detector singleThreshold() {
     return Detector.builder()
-        .rule("High", r -> r.when(channel("x").above(50)))
+        .rule("High", r -> r.when(X.above(50)))
         .build();
   }
 
@@ -65,28 +69,28 @@ class PerformanceTest {
   static Detector realisticRuleSet() {
     return Detector.builder()
         .rule("Lift", r -> r
-            .when(channel("weight").above(500)).forDuration(2_000)
-            .endWhen(channel("weight").below(50)).forDuration(1_000)
+            .when(WEIGHT.above(500)).forDuration(2_000)
+            .endWhen(WEIGHT.below(50)).forDuration(1_000)
             .maxGap(5_000))
         .rule("Overload", r -> r
-            .when(channel("weight").above(channel("limit")).and(during("Lift"))).forSamples(3))
-        .rule("FastRise", r -> r.when(channel("weight").rate().above(2_000)))
+            .when(WEIGHT.above(LIMIT).and(during("Lift"))).forSamples(3))
+        .rule("FastRise", r -> r.when(WEIGHT.rate().above(2_000)))
         .rule("Swinging", r -> r
-            .when(channel("angle").averageOverSamples(50).above(5)
-                .or(channel("angle").averageOverDuration(Duration.ofSeconds(10)).below(-5))))
+            .when(ANGLE.averageOverSamples(50).above(5)
+                .or(ANGLE.averageOverDuration(Duration.ofSeconds(10)).below(-5))))
         .rule("LiftAfterOverload", r -> r
             .when(after("Overload").unless("Lift").within(60_000)
-                .and(channel("weight").rising())))
+                .and(WEIGHT.rising())))
         .rule("NearLimit", r -> r
-            .when(channel("limit").minus(channel("weight")).abs().below(100)))
+            .when(LIMIT.minus(WEIGHT).abs().below(100)))
         .rule("SmoothRise", r -> r
-            .when(channel("weight").averageOverSamples(10).rate().above(100)))
+            .when(WEIGHT.averageOverSamples(10).rate().above(100)))
         .rule("FrequentLifts", r -> r.when(count("Lift").within(60_000).above(3)))
         .rule("LongLifting", r -> r.when(totalDuration("Lift").above(3_600_000)))
         .rule("PartialSetDown", r -> r
             .when(during("Lift")
-                .and(channel("weight").below(latest("Lift").max("weight").times(0.5)))))
-        .rule("AngleSensorSilent", r -> r.when(channel("angle").age().above(5_000)))
+                .and(WEIGHT.below(latest("Lift").max(WEIGHT).times(0.5)))))
+        .rule("AngleSensorSilent", r -> r.when(ANGLE.age().above(5_000)))
         .build();
   }
 
@@ -94,10 +98,10 @@ class PerformanceTest {
   static Detector manyRulesAndChannels() {
     Detector.Builder b = Detector.builder();
     for (int i = 0; i < 50; i++) {
-      String c = "c" + (i % 20);
+      Channel c = Channel.named("c" + (i % 20));
       b.rule("R" + i, r -> r
-          .when(channel(c).above(50)).forSamples(5)
-          .endWhen(channel(c).below(10)).forSamples(2));
+          .when(c.above(50)).forSamples(5)
+          .endWhen(c.below(10)).forSamples(2));
     }
     return b.build();
   }
@@ -114,13 +118,13 @@ class PerformanceTest {
   void steadyStateSamplesDoNotAllocate() {
     Detector detector = Detector.builder()
         .rule("Long", r -> r
-            .when(channel("x").above(0))
-            .endWhen(channel("x").below(-1_000)))
-        .rule("AvgSamples", r -> r.when(channel("x").averageOverSamples(1_000).above(0)))
-        .rule("AvgTime", r -> r.when(channel("x").averageOverDuration(60_000).above(0)))
-        .rule("Rate", r -> r.when(channel("x").rate().above(1e9)))
+            .when(X.above(0))
+            .endWhen(X.below(-1_000)))
+        .rule("AvgSamples", r -> r.when(X.averageOverSamples(1_000).above(0)))
+        .rule("AvgTime", r -> r.when(X.averageOverDuration(60_000).above(0)))
+        .rule("Rate", r -> r.when(X.rate().above(1e9)))
         .build();
-    Feed feed = new Feed(8, "x", i -> 1.0 + (i % 7)); // always > 0, never rising 1e9/s
+    Feed feed = new Feed(8, X, i -> 1.0 + (i % 7)); // always > 0, never rising 1e9/s
 
     feed.push(detector, 120_000); // fill every window (2 minutes at 1 kHz), start the Event
     long bytes = allocatedBytes(() -> feed.push(detector, MEASURED_SAMPLES));
@@ -135,7 +139,7 @@ class PerformanceTest {
   @Test
   void realisticRuleSetDoesNotAllocateInSteadyState() {
     Detector detector = realisticRuleSet();
-    Feed feed = new Feed(4, Map.of("weight", 800.0, "limit", 5_000.0, "angle", 0.0));
+    Feed feed = new Feed(4, Map.of(WEIGHT, 800.0, LIMIT, 5_000.0, ANGLE, 0.0));
     feed.push(detector, 100_000);
     long bytes = allocatedBytes(() -> feed.push(detector, MEASURED_SAMPLES));
 
@@ -151,7 +155,7 @@ class PerformanceTest {
   @Test
   void throughputSingleThreshold() {
     // crosses the threshold every 100 Samples, so Events start and end all the time
-    Feed feed = new Feed(100, "x", i -> i < 50 ? 0.0 : 100.0);
+    Feed feed = new Feed(100, X, i -> i < 50 ? 0.0 : 100.0);
     assertThroughput("single threshold", PerformanceTest::singleThreshold, feed, 5_000_000);
   }
 
@@ -160,9 +164,9 @@ class PerformanceTest {
     Feed feed = new Feed(200, i -> {
       boolean loaded = (i / 50) % 2 == 1;
       return Map.of(
-          "weight", loaded ? 1_200.0 + i : 10.0,
-          "limit", 5_000.0,
-          "angle", (i % 23) - 11.0);
+          WEIGHT, loaded ? 1_200.0 + i : 10.0,
+          LIMIT, 5_000.0,
+          ANGLE, (i % 23) - 11.0);
     });
     assertThroughput("realistic rule set", PerformanceTest::realisticRuleSet, feed, 1_000_000);
   }
@@ -175,8 +179,8 @@ class PerformanceTest {
   @Test
   void throughputManyRulesAndChannels() {
     Feed feed = new Feed(40, i -> {
-      Map<String, Double> values = new HashMap<>();
-      for (int c = 0; c < 20; c++) values.put("c" + c, ((i + c) % 40) < 20 ? 100.0 : 0.0);
+      Map<Channel, Double> values = new HashMap<>();
+      for (int c = 0; c < 20; c++) values.put(Channel.named("c" + c), ((i + c) % 40) < 20 ? 100.0 : 0.0);
       return values;
     });
     assertThroughput("50 rules x 20 channels", PerformanceTest::manyRulesAndChannels, feed,
@@ -191,20 +195,20 @@ class PerformanceTest {
    * the harness allocates nothing per Sample.
    */
   static final class Feed {
-    private final Map<String, Double>[] samples;
+    private final Map<Channel, Double>[] samples;
     private long timestamp;
     private int next;
 
-    Feed(int distinct, String channel, java.util.function.IntToDoubleFunction value) {
+    Feed(int distinct, Channel channel, java.util.function.IntToDoubleFunction value) {
       this(distinct, i -> Map.of(channel, value.applyAsDouble(i)));
     }
 
-    Feed(int distinct, Map<String, Double> constant) {
+    Feed(int distinct, Map<Channel, Double> constant) {
       this(distinct, i -> constant);
     }
 
     @SuppressWarnings("unchecked")
-    Feed(int distinct, java.util.function.IntFunction<Map<String, Double>> sample) {
+    Feed(int distinct, java.util.function.IntFunction<Map<Channel, Double>> sample) {
       samples = new Map[distinct];
       for (int i = 0; i < distinct; i++) samples[i] = new HashMap<>(sample.apply(i));
     }

@@ -1,12 +1,12 @@
 package rbed.examples;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static rbed.Conditions.channel;
 import static rbed.examples.Samples.DAY;
 
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import rbed.Channel;
 import rbed.Detector;
 import rbed.Event;
 
@@ -20,6 +20,7 @@ import rbed.Event;
  * <p>The expected crossing day is computed independently by brute force below.
  */
 class TradingSignalsExample {
+  static final Channel PRICE = Channel.named("price");
 
   static double price(double day) {
     return day < 300 ? 200 - day / 3 : 100 + (day - 300) / 2;
@@ -35,13 +36,13 @@ class TradingSignalsExample {
   void detectsMovingAverageCrosses() {
     Detector detector = Detector.builder()
         .rule("DeathCross", r -> r.when(
-            channel("price").averageOverSamples(50).below(channel("price").averageOverSamples(200))))
+            PRICE.averageOverSamples(50).below(PRICE.averageOverSamples(200))))
         .rule("GoldenCross", r -> r.when(
-            channel("price").averageOverSamples(50).above(channel("price").averageOverSamples(200))))
+            PRICE.averageOverSamples(50).above(PRICE.averageOverSamples(200))))
         .build();
 
     List<Event> events = detector.detect(
-        Samples.every(1, 0, 600, DAY, day -> Map.of("price", price(day))));
+        Samples.every(1, 0, 600, DAY, day -> Map.of(PRICE, price(day))));
 
     int golden = 199;
     while (!(sma(golden, 50) > sma(golden, 200))) golden++;

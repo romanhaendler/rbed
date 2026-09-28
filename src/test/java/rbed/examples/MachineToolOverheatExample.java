@@ -1,13 +1,13 @@
 package rbed.examples;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static rbed.Conditions.channel;
 import static rbed.Conditions.during;
 import static rbed.examples.Samples.SECOND;
 
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import rbed.Channel;
 import rbed.Detector;
 import rbed.Event;
 import rbed.Sample;
@@ -29,6 +29,8 @@ import rbed.Sample;
  * Detector cannot know earlier that the Event is over.
  */
 class MachineToolOverheatExample {
+  static final Channel LOAD = Channel.named("load");
+  static final Channel TEMP = Channel.named("temp");
 
   static double temperature(double s) {
     if (s < 100) return 60;
@@ -47,17 +49,17 @@ class MachineToolOverheatExample {
     Detector detector = Detector.builder()
         .samplingRate(1)
         .rule("HighLoad", r -> r
-            .when(channel("load").above(80)).forDuration(10 * SECOND)
-            .endWhen(channel("load").below(60)))
+            .when(LOAD.above(80)).forDuration(10 * SECOND)
+            .endWhen(LOAD.below(60)))
         .rule("Overheat", r -> r
-            .when(channel("temp").above(80)).forDuration(30 * SECOND)
-            .endWhen(channel("temp").below(70)).forDuration(60 * SECOND))
+            .when(TEMP.above(80)).forDuration(30 * SECOND)
+            .endWhen(TEMP.below(70)).forDuration(60 * SECOND))
         .rule("OverheatUnderLoad", r -> r.when(during("Overheat").and(during("HighLoad"))))
-        .rule("FastHeating", r -> r.when(channel("temp").rate().above(0.5)).forSamples(5))
+        .rule("FastHeating", r -> r.when(TEMP.rate().above(0.5)).forSamples(5))
         .build();
 
     List<Sample> series = Samples.every(1, 0, 600, SECOND,
-        s -> Map.of("temp", temperature(s), "load", load(s)));
+        s -> Map.of(TEMP, temperature(s), LOAD, load(s)));
     List<Event> events = detector.detectValues(series.stream().map(Sample::values).toList());
 
     assertEquals(List.of(
@@ -66,6 +68,6 @@ class MachineToolOverheatExample {
             "OverheatUnderLoad 151..391",     // Overheat Confirmed at 151 s, End confirmed 391 s
             "HighLoad 100..400"),
         Samples.describe(events, SECOND));
-    assertEquals(100.0, events.get(1).aggregates("temp").max()); // peak temperature
+    assertEquals(100.0, events.get(1).aggregates(TEMP).max()); // peak temperature
   }
 }

@@ -1,7 +1,6 @@
 package rbed.examples;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static rbed.Conditions.channel;
 import static rbed.Conditions.during;
 import static rbed.examples.Samples.SECOND;
 
@@ -9,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import rbed.Channel;
 import rbed.Detector;
 import rbed.Event;
 import rbed.EventListener;
@@ -29,21 +29,23 @@ import rbed.Sample;
  * </ul>
  */
 class VitalSignsExample {
+  static final Channel HR = Channel.named("hr");
+  static final Channel SPO2 = Channel.named("spo2");
 
   @Test
   void detectsCombinedAlarmsAndHandlesSensorDropout() {
     List<Event> ended = new ArrayList<>();
     Detector detector = Detector.builder()
         .rule("Tachycardia", r -> r
-            .when(channel("hr").above(100)).forDuration(30 * SECOND)
-            .endWhen(channel("hr").below(95)).forDuration(30 * SECOND)
+            .when(HR.above(100)).forDuration(30 * SECOND)
+            .endWhen(HR.below(95)).forDuration(30 * SECOND)
             .maxGap(10 * SECOND))
         .rule("Desaturation", r -> r
-            .when(channel("spo2").below(90)).forDuration(10 * SECOND)
-            .endWhen(channel("spo2").below(92).not()))
+            .when(SPO2.below(90)).forDuration(10 * SECOND)
+            .endWhen(SPO2.below(92).not()))
         .rule("HypoxicTachycardia", r -> r
             .when(during("Tachycardia").and(during("Desaturation"))))
-        .rule("SensorLost", r -> r.when(channel("hr").age().above(5 * SECOND)))
+        .rule("SensorLost", r -> r.when(HR.age().above(5 * SECOND)))
         .listener(new EventListener() {
           @Override public void onEnded(Event e) {
             ended.add(e);
@@ -52,8 +54,8 @@ class VitalSignsExample {
         .build();
 
     for (Sample sample : Samples.every(1, 0, 600, SECOND, s -> Map.of(
-        "hr", s < 60 ? 80.0 : s < 300 ? 120.0 : 85.0,
-        "spo2", s < 120 ? 97.0 : s < 200 ? 86.0 : 96.0))) {
+        HR, s < 60 ? 80.0 : s < 300 ? 120.0 : 85.0,
+        SPO2, s < 120 ? 97.0 : s < 200 ? 86.0 : 96.0))) {
       boolean dropout = sample.timestamp() >= 150 * SECOND && sample.timestamp() < 170 * SECOND;
       if (dropout) detector.advanceTo(sample.timestamp());
       else detector.push(sample.timestamp(), sample.values());

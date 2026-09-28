@@ -8,4 +8,4 @@ import java.util.Map;
  * @param timestamp milliseconds
  * @param values values of any subset of Channels
  */
-public record Sample(long timestamp, Map<String, Double> values) {}
+public record Sample(long timestamp, Map<Channel, Double> values) {}

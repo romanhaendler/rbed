@@ -1,7 +1,6 @@
 package rbed;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static rbed.Conditions.channel;
 import static rbed.Conditions.during;
 import static rbed.Conditions.latest;
 
@@ -18,6 +17,8 @@ import org.junit.jupiter.api.Test;
  * released), and set down completely. Weight is sampled every 500 ms.
  */
 class CraneScenarioTest {
+  static final Channel RATED_LOAD = Channel.named("ratedLoad");
+  static final Channel WEIGHT = Channel.named("weight");
 
   static double weightAt(long t) {
     if (t < 1500) return 0;      // hook empty
@@ -30,7 +31,7 @@ class CraneScenarioTest {
 
   /** Classifies a lifted load by its mean weight. */
   static String load(Event lift) {
-    return lift.aggregates("weight").mean() < 1500 ? "pallet" : "container";
+    return lift.aggregates(WEIGHT).mean() < 1500 ? "pallet" : "container";
   }
 
   @Test
@@ -38,16 +39,16 @@ class CraneScenarioTest {
     List<String> pickedUp = new ArrayList<>();
     Detector crane = Detector.builder()
         .rule("LoadLifted", r -> r
-            .when(channel("weight").above(500)).forDuration(Duration.ofSeconds(2))
-            .endWhen(channel("weight").below(50)).forDuration(Duration.ofSeconds(1))
+            .when(WEIGHT.above(500)).forDuration(Duration.ofSeconds(2))
+            .endWhen(WEIGHT.below(50)).forDuration(Duration.ofSeconds(1))
             .maxGap(Duration.ofSeconds(5)))
         .rule("Overload", r -> r
-            .when(channel("weight").above(channel("ratedLoad")).and(during("LoadLifted")))
+            .when(WEIGHT.above(RATED_LOAD).and(during("LoadLifted")))
             .forSamples(2))
         .rule("PartialSetDown", r -> r
             .when(during("LoadLifted")
-                .and(channel("weight").below(latest("LoadLifted").max("weight").times(0.5)))
-                .and(channel("weight").above(50)))  // still a load on the hook
+                .and(WEIGHT.below(latest("LoadLifted").max(WEIGHT).times(0.5)))
+                .and(WEIGHT.above(50)))  // still a load on the hook
             .forSamples(2))
         .listener(new EventListener() {
           @Override public void onConfirmed(Event e) {
@@ -58,8 +59,8 @@ class CraneScenarioTest {
 
     List<Sample> series = new ArrayList<>();
     for (long t = 0; t <= 14000; t += 500) {
-      Map<String, Double> values = new HashMap<>(Map.of("weight", weightAt(t)));
-      if (t == 0) values.put("ratedLoad", 5000.0); // sent once, held from then on
+      Map<Channel, Double> values = new HashMap<>(Map.of(WEIGHT, weightAt(t)));
+      if (t == 0) values.put(RATED_LOAD, 5000.0); // sent once, held from then on
       series.add(new Sample(t, values));
     }
     List<Event> events = crane.detect(series);

@@ -22,18 +22,18 @@ public record Event(
     OptionalLong end,
     boolean truncatedStart,
     boolean truncatedEnd,
-    Map<String, Aggregates> aggregates) {
+    Map<Channel, Aggregates> aggregates) {
 
   /**
    * Aggregates of one Channel; {@link Aggregates#count()} is 0 if it had no value.
    *
    * @throws IllegalArgumentException if the Rule does not aggregate this Channel
    */
-  public Aggregates aggregates(String channel) {
+  public Aggregates aggregates(Channel channel) {
     Aggregates a = aggregates.get(channel);
     if (a == null) {
       throw new IllegalArgumentException("Rule " + name + " does not aggregate channel " + channel
-          + "; add .aggregate(\"" + channel + "\")");
+          + "; add it with aggregate(...)");
     }
     return a;
   }

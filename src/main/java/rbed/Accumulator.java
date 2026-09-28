@@ -109,11 +109,11 @@ final class Accumulator {
   }
 
   /** The Aggregates of every aggregated Channel, with values held until {@code until}. */
-  Map<String, Aggregates> snapshot(AggregatedChannels channels, long until) {
-    Map<String, Aggregates> out = new LinkedHashMap<>();
+  Map<Channel, Aggregates> snapshot(AggregatedChannels channels, long until) {
+    Map<Channel, Aggregates> out = new LinkedHashMap<>();
     for (int i = 0; i < channels.count(); i++) {
       boolean hasValue = i < valued.length && valued[i];
-      out.put(channels.get(i).name, hasValue ? aggregates(i, until) : Aggregates.EMPTY);
+      out.put(channels.get(i).channel, hasValue ? aggregates(i, until) : Aggregates.EMPTY);
     }
     return Map.copyOf(out);
   }

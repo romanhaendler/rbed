@@ -1,12 +1,12 @@
 package rbed.examples;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static rbed.Conditions.channel;
 import static rbed.examples.Samples.HOUR;
 
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import rbed.Channel;
 import rbed.Detector;
 import rbed.Event;
 import rbed.Sample;
@@ -23,6 +23,7 @@ import rbed.Sample;
  * </ul>
  */
 class FloodWarningExample {
+  static final Channel LEVEL = Channel.named("level");
 
   static double levelCm(double h) {
     return h <= 12 ? 200 + 20 * h : Math.max(200, 440 - 10 * (h - 12));
@@ -32,16 +33,16 @@ class FloodWarningExample {
   void warnsWhileRisingAndLiftsWithHysteresis() {
     Detector detector = Detector.builder()
         .rule("FloodWarning", r -> r
-            .when(channel("level").above(300)
-                .and(channel("level").averageOverSamples(4).rate().above(10.0 / (HOUR / 1000))))
+            .when(LEVEL.above(300)
+                .and(LEVEL.averageOverSamples(4).rate().above(10.0 / (HOUR / 1000))))
             .forDuration(HOUR / 2)
-            .endWhen(channel("level").below(250)).forDuration(2 * HOUR)
+            .endWhen(LEVEL.below(250)).forDuration(2 * HOUR)
             .maxGap(2 * HOUR))
         .rule("Receding", r -> r
-            .when(channel("level").falling().and(channel("level").above(300))))
+            .when(LEVEL.falling().and(LEVEL.above(300))))
         .build();
 
-    List<Sample> series = Samples.every(0.25, 0, 72, HOUR, h -> Map.of("level", levelCm(h)))
+    List<Sample> series = Samples.every(0.25, 0, 72, HOUR, h -> Map.of(LEVEL, levelCm(h)))
         .stream().filter(s -> s.timestamp() != 20 * HOUR).toList(); // one missing report
     List<Event> events = detector.detect(series);
 

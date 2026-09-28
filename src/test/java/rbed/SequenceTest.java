@@ -3,7 +3,6 @@ package rbed;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static rbed.Conditions.after;
-import static rbed.Conditions.channel;
 import static rbed.Conditions.during;
 
 import java.util.List;
@@ -12,6 +11,12 @@ import java.util.OptionalLong;
 import org.junit.jupiter.api.Test;
 
 class SequenceTest {
+  static final Channel A = Channel.named("a");
+  static final Channel F = Channel.named("f");
+  static final Channel M = Channel.named("m");
+  static final Channel WEIGHT = Channel.named("weight");
+  static final Channel X = Channel.named("x");
+
   final Recorder rec = new Recorder();
 
   List<String> ended() {
@@ -21,25 +26,25 @@ class SequenceTest {
   @Test
   void duringHoldsWhileOtherEventIsConfirmed() {
     Detector d = Detector.builder()
-        .rule("Lift", r -> r.when(channel("weight").above(500)).forSamples(2))
-        .rule("Overload", r -> r.when(channel("weight").above(1000).and(during("Lift"))))
+        .rule("Lift", r -> r.when(WEIGHT.above(500)).forSamples(2))
+        .rule("Overload", r -> r.when(WEIGHT.above(1000).and(during("Lift"))))
         .listener(rec).build();
     double[] ws = {0, 2000, 2000, 2000, 0};
-    for (int i = 0; i < ws.length; i++) d.push(i, Map.of("weight", ws[i]));
+    for (int i = 0; i < ws.length; i++) d.push(i, Map.of(WEIGHT, ws[i]));
     // at 1 Lift is only Pending, so no Overload yet; at 4 Lift has Ended
     assertEquals(List.of("ended Lift 1..4", "ended Overload 2..4"), ended());
   }
 
   Detector.Builder maintenanceThenStart(Condition startCondition) {
     return Detector.builder()
-        .rule("Maintenance", r -> r.when(channel("m").above(0)))
-        .rule("Fault", r -> r.when(channel("f").above(0)))
-        .rule("Start", r -> r.when(startCondition.and(channel("x").above(0))))
+        .rule("Maintenance", r -> r.when(M.above(0)))
+        .rule("Fault", r -> r.when(F.above(0)))
+        .rule("Start", r -> r.when(startCondition.and(X.above(0))))
         .listener(rec);
   }
 
   void push(Detector d, long t, double m, double f, double x) {
-    d.push(t, Map.of("m", m, "f", f, "x", x));
+    d.push(t, Map.of(M, m, F, f, X, x));
   }
 
   @Test
@@ -71,11 +76,11 @@ class SequenceTest {
   @Test
   void laterRuleSeesEarlierRulesEffectsOnSameSample() {
     Detector d = Detector.builder()
-        .rule("A", r -> r.when(channel("a").above(0)))
+        .rule("A", r -> r.when(A.above(0)))
         .rule("B", r -> r.when(after("A")))
         .listener(rec).build();
-    d.push(0, Map.of("a", 1.0));
-    d.push(1, Map.of("a", 0.0));
+    d.push(0, Map.of(A, 1.0));
+    d.push(1, Map.of(A, 0.0));
     assertEquals("confirmed B 1", rec.log.get(rec.log.size() - 1));
   }
 
@@ -84,8 +89,8 @@ class SequenceTest {
     assertThrows(IllegalArgumentException.class, () -> Detector.builder()
         .rule("A", r -> r.when(during("A"))).build());
     assertThrows(IllegalArgumentException.class, () -> Detector.builder()
-        .rule("A", r -> r.when(channel("x").above(0)).endWhen(after("B").unless("C")))
-        .rule("C", r -> r.when(channel("x").above(0))).build());
+        .rule("A", r -> r.when(X.above(0)).endWhen(after("B").unless("C")))
+        .rule("C", r -> r.when(X.above(0))).build());
     // names no Rule produces are fine: they can only come from History
     Detector.builder().rule("A", r -> r.when(after("External"))).build();
   }

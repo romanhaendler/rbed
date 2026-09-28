@@ -1,7 +1,6 @@
 package rbed;
 
 import java.time.Duration;
-import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -10,16 +9,11 @@ import java.util.function.Supplier;
  * how it developed. Functions of the past use the track's own updates (a Channel's values, not the
  * Samples in which it was absent) and are undefined until enough of them exist.
  */
-public final class ChannelExpression extends Expression {
+public class ChannelExpression extends Expression {
   /** Resolves the track in a Detector; each call on a moving average creates its own window. */
   private final Function<Detector, ValueTrack> track;
 
-  ChannelExpression(String channel) {
-    Objects.requireNonNull(channel, "channel");
-    this.track = detector -> detector.referencedChannel(channel);
-  }
-
-  private ChannelExpression(Function<Detector, ValueTrack> track) {
+  ChannelExpression(Function<Detector, ValueTrack> track) {
     this.track = track;
   }
 

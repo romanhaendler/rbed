@@ -15,17 +15,17 @@ public final class LatestEvent {
   }
 
   /** The mean of a Channel over the latest Event (so far, if it is running). */
-  public Expression mean(String channel) {
+  public Expression mean(Channel channel) {
     return aggregate(channel, Accumulator.Aggregate.MEAN);
   }
 
   /** The minimum of a Channel over the latest Event (so far, if it is running). */
-  public Expression min(String channel) {
+  public Expression min(Channel channel) {
     return aggregate(channel, Accumulator.Aggregate.MIN);
   }
 
   /** The maximum of a Channel over the latest Event (so far, if it is running). */
-  public Expression max(String channel) {
+  public Expression max(Channel channel) {
     return aggregate(channel, Accumulator.Aggregate.MAX);
   }
 
@@ -39,12 +39,12 @@ public final class LatestEvent {
     };
   }
 
-  private Expression aggregate(String channel, Accumulator.Aggregate aggregate) {
+  private Expression aggregate(Channel channel, Accumulator.Aggregate aggregate) {
     Objects.requireNonNull(channel, "channel");
     return new Expression() {
       @Override Bound bind(Detector detector) {
         // not a Channel lookup of the reading Rule: the referenced Rule aggregates it
-        return detector.referencedEvent(name).latest(detector.channel(channel), aggregate);
+        return detector.referencedEvent(name).latest(channel.state(detector), aggregate);
       }
     };
   }

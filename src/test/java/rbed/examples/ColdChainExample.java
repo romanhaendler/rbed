@@ -2,13 +2,13 @@ package rbed.examples;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static rbed.Conditions.after;
-import static rbed.Conditions.channel;
 import static rbed.Conditions.totalDuration;
 import static rbed.examples.Samples.MINUTE;
 
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import rbed.Channel;
 import rbed.Detector;
 import rbed.Event;
 
@@ -26,6 +26,8 @@ import rbed.Event;
  * </ul>
  */
 class ColdChainExample {
+  static final Channel DOOR = Channel.named("door");
+  static final Channel TEMP = Channel.named("temp");
 
   static double temperature(double m) {
     if (m >= 62 && m < 90) return 10;
@@ -37,17 +39,17 @@ class ColdChainExample {
   void detectsExcursionsAndTheirCause() {
     Detector detector = Detector.builder()
         .rule("Excursion", r -> r
-            .when(channel("temp").above(8)).forDuration(15 * MINUTE)
-            .endWhen(channel("temp").above(8).not()))
-        .rule("DoorOpen", r -> r.when(channel("door").above(0.5)))
+            .when(TEMP.above(8)).forDuration(15 * MINUTE)
+            .endWhen(TEMP.above(8).not()))
+        .rule("DoorOpen", r -> r.when(DOOR.above(0.5)))
         .rule("ExcursionAfterDoor", r -> r
-            .when(after("DoorOpen").within(30 * MINUTE).and(channel("temp").above(8))))
+            .when(after("DoorOpen").within(30 * MINUTE).and(TEMP.above(8))))
         .rule("CumulativeLimit", r -> r.when(totalDuration("Excursion").above(45 * MINUTE)))
         .build();
 
     List<Event> events = detector.detect(Samples.every(1, 0, 480, MINUTE, m -> Map.of(
-        "temp", temperature(m),
-        "door", m >= 60 && m < 65 ? 1.0 : 0.0)));
+        TEMP, temperature(m),
+        DOOR, m >= 60 && m < 65 ? 1.0 : 0.0)));
 
     assertEquals(List.of(
             "DoorOpen 60..65",

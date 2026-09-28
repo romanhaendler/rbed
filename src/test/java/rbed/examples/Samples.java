@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.DoubleFunction;
+import rbed.Channel;
 import rbed.Event;
 import rbed.Sample;
 
@@ -21,7 +22,7 @@ final class Samples {
    * given unit; {@code values} receives the time in that unit.
    */
   static List<Sample> every(double step, double from, double to, long unit,
-      DoubleFunction<Map<String, Double>> values) {
+      DoubleFunction<Map<Channel, Double>> values) {
     List<Sample> samples = new ArrayList<>();
     for (long i = 0; from + i * step < to; i++) {
       double t = from + i * step;

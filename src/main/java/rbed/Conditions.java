@@ -7,11 +7,6 @@ import java.util.Objects;
 public final class Conditions {
   private Conditions() {}
 
-  /** The current (last known) value of the named Channel. */
-  public static ChannelExpression channel(String name) {
-    return new ChannelExpression(name);
-  }
-
   /** True while an Event with the given name is Confirmed and has not Ended. */
   public static Condition during(String eventName) {
     Objects.requireNonNull(eventName, "eventName");

@@ -45,8 +45,10 @@ The library is the Java module `rbed` (`requires rbed;`) and has a single packag
 ```java
 import static rbed.Conditions.*;
 
+Channel temp = Channel.named("temp");
+
 Detector detector = Detector.builder()
-    .rule("HighTemperature", r -> r.when(channel("temp").above(80)))
+    .rule("HighTemperature", r -> r.when(temp.above(80)))
     .listener(new EventListener() {
       @Override public void onEnded(Event e) {
         System.out.println(e.name() + " from " + e.start() + " to " + e.end().getAsLong());
@@ -54,9 +56,9 @@ Detector detector = Detector.builder()
     })
     .build();
 
-detector.push(1_000, Map.of("temp", 75.0));   // timestamp in ms, then Channel values
-detector.push(2_000, Map.of("temp", 85.0));
-detector.push(3_000, Map.of("temp", 70.0));   // prints "HighTemperature from 2000 to 3000"
+detector.push(1_000, Map.of(temp, 75.0));   // timestamp in ms, then Channel values
+detector.push(2_000, Map.of(temp, 85.0));
+detector.push(3_000, Map.of(temp, 70.0));   // prints "HighTemperature from 2000 to 3000"
 detector.close();
 ```
 
@@ -72,12 +74,21 @@ For a recorded series, `detect(samples)` does all three in one call and returns 
 
 A **Sample** is the values of one or more **Channels** at one timestamp. Timestamps are milliseconds (`long`), for example epoch milliseconds or milliseconds since the start of a recording. They must strictly increase.
 
+Each Channel is created once, by name, and then used everywhere: in Conditions, when pushing values and when reading Aggregates. The compiler checks every use, so a misspelled Channel does not compile. The examples in this README assume their Channels are created like this:
+
+```java
+Channel temp = Channel.named("temp");
+Channel pressure = Channel.named("pressure");
+```
+
+Channels are equal by name. Data that arrives with Channel names as strings, such as a CSV header or a JSON field, maps onto the same Channels with `Channel.named(column)`. Values of Channels that no Rule uses are ignored, so a Sample may carry more Channels than the Rules need.
+
 A Sample does not have to contain every Channel. A missing Channel keeps its last value, so sensors reporting at different rates can share one Detector:
 
 ```java
-detector.push(0,     Map.of("temp", 20.0, "pressure", 1.2));
-detector.push(1_000, Map.of("temp", 21.0));           // pressure is still 1.2
-detector.push(2_000, Map.of("pressure", 1.4));        // temp is still 21.0
+detector.push(0,     Map.of(temp, 20.0, pressure, 1.2));
+detector.push(1_000, Map.of(temp, 21.0));           // pressure is still 1.2
+detector.push(2_000, Map.of(pressure, 1.4));        // temp is still 21.0
 ```
 
 A Channel that has not had any value yet is *undefined*, and a Condition on it never holds (see [Undefined values](#undefined-values)). Values must be finite: NaN and infinities are rejected.
@@ -97,7 +108,7 @@ The distinction between Pending and Confirmed matters when a Rule requires a dur
 
 ```java
 Detector detector = Detector.builder()
-    .rule("Overheat", r -> r.when(channel("temp").above(80)).forDuration(2_000))
+    .rule("Overheat", r -> r.when(temp.above(80)).forDuration(2_000))
     .listener(new EventListener() {
       @Override public void onPending(Event e)   { System.out.println("pending at " + e.start()); }
       @Override public void onConfirmed(Event e) { System.out.println("confirmed at " + e.confirmed().getAsLong()); }
@@ -106,13 +117,13 @@ Detector detector = Detector.builder()
     })
     .build();
 
-detector.push(0,     Map.of("temp", 70.0));
-detector.push(1_000, Map.of("temp", 85.0));  // pending at 1000
-detector.push(2_000, Map.of("temp", 86.0));
-detector.push(3_000, Map.of("temp", 84.0));  // confirmed at 3000: held for 2 s
-detector.push(4_000, Map.of("temp", 75.0));  // ended at 4000
-detector.push(5_000, Map.of("temp", 90.0));  // pending at 5000
-detector.push(6_000, Map.of("temp", 70.0));  // discarded: only held for 1 s
+detector.push(0,     Map.of(temp, 70.0));
+detector.push(1_000, Map.of(temp, 85.0));  // pending at 1000
+detector.push(2_000, Map.of(temp, 86.0));
+detector.push(3_000, Map.of(temp, 84.0));  // confirmed at 3000: held for 2 s
+detector.push(4_000, Map.of(temp, 75.0));  // ended at 4000
+detector.push(5_000, Map.of(temp, 90.0));  // pending at 5000
+detector.push(6_000, Map.of(temp, 70.0));  // discarded: only held for 1 s
 ```
 
 The Event's `start()` is 1000, where the Conditions started holding, not 3000, where it was Confirmed. Without a duration, an Event is Pending and Confirmed at the same moment.
@@ -125,8 +136,8 @@ Each Rule has at most one Event in progress. A new Event of a Rule only starts a
 - `truncatedStart()`: the Event may have begun before its `start()`. This is the case whenever its Rule had not yet seen its Conditions *not* holding: when the very first Sample already satisfies them, while a moving average was warming up, or right after a data gap.
 
 ```java
-detector.push(0,     Map.of("temp", 90.0));  // already hot at the first Sample
-detector.push(1_000, Map.of("temp", 70.0));  // Overheat 0..1000 with truncatedStart() == true
+detector.push(0,     Map.of(temp, 90.0));  // already hot at the first Sample
+detector.push(1_000, Map.of(temp, 70.0));  // Overheat 0..1000 with truncatedStart() == true
 ```
 
 ## Events
@@ -141,7 +152,7 @@ An `Event` is an immutable record. The listener receives a fresh snapshot at eac
 | `end()`            | `OptionalLong`: when it Ended; empty until then.                               |
 | `truncatedStart()` | It may have begun earlier than `start()`.                                      |
 | `truncatedEnd()`   | Observation stopped while it ran: `close()` or a data gap.                     |
-| `aggregates("x")`  | [Aggregates](#aggregates) of Channel `x` over the Event so far.                |
+| `aggregates(x)`  | [Aggregates](#aggregates) of Channel `x` over the Event so far.                |
 
 The duration of an Ended Event is `e.end().getAsLong() - e.start()`.
 
@@ -151,10 +162,10 @@ A Rule is configured in a lambda that receives a `RuleBuilder`. A complete Rule 
 
 ```java
 .rule("LoadLifted", r -> r
-    .when(channel("weight").above(500)).forDuration(Duration.ofSeconds(2))
-    .endWhen(channel("weight").below(50)).forDuration(Duration.ofSeconds(1))
+    .when(weight.above(500)).forDuration(Duration.ofSeconds(2))
+    .endWhen(weight.below(50)).forDuration(Duration.ofSeconds(1))
     .maxGap(Duration.ofSeconds(5))
-    .aggregate("height"))
+    .aggregate(height))
 ```
 
 Every time value accepts either a `long` in milliseconds or a `java.time.Duration`.
@@ -168,9 +179,9 @@ Every time value accepts either a `long` in milliseconds or a `java.time.Duratio
 A Condition that holds only briefly is often noise. `forDuration(ms)` requires the preceding Condition to hold for at least that long, `forSamples(n)` for at least `n` consecutive Samples:
 
 ```java
-.rule("Vibration", r -> r.when(channel("rms").above(4.5)).forSamples(3))
-.rule("Stall", r -> r.when(channel("rpm").below(10)).forDuration(Duration.ofSeconds(5)))
-.rule("Both", r -> r.when(channel("rpm").below(10)).forSamples(3).forDuration(5_000))
+.rule("Vibration", r -> r.when(rms.above(4.5)).forSamples(3))
+.rule("Stall", r -> r.when(rpm.below(10)).forDuration(Duration.ofSeconds(5)))
+.rule("Both", r -> r.when(rpm.below(10)).forSamples(3).forDuration(5_000))
 ```
 
 With both, both must be met: at least 3 Samples *and* at least 5 seconds. Until then the Event is Pending; if the Condition stops holding first, it is Discarded. `forDuration` measures from the Event's `start()`, so the required duration is reached at `start() + ms`.
@@ -183,19 +194,19 @@ Real signals hover around thresholds. With `when(weight > 500)` alone, a weight 
 
 ```java
 .rule("LoadLifted", r -> r
-    .when(channel("weight").above(500))
-    .endWhen(channel("weight").below(50)))
+    .when(weight.above(500))
+    .endWhen(weight.below(50)))
 ```
 
 ```java
-detector.push(0,     Map.of("weight", 0.0));
-detector.push(1_000, Map.of("weight", 600.0));  // starts
-detector.push(2_000, Map.of("weight", 300.0));  // below 500, but not below 50: continues
-detector.push(3_000, Map.of("weight", 510.0));  // still the same Event, no new one
-detector.push(4_000, Map.of("weight", 40.0));   // LoadLifted 1000..4000
+detector.push(0,     Map.of(weight, 0.0));
+detector.push(1_000, Map.of(weight, 600.0));  // starts
+detector.push(2_000, Map.of(weight, 300.0));  // below 500, but not below 50: continues
+detector.push(3_000, Map.of(weight, 510.0));  // still the same Event, no new one
+detector.push(4_000, Map.of(weight, 40.0));   // LoadLifted 1000..4000
 ```
 
-The End Condition can have its own duration, written right after it: `.endWhen(channel("weight").below(50)).forDuration(1_000)` Ends the Event only once the weight has stayed below 50 for a second. The Event's `end()` is then where the End Condition *started* holding, not where its duration was reached, so the Event's extent is what you would draw by hand.
+The End Condition can have its own duration, written right after it: `.endWhen(weight.below(50)).forDuration(1_000)` Ends the Event only once the weight has stayed below 50 for a second. The Event's `end()` is then where the End Condition *started* holding, not where its duration was reached, so the Event's extent is what you would draw by hand.
 
 While the End Condition's duration is running, the Event is still Confirmed and `during(...)` of it still holds.
 
@@ -204,7 +215,7 @@ While the End Condition's duration is running, the Event is still Confirmed and 
 If a sensor stops reporting, the last values would otherwise hold forever and an Event could run on stale data. `maxGap(ms)` bounds how far apart two Samples may be:
 
 ```java
-.rule("Running", r -> r.when(channel("rpm").above(100)).maxGap(Duration.ofSeconds(10)))
+.rule("Running", r -> r.when(rpm.above(100)).maxGap(Duration.ofSeconds(10)))
 ```
 
 When the next Sample (or [time advance](#silent-sensors-advancing-time)) comes more than 10 seconds after the previous Sample, a Pending Event is Discarded, and a Confirmed Event Ends with `truncatedEnd()` at the last moment evaluated before the gap. An Event that starts right after the gap has `truncatedStart()`, since its Rule has not seen its Conditions not holding since data resumed. Without `maxGap`, gaps of any length are accepted.
@@ -215,8 +226,8 @@ Each Event carries [Aggregates](#aggregates) (min, max, mean, ...) of the Channe
 
 ```java
 .rule("LoadLifted", r -> r
-    .when(channel("weight").above(500))
-    .aggregate("height", "windSpeed"))   // weight is aggregated anyway
+    .when(weight.above(500))
+    .aggregate(height, windSpeed))   // weight is aggregated anyway
 ```
 
 ### Derived values
@@ -247,38 +258,38 @@ import static rbed.Conditions.*;
 
 There are two kinds of building blocks:
 
-- An **Expression** is a number that changes over time: a Channel's value, a rate, a moving average, a count of Events. `channel("temp")` is an Expression.
-- A **Condition** is true, false or [undefined](#undefined-values) at each moment: `channel("temp").above(80)` is a Condition. Rules take Conditions.
+- An **Expression** is a number that changes over time: a Channel's value, a rate, a moving average, a count of Events. `temp` is an Expression.
+- A **Condition** is true, false or [undefined](#undefined-values) at each moment: `temp.above(80)` is a Condition. Rules take Conditions.
 
 Expressions are compared to get Conditions, and Conditions are combined with `and`, `or` and `not`. Every Expression below, including those about other Rules' Events, supports every comparison and every arithmetic operation.
 
 ### Comparisons
 
 ```java
-channel("temp").above(80)              // temp > 80, strictly
-channel("temp").below(-5)              // temp < -5, strictly
-channel("temp").between(18, 24)        // 18 <= temp <= 24, both bounds included
+temp.above(80)              // temp > 80, strictly
+temp.below(-5)              // temp < -5, strictly
+temp.between(18, 24)        // 18 <= temp <= 24, both bounds included
 ```
 
 `above` and `below` also compare two Expressions, so a threshold can itself be a Channel:
 
 ```java
-channel("weight").above(channel("ratedLoad"))      // overload, with a per-crane rated load
-channel("level").below(channel("setpoint").minus(0.5))
+weight.above(ratedLoad)      // overload, with a per-crane rated load
+level.below(setpoint.minus(0.5))
 ```
 
-To test "at least" or "at most", negate the opposite: `channel("temp").below(80).not()` is `temp >= 80`.
+To test "at least" or "at most", negate the opposite: `temp.below(80).not()` is `temp >= 80`.
 
 ### Arithmetic
 
 Expressions support `plus`, `minus`, `times` and `dividedBy`, each with another Expression or a number, and `abs()`:
 
 ```java
-channel("supply").minus(channel("return")).above(5)             // temperature spread
-channel("current").times(channel("voltage")).above(2_000)       // power from two Channels
-channel("setpoint").minus(channel("actual")).abs().above(2)     // deviation in either direction
-channel("errors").dividedBy(channel("requests")).above(0.01)    // error rate above 1 %
-channel("tempF").minus(32).times(5.0 / 9).above(30)             // unit conversion
+supply.minus(return).above(5)             // temperature spread
+current.times(voltage).above(2_000)       // power from two Channels
+setpoint.minus(actual).abs().above(2)     // deviation in either direction
+errors.dividedBy(requests).above(0.01)    // error rate above 1 %
+tempF.minus(32).times(5.0 / 9).above(30)             // unit conversion
 ```
 
 A division by zero, or any other operation without a finite result, is undefined.
@@ -292,7 +303,7 @@ A threshold tells you *where* a signal is. Often it matters more *where it is go
 *A sustained trend*, with `forSamples`. This Rule detects a temperature that has risen at five consecutive Samples, even while it is still far below any alarm threshold:
 
 ```java
-.rule("Warming", r -> r.when(channel("temp").rising()).forSamples(5))
+.rule("Warming", r -> r.when(temp.rising()).forSamples(5))
 ```
 
 ```java
@@ -305,30 +316,30 @@ A threshold tells you *where* a signal is. Often it matters more *where it is go
 *Level plus direction*, with `and`. A high value that is still climbing needs action; a high value that is already falling is recovering:
 
 ```java
-.rule("PressureEscalating", r -> r.when(channel("pressure").above(8).and(channel("pressure").rising())))
+.rule("PressureEscalating", r -> r.when(pressure.above(8).and(pressure.rising())))
 ```
 
 *Peaks and troughs.* An Event of `rising()` lasts exactly as long as a climb. It Ends at the first Sample that is not higher, and its `max` Aggregate is the peak value:
 
 ```java
-.rule("Climb", r -> r.when(channel("x").rising()))
-// x: 1 2 5 9 7 3 1 at 0..6 s  ->  Climb 1000..4000, e.aggregates("x").max() is 9.0
+.rule("Climb", r -> r.when(x.rising()))
+// x: 1 2 5 9 7 3 1 at 0..6 s  ->  Climb 1000..4000, e.aggregates(x).max() is 9.0
 ```
 
 **`rate()`** is an Expression: how fast the Channel changes, in its own units per second. It is computed from the two latest values and their timestamps, `(latest - previous) / seconds between them`, so irregular sampling is handled correctly. Unlike `rising()`, it says *how fast*, so you compare it with a limit:
 
 ```java
 // hard braking: speed in m/s drops by more than 4 m/s per second
-.rule("HardBraking", r -> r.when(channel("speed").rate().below(-4)))
+.rule("HardBraking", r -> r.when(speed.rate().below(-4)))
 
 // leak: the tank level falls faster than any consumer can draw, for a whole minute
-.rule("Leak", r -> r.when(channel("level").rate().below(-0.5)).forDuration(60_000))
+.rule("Leak", r -> r.when(level.rate().below(-0.5)).forDuration(60_000))
 
 // heat treatment: heating faster than 2 °C per minute (rate is per second)
-.rule("RampTooSteep", r -> r.when(channel("furnaceTemp").rate().above(2.0 / 60)))
+.rule("RampTooSteep", r -> r.when(furnaceTemp.rate().above(2.0 / 60)))
 ```
 
-Because `rate()` looks at only two values, noise in the signal shows up in full in the rate. For noisy signals, take the rate of a [moving average](#moving-averages) instead: `channel("level").averageOverSamples(4).rate()`.
+Because `rate()` looks at only two values, noise in the signal shows up in full in the rate. For noisy signals, take the rate of a [moving average](#moving-averages) instead: `level.averageOverSamples(4).rate()`.
 
 All three are undefined until the Channel has two values. They use the Channel's own values, not Samples: if `pressure` is missing from a Sample, `rising()` still compares its two latest reported values, and `rate()` divides by the time between them.
 
@@ -339,8 +350,8 @@ A fourth function about a Channel's history, **`age()`**, is the time since the 
 Raw sensor data is noisy. A single outlier crosses a threshold, and a rate computed from two jittery values jumps around. A moving average replaces each value with the mean of the most recent ones, so Rules see the underlying trend instead of the noise. It is also how you compare "now" with "normally": a value against its own average over the last hour.
 
 ```java
-channel("level").averageOverSamples(5)                          // mean of the last 5 values
-channel("level").averageOverDuration(Duration.ofMinutes(10))    // mean of the last 10 minutes
+level.averageOverSamples(5)                          // mean of the last 5 values
+level.averageOverDuration(Duration.ofMinutes(10))    // mean of the last 10 minutes
 ```
 
 `averageOverSamples(n)` averages the last `n` values and is defined once `n` values exist. Use it for regularly sampled data. `averageOverDuration(ms)` averages the values from the last `ms` milliseconds before the latest value and is defined once the values span that long. Use it when Samples arrive irregularly, or when the window has a meaning in time ("the last 10 minutes").
@@ -349,20 +360,20 @@ A longer window smooths more but reacts later. Compare with the raw value to fin
 
 ```java
 // a reading 20 % above its own 1-hour average
-channel("power").above(channel("power").averageOverDuration(Duration.ofHours(1)).times(1.2))
+power.above(power.averageOverDuration(Duration.ofHours(1)).times(1.2))
 ```
 
 A moving average supports everything a Channel does, including another average, `rising`, `falling`, `rate` and `age`. A smoothed slope, for example, is:
 
 ```java
-channel("level").averageOverSamples(4).rate().above(0.2)
+level.averageOverSamples(4).rate().above(0.2)
 ```
 
 Two averages of the same Channel make a classic crossover signal:
 
 ```java
 .rule("GoldenCross", r -> r.when(
-    channel("price").averageOverSamples(50).above(channel("price").averageOverSamples(200))))
+    price.averageOverSamples(50).above(price.averageOverSamples(200))))
 ```
 
 While an average warms up it is undefined, so Events of such a Rule that start right after the warm-up have `truncatedStart()`: the Rule could not tell whether the Condition held earlier.
@@ -376,15 +387,15 @@ Single comparisons rarely describe a real situation. Combine them:
 - **`not`**: the opposite. It expresses "outside a band", "at least" (`below(80).not()` is `>= 80`) and "no pulse now" for [Pulse Channels](#pulse-channels).
 
 ```java
-channel("temp").above(80).and(channel("fan").below(0.5))            // cooling failure
-channel("doorA").above(0.5).or(channel("doorB").above(0.5))          // any door open
-channel("temp").between(18, 24).not()                               // outside the comfort band
+temp.above(80).and(fan.below(0.5))            // cooling failure
+doorA.above(0.5).or(doorB.above(0.5))          // any door open
+temp.between(18, 24).not()                               // outside the comfort band
 ```
 
 There is no operator precedence to remember: calls nest explicitly. This holds when the machine runs and at least one of the two warning signs is present:
 
 ```java
-channel("rpm").above(100).and(channel("vibration").above(4).or(channel("temp").above(80)))
+rpm.above(100).and(vibration.above(4).or(temp.above(80)))
 ```
 
 ### Undefined values
@@ -392,7 +403,7 @@ channel("rpm").above(100).and(channel("vibration").above(4).or(channel("temp").a
 A Condition is undefined when the data it needs does not exist yet: a Channel without a value so far, a moving average still warming up, `rate` before two values, a division by zero, or `latest(...)` before the first such Event. Undefined **never counts as true**, and that includes `not()`:
 
 ```java
-channel("pressure").above(5).not()   // false as long as pressure has no value, not true
+pressure.above(5).not()   // false as long as pressure has no value, not true
 ```
 
 So a Rule never fires because data is missing. To detect missing data explicitly, use [`age()`](#silent-sensors-advancing-time).
@@ -408,17 +419,17 @@ Rules can refer to the Events of Rules declared before them. This composes simpl
 *Restricting a Rule to a phase.* Many criteria only make sense in a certain operating state. Vibration of a stopped machine is irrelevant, and a Rule for it would fire on every truck driving past. Define the phase once as a Rule and refer to it:
 
 ```java
-.rule("Running", r -> r.when(channel("rpm").above(100)).forDuration(10_000))
-.rule("RoughRunning", r -> r.when(during("Running").and(channel("vibration").above(4))))
+.rule("Running", r -> r.when(rpm.above(100)).forDuration(10_000))
+.rule("RoughRunning", r -> r.when(during("Running").and(vibration.above(4))))
 ```
 
-`RoughRunning` Ends at the latest when `Running` Ends. The phase Rule brings its own timing, here ten seconds of start-up during which vibration is ignored, which a plain `channel("rpm").above(100)` could not express.
+`RoughRunning` Ends at the latest when `Running` Ends. The phase Rule brings its own timing, here ten seconds of start-up during which vibration is ignored, which a plain `rpm.above(100)` could not express.
 
 *Combining Events that have their own timing.* Each part keeps its own duration, End Condition and hysteresis, and the combination holds while both are Confirmed:
 
 ```java
-.rule("Tachycardia", r -> r.when(channel("hr").above(100)).forDuration(30_000))
-.rule("Desaturation", r -> r.when(channel("spo2").below(90)).forDuration(10_000))
+.rule("Tachycardia", r -> r.when(hr.above(100)).forDuration(30_000))
+.rule("Desaturation", r -> r.when(spo2.below(90)).forDuration(10_000))
 .rule("HypoxicTachycardia", r -> r.when(during("Tachycardia").and(during("Desaturation"))))
 ```
 
@@ -430,14 +441,14 @@ Rules can refer to the Events of Rules declared before them. This composes simpl
 - `.unless("B", "C", ...)`: no B or C Event has been Confirmed since the most recent A Event Ended.
 
 ```java
-.rule("DoorOpen", r -> r.when(channel("door").above(0.5)))
+.rule("DoorOpen", r -> r.when(door.above(0.5)))
 .rule("ExcursionAfterDoor", r -> r
-    .when(after("DoorOpen").within(Duration.ofMinutes(30)).and(channel("temp").above(8))))
+    .when(after("DoorOpen").within(Duration.ofMinutes(30)).and(temp.above(8))))
 ```
 
 ```java
-.rule("Lift", r -> r.when(channel("weight").above(500)))
-.rule("Maintenance", r -> r.when(channel("serviceMode").above(0.5)))
+.rule("Lift", r -> r.when(weight.above(500)))
+.rule("Maintenance", r -> r.when(serviceMode.above(0.5)))
 .rule("LiftSinceService", r -> r.when(after("Lift").unless("Maintenance")))
 ```
 
@@ -448,7 +459,7 @@ Interrupting Events are named explicitly with `unless` rather than implied, so a
 `count("A")` is the number of A Events Confirmed so far, an Expression like any other. `.within(ms)` counts only those Confirmed in a sliding window ending now:
 
 ```java
-.rule("Run", r -> r.when(channel("power").above(500)).forDuration(30_000))
+.rule("Run", r -> r.when(power.above(500)).forDuration(30_000))
 .rule("FrequentStarts", r -> r.when(count("Run").within(Duration.ofHours(1)).above(3)))
 .rule("ServiceDue", r -> r.when(count("Run").above(10_000)))
 ```
@@ -460,7 +471,7 @@ An Event counts from the moment it is Confirmed, so a running Event is included.
 `totalDuration("A")` is the summed duration in milliseconds of all A Events: the Ended ones in full, plus a running one up to now. It grows continuously while an A Event runs, so a limit is detected the moment it is crossed:
 
 ```java
-.rule("Excursion", r -> r.when(channel("temp").above(8)))
+.rule("Excursion", r -> r.when(temp.above(8)))
 .rule("CumulativeLimit", r -> r.when(totalDuration("Excursion").above(45 * 60_000)))
 ```
 
@@ -468,33 +479,33 @@ An Event counts from the moment it is Confirmed, so a running Event is included.
 
 `latest("A")` gives access to the most recent Confirmed A Event, whether still running or Ended:
 
-- `.min("x")`, `.max("x")`, `.mean("x")`: its [Aggregates](#aggregates) of Channel `x`, so far if it is running. Rule A aggregates `x` for this automatically.
+- `.min(x)`, `.max(x)`, `.mean(x)`: its [Aggregates](#aggregates) of Channel `x`, so far if it is running. Rule A aggregates `x` for this automatically.
 - `.duration()`: its duration in ms, up to now if it is running.
 
 Each is an Expression, undefined while there has been no A Event. This relates the present to an earlier Event, for example a partial set-down of a lifted load:
 
 ```java
-.rule("LoadLifted", r -> r.when(channel("weight").above(500)).endWhen(channel("weight").below(50)))
+.rule("LoadLifted", r -> r.when(weight.above(500)).endWhen(weight.below(50)))
 .rule("PartialSetDown", r -> r.when(during("LoadLifted")
-    .and(channel("weight").below(latest("LoadLifted").max("weight").times(0.5)))))
+    .and(weight.below(latest("LoadLifted").max(weight).times(0.5)))))
 ```
 
 or a machine cycle that is taking too long, detected while it is still running:
 
 ```java
-.rule("Cycle", r -> r.when(channel("spindle").above(0.5)))
+.rule("Cycle", r -> r.when(spindle.above(0.5)))
 .rule("SlowCycle", r -> r.when(during("Cycle").and(latest("Cycle").duration().above(120_000))))
 ```
 
 ## Aggregates
 
-Every Event carries Aggregates of the Channels its Rule's Conditions use, plus those requested with [`aggregate(...)`](#aggregates-for-more-channels-aggregate). Read them with `event.aggregates("x")`:
+Every Event carries Aggregates of the Channels its Rule's Conditions use, plus those requested with [`aggregate(...)`](#aggregates-for-more-channels-aggregate). Read them with `event.aggregates(x)`:
 
 ```java
 @Override public void onEnded(Event e) {
-  Aggregates speed = e.aggregates("speed");
+  Aggregates s = e.aggregates(speed);
   System.out.printf("avg %.1f m/s, max %.1f m/s, %.0f m driven%n",
-      speed.timeWeightedMean(), speed.max(), speed.integral());
+      s.timeWeightedMean(), s.max(), s.integral());
 }
 ```
 
@@ -515,13 +526,13 @@ For a recorded series, `detect` runs all Samples through a fresh Detector, close
 
 ```java
 Detector detector = Detector.builder()
-    .rule("LoadLifted", r -> r.when(channel("weight").above(500)))
+    .rule("LoadLifted", r -> r.when(weight.above(500)))
     .build();
 
 List<Event> events = detector.detect(List.of(
-    new Sample(0,     Map.of("weight", 0.0)),
-    new Sample(500,   Map.of("weight", 1200.0)),
-    new Sample(1_000, Map.of("weight", 0.0))));   // [LoadLifted 500..1000]
+    new Sample(0,     Map.of(weight, 0.0)),
+    new Sample(500,   Map.of(weight, 1200.0)),
+    new Sample(1_000, Map.of(weight, 0.0))));   // [LoadLifted 500..1000]
 ```
 
 `detect` accepts any `Iterable<Sample>`, so a lazily read file works as well. A listener, if configured, is still called. A Detector can only be used once: `detect` on a Detector that has already seen Samples throws.
@@ -531,11 +542,11 @@ List<Event> events = detector.detect(List.of(
 ```java
 Detector detector = Detector.builder()
     .samplingRate(50)    // 50 Hz: Samples are 20 ms apart
-    .rule("Spike", r -> r.when(channel("accel").above(3)).forSamples(5))
+    .rule("Spike", r -> r.when(accel.above(3)).forSamples(5))
     .build();
 
-detector.push(Map.of("accel", 0.1));                     // timestamp 0
-detector.push(Map.of("accel", 3.2));                     // timestamp 20
+detector.push(Map.of(accel, 0.1));                     // timestamp 0
+detector.push(Map.of(accel, 3.2));                     // timestamp 20
 // or, for a whole recording:
 List<Event> events = detector.detectValues(listOfMaps);
 ```
@@ -548,41 +559,43 @@ A Detector only evaluates Rules when something happens. If Samples stop arriving
 
 ```java
 Detector detector = Detector.builder()
-    .rule("SensorLost", r -> r.when(channel("hr").age().above(10_000)))
+    .rule("SensorLost", r -> r.when(hr.age().above(10_000)))
     .build();
 
-detector.push(0, Map.of("hr", 72.0));
+detector.push(0, Map.of(hr, 72.0));
 detector.advanceTo(5_000);    // hr is 5 s old
 detector.advanceTo(12_000);   // hr is 12 s old: SensorLost Confirmed
-detector.push(13_000, Map.of("hr", 70.0));   // SensorLost Ended at 13000
+detector.push(13_000, Map.of(hr, 70.0));   // SensorLost Ended at 13000
 ```
 
-`channel("x").age()` is the number of milliseconds since `x` last had a value, measured at the current Sample or advance. It is undefined before the first value.
+`x.age()` is the number of milliseconds since `x` last had a value, measured at the current Sample or advance. It is undefined before the first value.
 
 At an advance, all Rules are evaluated with every Channel holding its value: durations can be reached, `totalDuration` and `count(...).within(...)` move on, and `maxGap` is noticed. An advance is not a Sample, though: it does not count for `forSamples`, nor for the Sample-based Aggregates `min`, `max`, `mean` and `count`. The time-weighted Aggregates do include the time up to it.
 
 ## Pulse Channels
 
-Some Channels report one-off occurrences rather than a state: a deployment, a button press, a trade. By default a Channel keeps its last value, so `deploy = 1` would stay 1 forever. Declare such Channels as Pulse Channels:
+Some Channels report one-off occurrences rather than a state: a deployment, a button press, a trade. By default a Channel keeps its last value, so `deploy = 1` would stay 1 forever. Create such Channels as Pulse Channels:
 
 ```java
+Channel deploy = Channel.pulse("deploy");
+Channel errors = Channel.named("errors");
+
 Detector detector = Detector.builder()
-    .pulse("deploy")
-    .rule("Deployment", r -> r.when(channel("deploy").above(0.5)))
+    .rule("Deployment", r -> r.when(deploy.above(0.5)))
     .rule("Regression", r -> r
-        .when(after("Deployment").within(30 * 60_000).and(channel("errors").above(5))))
+        .when(after("Deployment").within(30 * 60_000).and(errors.above(5))))
     .build();
 
-detector.push(0,      Map.of("errors", 1.0));
-detector.push(60_000, Map.of("errors", 1.0, "deploy", 1.0));  // Deployment starts
-detector.push(120_000, Map.of("errors", 1.0));                // deploy is absent: Deployment Ended
+detector.push(0,      Map.of(errors, 1.0));
+detector.push(60_000, Map.of(errors, 1.0, deploy, 1.0));  // Deployment starts
+detector.push(120_000, Map.of(errors, 1.0));                // deploy is absent: Deployment Ended
 ```
 
 A Pulse Channel's value exists only in the Sample that carries it. In every other Sample and at every advance it is *absent*. Absent is not undefined, because the absence of a pulse is known:
 
-- Comparisons, `rising` and `falling` on an absent pulse are **false**, so `not()` of them is **true**: `channel("deploy").above(0.5).not()` means "no deployment now".
+- Comparisons, `rising` and `falling` on an absent pulse are **false**, so `not()` of them is **true**: `deploy.above(0.5).not()` means "no deployment now".
 - Arithmetic on an absent pulse is undefined.
-- `age()` is the time since the last pulse, e.g. `channel("heartbeat").age().above(60_000)`.
+- `age()` is the time since the last pulse, e.g. `heartbeat.age().above(60_000)`.
 
 ## Restarts: History
 
@@ -593,7 +606,7 @@ A Detector keeps its state in memory. After a restart, Rules like `after("Mainte
 List<Event> stored = loadFromDatabase();
 
 Detector detector = Detector.builder()
-    .rule("Maintenance", r -> r.when(channel("serviceMode").above(0.5)))
+    .rule("Maintenance", r -> r.when(serviceMode.above(0.5)))
     .rule("OverdueService", r -> r.when(after("Maintenance").within(Duration.ofDays(90)).not()))
     .history(stored)
     .build();
@@ -613,6 +626,8 @@ Mistakes are reported as early as possible, most of them when the Detector is bu
 | A sampling rate outside (0, 1000] Hz                                  | `samplingRate(...)`: `IllegalArgumentException` |
 | A History Event that has not Ended                                    | `history(...)`: `IllegalArgumentException` |
 | A Rule referring to itself or to a Rule declared after it             | `build()`: `IllegalArgumentException` |
+| One Channel name used both as a Pulse Channel and as an ordinary one  | `build()`: `IllegalArgumentException` |
+| An empty Channel name                                                 | `Channel.named`/`Channel.pulse`: `IllegalArgumentException` |
 | A timestamp not after the previous one or the History's latest end    | `push`/`advanceTo`: `IllegalArgumentException` |
 | A NaN, infinite or null value                                         | `push`: `IllegalArgumentException`, and the Sample is ignored |
 | Pushing after `close()`, or the wrong `push` for the sampling mode    | `IllegalStateException`             |

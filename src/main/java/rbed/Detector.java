@@ -44,9 +44,9 @@ public final class Detector implements AutoCloseable {
    * Callbacks for {@link Map#forEach}, created once: iterating a HashMap this way needs no
    * iterator, so pushing a Sample allocates nothing regardless of what the JIT inlines.
    */
-  private final BiConsumer<String, Double> validateValue = Detector::validate;
-  private final BiConsumer<String, Double> applyValue =
-      (channel, value) -> channel(channel).update(sampleTimestamp, value);
+  private final BiConsumer<Channel, Double> validateValue = Detector::validate;
+  private final BiConsumer<Channel, Double> applyValue =
+      (channel, value) -> channel(channel.name()).update(sampleTimestamp, value);
 
   /**
    * While binding Rules: the Rule being bound, the names it must not reference, and the Channels
@@ -59,8 +59,6 @@ public final class Detector implements AutoCloseable {
   private Detector(Builder b) {
     listener = b.listener;
     samplingRate = b.samplingRate;
-    pulses = b.pulses.stream().map(this::channel).toArray(ChannelState[]::new);
-
     notDeclaredBefore = new HashSet<>(b.rules.keySet());
     rules = new Rule[b.rules.size()];
     int i = 0;
@@ -71,6 +69,7 @@ public final class Detector implements AutoCloseable {
     }
     notDeclaredBefore = null;
     bindingRule = null;
+    pulses = channels.values().stream().filter(c -> c.pulse).toArray(ChannelState[]::new);
 
     hasHistory = !b.history.isEmpty();
     latestHistoryEnd = remember(b.history); // after binding, so that Event counts see it too
@@ -100,7 +99,7 @@ public final class Detector implements AutoCloseable {
    * @param values values of any subset of Channels; must be finite
    * @throws IllegalStateException if a sampling rate was configured, or after {@link #close}
    */
-  public void push(long timestamp, Map<String, Double> values) {
+  public void push(long timestamp, Map<Channel, Double> values) {
     if (samplingRate > 0) {
       throw new IllegalStateException("Detector has a sampling rate: push values only");
     }
@@ -113,7 +112,7 @@ public final class Detector implements AutoCloseable {
    *
    * @throws IllegalStateException if no sampling rate was configured, or after {@link #close}
    */
-  public void push(Map<String, Double> values) {
+  public void push(Map<Channel, Double> values) {
     if (samplingRate == 0) {
       throw new IllegalStateException("Detector has no sampling rate: push timestamps too");
     }
@@ -131,7 +130,7 @@ public final class Detector implements AutoCloseable {
   }
 
   /** Like {@link #detect}, for a regularly sampled series without timestamps. */
-  public List<Event> detectValues(Iterable<Map<String, Double>> series) {
+  public List<Event> detectValues(Iterable<Map<Channel, Double>> series) {
     return batch(() -> series.forEach(this::push));
   }
 
@@ -169,7 +168,7 @@ public final class Detector implements AutoCloseable {
     evaluate(timestamp, false);
   }
 
-  private void accept(long timestamp, Map<String, Double> values) {
+  private void accept(long timestamp, Map<Channel, Double> values) {
     values.forEach(validateValue); // first, so a rejected Sample leaves no trace
     moveTo(timestamp);
     for (ChannelState pulse : pulses) pulse.carried = false;
@@ -186,7 +185,7 @@ public final class Detector implements AutoCloseable {
     for (Rule rule : rules) rule.step(timestamp, isSample);
   }
 
-  private static void validate(String channel, Double value) {
+  private static void validate(Channel channel, Double value) {
     if (channel == null || value == null || !Double.isFinite(value)) {
       throw new IllegalArgumentException("Invalid value " + value + " of channel " + channel);
     }
@@ -222,6 +221,7 @@ public final class Detector implements AutoCloseable {
     listener.onEnded(event);
   }
 
+  /** A Channel's state, created when first pushed or referenced. */
   ChannelState channel(String name) {
     ChannelState state = channels.get(name);
     if (state == null) {
@@ -231,9 +231,25 @@ public final class Detector implements AutoCloseable {
     return state;
   }
 
-  /** A Channel that a Condition being bound refers to; recorded for the Rule's Aggregates. */
-  ChannelState referencedChannel(String name) {
+  /**
+   * The state of a Channel a Rule refers to, while binding it.
+   *
+   * @throws IllegalArgumentException if another reference disagrees on whether it is a pulse
+   */
+  ChannelState channel(String name, boolean pulse) {
     ChannelState state = channel(name);
+    if (state.referenced && state.pulse != pulse) {
+      throw new IllegalArgumentException(
+          "Channel " + name + " is used both as a Pulse Channel and as an ordinary Channel");
+    }
+    state.referenced = true;
+    state.pulse = pulse;
+    return state;
+  }
+
+  /** A Channel that a Condition being bound refers to; recorded for the Rule's Aggregates. */
+  ChannelState referencedChannel(String name, boolean pulse) {
+    ChannelState state = channel(name, pulse);
     if (channelLookups != null) channelLookups.add(state);
     return state;
   }
@@ -276,7 +292,6 @@ public final class Detector implements AutoCloseable {
   public static final class Builder {
     private final Map<String, RuleBuilder> rules = new LinkedHashMap<>();
     private final List<Event> history = new ArrayList<>();
-    private final Set<String> pulses = new LinkedHashSet<>();
     private EventListener listener = new EventListener() {};
     private double samplingRate;
 
@@ -296,17 +311,6 @@ public final class Detector implements AutoCloseable {
 
     public Builder listener(EventListener listener) {
       this.listener = Objects.requireNonNull(listener, "listener");
-      return this;
-    }
-
-    /**
-     * Declares Pulse Channels, such as a Channel reporting deployments: their value exists only in
-     * the Sample that carries it instead of holding. In other Samples the pulse is absent: comparisons on it
-     * (and {@code rising}/{@code falling}) are false, so {@code not()} of them is true, while
-     * computing with it is undefined. {@code age()} gives the time since the last pulse.
-     */
-    public Builder pulse(String... channels) {
-      for (String channel : channels) pulses.add(Objects.requireNonNull(channel, "channel"));
       return this;
     }
 

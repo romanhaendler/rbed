@@ -47,7 +47,7 @@ final class Rule {
     this.end = spec.end == null ? null : spec.end.condition().bind(detector);
     this.ending = spec.end == null ? null : new Progress(spec.end);
     for (ChannelState referenced : detector.recordedChannelLookups()) aggregate(referenced);
-    for (String channel : spec.aggregated) aggregate(detector.channel(channel));
+    for (Channel channel : spec.aggregated) aggregate(channel.state(detector));
     this.maxGap = spec.maxGap;
   }
 

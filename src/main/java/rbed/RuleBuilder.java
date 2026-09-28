@@ -15,7 +15,7 @@ public final class RuleBuilder {
   Phase when;
   Phase end;
   long maxGap = Long.MAX_VALUE;
-  final Set<String> aggregated = new LinkedHashSet<>();
+  final Set<Channel> aggregated = new LinkedHashSet<>();
   private boolean durationsApplyToEnd;
 
   RuleBuilder() {}
@@ -76,8 +76,8 @@ public final class RuleBuilder {
    * Also keeps Aggregates for these Channels. Channels referenced by the Rule's Conditions are
    * aggregated anyway.
    */
-  public RuleBuilder aggregate(String... channels) {
-    for (String channel : channels) aggregated.add(Objects.requireNonNull(channel, "channel"));
+  public RuleBuilder aggregate(Channel... channels) {
+    for (Channel channel : channels) aggregated.add(Objects.requireNonNull(channel, "channel"));
     return this;
   }
 
