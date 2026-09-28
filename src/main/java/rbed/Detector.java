@@ -53,23 +53,23 @@ public final class Detector implements AutoCloseable {
    */
   private String bindingRule;
   private Set<String> added;
-  private Set<String> declaredBefore;
+  private Set<String> addedBefore;
   private Set<ChannelState> channelLookups;
 
   private Detector(Builder b) {
     listener = b.listener;
     samplingRate = b.samplingRate;
     added = b.rules.keySet();
-    declaredBefore = new HashSet<>();
+    addedBefore = new HashSet<>();
     rules = new RuleState[b.rules.size()];
     int i = 0;
     for (Rule rule : b.rules.values()) {
       bindingRule = rule.name();
       rules[i++] = new RuleState(this, rule);
-      declaredBefore.add(rule.name());
+      addedBefore.add(rule.name());
     }
     added = null;
-    declaredBefore = null;
+    addedBefore = null;
     bindingRule = null;
     pulses = channels.values().stream().filter(c -> c.pulse).toArray(ChannelState[]::new);
 
@@ -288,7 +288,7 @@ public final class Detector implements AutoCloseable {
    */
   EventState referencedEvent(Rule rule) {
     String name = rule.name();
-    if (!declaredBefore.contains(name)) {
+    if (!addedBefore.contains(name)) {
       throw new IllegalArgumentException("Rule " + bindingRule + " references " + name
           + (added.contains(name) ? ", which is not added before it" : ", which is not added"));
     }
@@ -354,7 +354,8 @@ public final class Detector implements AutoCloseable {
 
     /**
      * @throws IllegalArgumentException if a Rule references itself, a Rule added after it or a
-     *     Rule not added, or if History contains an Event of no added Rule
+     *     Rule not added, or if History contains an Event of no added Rule. A Rule without
+     *     {@code when} and duplicate Rule names are already rejected by {@link #rules}.
      */
     public Detector build() {
       return new Detector(this);

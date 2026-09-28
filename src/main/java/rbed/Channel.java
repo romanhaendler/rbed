@@ -1,6 +1,7 @@
 package rbed;
 
 import java.util.Objects;
+import java.util.function.Function;
 
 /**
  * A named signal within a time series, such as "weight". Create each Channel once and use it in
@@ -41,8 +42,7 @@ public final class Channel extends ChannelExpression {
     return detector.channel(name, pulse);
   }
 
-  private static java.util.function.Function<Detector, ValueTrack> track(
-      String name, boolean pulse) {
+  private static Function<Detector, ValueTrack> track(String name, boolean pulse) {
     if (Objects.requireNonNull(name, "name").isEmpty()) {
       throw new IllegalArgumentException("Channel name is empty");
     }
