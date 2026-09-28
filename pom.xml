@@ -90,7 +90,8 @@
 
   <profiles>
     <profile>
-      <!-- Sources, javadoc, signatures and the upload to Maven Central: mvn deploy -Prelease -->
+      <!-- Sources, javadoc, signatures and the release to Maven Central: mvn deploy -Prelease.
+           Normally run by .github/workflows/publish.yml, see RELEASING.md. -->
       <id>release</id>
       <build>
         <plugins>
@@ -145,9 +146,8 @@
             <extensions>true</extensions>
             <configuration>
               <publishingServerId>central</publishingServerId>
-              <!-- uploads and validates; publishing is a manual click on central.sonatype.com -->
-              <autoPublish>false</autoPublish>
-              <waitUntil>validated</waitUntil>
+              <autoPublish>true</autoPublish>
+              <waitUntil>published</waitUntil>
             </configuration>
           </plugin>
         </plugins>

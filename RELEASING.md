@@ -1,39 +1,38 @@
 # Releasing
 
-rbed is published to Maven Central as `io.github.romanhaendler:rbed` through the [Central Portal](https://central.sonatype.com).
+rbed is published to Maven Central as `io.github.romanhaendler:rbed` by the GitHub workflow [Publish](.github/workflows/publish.yml).
 
-## One-time setup
+## Releasing a version
 
-1. Sign in to [central.sonatype.com](https://central.sonatype.com) with the GitHub account `romanhaendler`. The namespace `io.github.romanhaendler` is verified automatically.
-2. Under *View Account*, generate a user token and add it to `~/.m2/settings.xml`:
+1. Raise the version in `pom.xml` and in the README's install section, e.g. to `0.2.0`, and push to `main`.
+2. The workflow sees that `0.2.0` is not on Maven Central yet, then builds, tests, signs, uploads and waits until Central has published it. It then tags `v0.2.0` and creates the GitHub release with the jars.
 
-   ```xml
-   <settings>
-     <servers>
-       <server>
-         <id>central</id>
-         <username>TOKEN_USERNAME</username>
-         <password>TOKEN_PASSWORD</password>
-       </server>
-     </servers>
-   </settings>
-   ```
+A push whose version is already on Maven Central releases nothing. A published version can never be changed or deleted, so every fix gets a new version. Versions ending in `-SNAPSHOT` are never released.
 
-3. Create a GPG key and publish it, so that Central can verify the signatures:
+## How the workflow is trusted
 
-   ```sh
-   brew install gnupg pinentry-mac
-   gpg --full-generate-key                                   # RSA 4096, your name and email
-   gpg --list-secret-keys --keyid-format long                # the key id follows "rsa4096/"
-   gpg --keyserver keys.openpgp.org --send-keys KEY_ID
-   ```
+Maven Central has no trust relationship with GitHub Actions like npm's Trusted Publishing, so the workflow uses secrets of the GitHub environment `maven-central`, which only `main` may use:
 
-   keys.openpgp.org sends a confirmation email before it publishes the key with your address.
+| Secret | What it is |
+| --- | --- |
+| `CENTRAL_USERNAME`, `CENTRAL_PASSWORD` | A user token of [central.sonatype.com](https://central.sonatype.com) (*View Account* → *Generate User Token*). |
+| `GPG_PRIVATE_KEY` | Only the signing subkey of the key `34B0836E9C5DD51D668D059A56A65A814808CD25`, never the primary key. |
+| `GPG_PASSPHRASE` | Its passphrase. |
 
-## Each release
+The primary key stays on the maintainer's machine. If a secret leaks, revoke the signing subkey, publish the key again and store a new subkey; the identity and the signatures of earlier releases stay valid.
 
-1. Set the release version, e.g. `mvn versions:set -DnewVersion=0.1.0 -DgenerateBackupPoms=false`, update the version in the README's install section, and commit.
-2. Upload: `mvn clean deploy -Prelease`. This builds, tests, signs and uploads, then waits until Central has validated the bundle.
-3. Check the deployment on [central.sonatype.com/publishing/deployments](https://central.sonatype.com/publishing/deployments) and click *Publish*. A published version can never be changed or deleted.
-4. Tag and release on GitHub: `git tag v0.1.0 && git push origin v0.1.0 && gh release create v0.1.0 --generate-notes`.
-5. Set the next development version, e.g. `0.2.0-SNAPSHOT`, and commit.
+### Replacing the signing subkey
+
+```sh
+KEY=34B0836E9C5DD51D668D059A56A65A814808CD25
+gpg --quick-add-key $KEY rsa4096 sign 2y
+gpg --keyserver keys.openpgp.org --send-keys $KEY
+gpg --list-keys --with-subkey-fingerprints $KEY    # the new subkey is the last one with [S]
+gpg --export-secret-subkeys --armor 'SUBKEY_FINGERPRINT!' | gh secret set GPG_PRIVATE_KEY --env maven-central -R romanhaendler/rbed
+```
+
+The `!` exports exactly that subkey. Central verifies signatures against the key on keys.openpgp.org, so the key must be sent there before the next release.
+
+## Releasing by hand
+
+With the token in `~/.m2/settings.xml` (server id `central`) and the key in the local GnuPG, `mvn clean deploy -Prelease` does the same as the workflow, except tagging and the GitHub release.

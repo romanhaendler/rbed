@@ -1,0 +1,94 @@
+# Releases the version in pom.xml to Maven Central on each push to main, unless
+# it is already there (RELEASING.md). A version is released by raising it in
+# pom.xml; the tag v<version> and the GitHub release are created here afterwards.
+# Maven Central has no OIDC trust, so the Central token and a signing subkey
+# are secrets of the environment maven-central, which only main may use.
+name: Publish
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  # Outside the environment, so a push that releases nothing needs no secrets.
+  find:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.find.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: find
+        run: |
+          version="$(python3 -c "import xml.etree.ElementTree as E; print(E.parse('pom.xml').getroot().find('{http://maven.apache.org/POM/4.0.0}version').text)")"
+          url="https://repo1.maven.org/maven2/io/github/romanhaendler/rbed/$version/rbed-$version.pom"
+          if [[ "$version" == *-SNAPSHOT ]]; then
+            echo "$version is a snapshot - not releasing"
+          elif curl -sfI "$url" > /dev/null; then
+            echo "$version is on Maven Central"
+          else
+            echo "$version is not - releasing"
+            echo "version=$version" >> "$GITHUB_OUTPUT"
+          fi
+
+  publish:
+    needs: find
+    if: needs.find.outputs.version != ''
+    runs-on: ubuntu-latest
+    environment: maven-central
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.find.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      # Writes a settings.xml for the server "central" and imports the signing subkey.
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: maven
+          server-id: central
+          server-username: CENTRAL_USERNAME
+          server-password: CENTRAL_PASSWORD
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+
+      # A release of the last few minutes may not have reached repo1 yet;
+      # the Central Portal knows for sure.
+      - name: Check the Central Portal
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+        run: |
+          token="$(printf '%s:%s' "$CENTRAL_USERNAME" "$CENTRAL_PASSWORD" | base64 -w0)"
+          published="$(curl -sf -H "Authorization: Bearer $token" \
+            "https://central.sonatype.com/api/v1/publisher/published?namespace=io.github.romanhaendler&name=rbed&version=$VERSION")"
+          echo "$published"
+          if [[ "$published" == *'"published":true'* ]]; then
+            echo "::error::$VERSION is already published"
+            exit 1
+          fi
+
+      # Builds, tests, signs, uploads and waits until Central has published it.
+      - run: mvn -B deploy -Prelease
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Tag and release on GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
+          gh release create "v$VERSION" --title "$VERSION" --generate-notes \
+            target/rbed-$VERSION.jar target/rbed-$VERSION-sources.jar target/rbed-$VERSION-javadoc.jar
