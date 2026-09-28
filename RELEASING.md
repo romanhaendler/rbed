@@ -16,7 +16,7 @@ Maven Central has no trust relationship with GitHub Actions like npm's Trusted P
 | Secret | What it is |
 | --- | --- |
 | `CENTRAL_USERNAME`, `CENTRAL_PASSWORD` | A user token of [central.sonatype.com](https://central.sonatype.com) (*View Account* → *Generate User Token*). |
-| `GPG_PRIVATE_KEY` | Only the signing subkey of the key `34B0836E9C5DD51D668D059A56A65A814808CD25`, never the primary key. |
+| `GPG_PRIVATE_KEY` | Only the signing subkey of the key `00FB80F0CFB962F380639C85867712B5E595DD3F`, never the primary key. |
 | `GPG_PASSPHRASE` | Its passphrase. |
 
 The primary key stays on the maintainer's machine. If a secret leaks, revoke the signing subkey, publish the key again and store a new subkey; the identity and the signatures of earlier releases stay valid.
@@ -24,14 +24,18 @@ The primary key stays on the maintainer's machine. If a secret leaks, revoke the
 ### Replacing the signing subkey
 
 ```sh
-KEY=34B0836E9C5DD51D668D059A56A65A814808CD25
+KEY=00FB80F0CFB962F380639C85867712B5E595DD3F
 gpg --quick-add-key $KEY rsa4096 sign 2y
-gpg --keyserver keys.openpgp.org --send-keys $KEY
 gpg --list-keys --with-subkey-fingerprints $KEY    # the new subkey is the last one with [S]
 gpg --export-secret-subkeys --armor 'SUBKEY_FINGERPRINT!' | gh secret set GPG_PRIVATE_KEY --env maven-central -R romanhaendler/rbed
 ```
 
-The `!` exports exactly that subkey. Central verifies signatures against the key on keys.openpgp.org, so the key must be sent there before the next release.
+The `!` exports exactly that subkey. Central verifies signatures against the public key on the keyservers, so the key must be sent there before the next release:
+
+```sh
+gpg --keyserver keys.openpgp.org --send-keys $KEY
+gpg --keyserver hkps://keyserver.ubuntu.com --send-keys $KEY
+```
 
 ## Releasing by hand
 
