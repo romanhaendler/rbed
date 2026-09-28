@@ -47,9 +47,9 @@ class IntervalTrainingExample {
         .endWhen(SPEED.below(4));
     Rule recovered = Rule.named("Recovered")
         .when(after(sprint).within(2 * MINUTE).and(HR.below(120)));
+    Rule sessionDone = Rule.named("SessionDone").when(count(sprint).above(2));
     Detector detector = Detector.builder()
-        .rules(sprint, recovered)
-        .rules(Rule.named("SessionDone").when(count(sprint).above(2)))
+        .rules(sprint, recovered, sessionDone)
         .listener(new EventListener() {
           private long lastSprintEnd;
 

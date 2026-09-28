@@ -75,14 +75,22 @@ For a recorded series, `detect(samples)` does all three in one call and returns 
 
 A **Sample** is the values of one or more **Channels** at one timestamp. Timestamps are milliseconds (`long`), for example epoch milliseconds or milliseconds since the start of a recording. They must strictly increase.
 
-Each Channel is created once, by name, and then used everywhere: in Conditions, when pushing values and when reading Aggregates. The compiler checks every use, so a misspelled Channel does not compile. The examples in this README assume their Channels are created like this:
+Each Channel is created once, by name, and then used everywhere: in Conditions, when pushing values and when reading Aggregates. The name is written in one place, and the compiler checks every use. The examples in this README assume their Channels are created like this (in an application they are typically `static final` constants):
 
 ```java
 Channel temp = Channel.named("temp");
 Channel pressure = Channel.named("pressure");
 ```
 
-Channels are equal by name. Data that arrives with Channel names as strings, such as a CSV header or a JSON field, maps onto the same Channels with `Channel.named(column)`. Values of Channels that no Rule uses are ignored, so a Sample may carry more Channels than the Rules need.
+Channels are equal by name, so data that arrives with names as strings, such as a CSV row or a JSON object, maps onto the same Channels without a registry:
+
+```java
+Map<Channel, Double> values = new HashMap<>();
+row.forEach((column, value) -> values.put(Channel.named(column), value));
+detector.push(timestamp, values);
+```
+
+Values of Channels that no Rule uses are ignored, so a Sample may carry more Channels than the Rules need.
 
 A Sample does not have to contain every Channel. A missing Channel keeps its last value, so sensors reporting at different rates can share one Detector:
 
@@ -277,7 +285,7 @@ temp.between(18, 24)        // 18 <= temp <= 24, both bounds included
 `above` and `below` also compare two Expressions, so a threshold can itself be a Channel:
 
 ```java
-weight.above(ratedLoad)      // overload, with a per-crane rated load
+weight.above(ratedLoad)                   // overload, with a per-crane rated load
 level.below(setpoint.minus(0.5))
 ```
 
@@ -288,11 +296,11 @@ To test "at least" or "at most", negate the opposite: `temp.below(80).not()` is 
 Expressions support `plus`, `minus`, `times` and `dividedBy`, each with another Expression or a number, and `abs()`:
 
 ```java
-supply.minus(return).above(5)             // temperature spread
+supplyTemp.minus(returnTemp).above(5)     // temperature spread
 current.times(voltage).above(2_000)       // power from two Channels
 setpoint.minus(actual).abs().above(2)     // deviation in either direction
 errors.dividedBy(requests).above(0.01)    // error rate above 1 %
-tempF.minus(32).times(5.0 / 9).above(30)             // unit conversion
+tempF.minus(32).times(5.0 / 9).above(30)  // unit conversion
 ```
 
 A division by zero, or any other operation without a finite result, is undefined.
@@ -319,7 +327,8 @@ Rule warming = Rule.named("Warming").when(temp.rising()).forSamples(5);
 *Level plus direction*, with `and`. A high value that is still climbing needs action; a high value that is already falling is recovering:
 
 ```java
-Rule pressureEscalating = Rule.named("PressureEscalating").when(pressure.above(8).and(pressure.rising()));
+Rule pressureEscalating = Rule.named("PressureEscalating")
+    .when(pressure.above(8).and(pressure.rising()));
 ```
 
 *Peaks and troughs.* An Event of `rising()` lasts exactly as long as a climb. It Ends at the first Sample that is not higher, and its `max` Aggregate is the peak value:
@@ -390,9 +399,9 @@ Single comparisons rarely describe a real situation. Combine them:
 - **`not`**: the opposite. It expresses "outside a band", "at least" (`below(80).not()` is `>= 80`) and "no pulse now" for [Pulse Channels](#pulse-channels).
 
 ```java
-temp.above(80).and(fan.below(0.5))            // cooling failure
-doorA.above(0.5).or(doorB.above(0.5))          // any door open
-temp.between(18, 24).not()                               // outside the comfort band
+temp.above(80).and(fan.below(0.5))       // cooling failure
+doorA.above(0.5).or(doorB.above(0.5))     // any door open
+temp.between(18, 24).not()                // outside the comfort band
 ```
 
 There is no operator precedence to remember: calls nest explicitly. This holds when the machine runs and at least one of the two warning signs is present:
@@ -413,7 +422,7 @@ So a Rule never fires because data is missing. To detect missing data explicitly
 
 ## Referring to other Rules
 
-Rules can refer to the Events of Rules added before them, by passing the Rule itself. This composes simple Rules into sequences, combinations and statistics.
+Rules can refer to the Events of Rules added before them, by passing the Rule itself. This composes simple Rules into sequences, combinations, counts and durations.
 
 ### `during`: while another Event runs
 
@@ -433,7 +442,8 @@ Rule roughRunning = Rule.named("RoughRunning").when(during(running).and(vibratio
 ```java
 Rule tachycardia = Rule.named("Tachycardia").when(hr.above(100)).forDuration(30_000);
 Rule desaturation = Rule.named("Desaturation").when(spo2.below(90)).forDuration(10_000);
-Rule hypoxicTachycardia = Rule.named("HypoxicTachycardia").when(during(tachycardia).and(during(desaturation)));
+Rule hypoxicTachycardia = Rule.named("HypoxicTachycardia")
+    .when(during(tachycardia).and(during(desaturation)));
 ```
 
 ### `after`: sequences
@@ -463,7 +473,8 @@ Interrupting Events are named explicitly with `unless` rather than implied, so a
 
 ```java
 Rule run = Rule.named("Run").when(power.above(500)).forDuration(30_000);
-Rule frequentStarts = Rule.named("FrequentStarts").when(count(run).within(Duration.ofHours(1)).above(3));
+Rule frequentStarts = Rule.named("FrequentStarts")
+    .when(count(run).within(Duration.ofHours(1)).above(3));
 Rule serviceDue = Rule.named("ServiceDue").when(count(run).above(10_000));
 ```
 
@@ -475,7 +486,8 @@ An Event counts from the moment it is Confirmed, so a running Event is included.
 
 ```java
 Rule excursion = Rule.named("Excursion").when(temp.above(8));
-Rule cumulativeLimit = Rule.named("CumulativeLimit").when(totalDuration(excursion).above(45 * 60_000));
+Rule cumulativeLimit = Rule.named("CumulativeLimit")
+    .when(totalDuration(excursion).above(45 * 60_000));
 ```
 
 ### `latest`: values of the most recent Event
@@ -489,15 +501,16 @@ Each is an Expression, undefined while there has been no A Event. This relates t
 
 ```java
 Rule loadLifted = Rule.named("LoadLifted").when(weight.above(500)).endWhen(weight.below(50));
-Rule partialSetDown = Rule.named("PartialSetDown").when(during(loadLifted)
-    .and(weight.below(latest(loadLifted).max(weight).times(0.5))));
+Rule partialSetDown = Rule.named("PartialSetDown")
+    .when(during(loadLifted).and(weight.below(latest(loadLifted).max(weight).times(0.5))));
 ```
 
 or a machine cycle that is taking too long, detected while it is still running:
 
 ```java
 Rule cycle = Rule.named("Cycle").when(spindle.above(0.5));
-Rule slowCycle = Rule.named("SlowCycle").when(during(cycle).and(latest(cycle).duration().above(120_000)));
+Rule slowCycle = Rule.named("SlowCycle")
+    .when(during(cycle).and(latest(cycle).duration().above(120_000)));
 ```
 
 ## Aggregates
@@ -613,7 +626,8 @@ A Detector keeps its state in memory. After a restart, Rules like `after(mainten
 List<Event> stored = loadFromDatabase();
 
 Rule maintenance = Rule.named("Maintenance").when(serviceMode.above(0.5));
-Rule overdueService = Rule.named("OverdueService").when(after(maintenance).within(Duration.ofDays(90)).not());
+Rule overdueService = Rule.named("OverdueService")
+    .when(after(maintenance).within(Duration.ofDays(90)).not());
 Detector detector = Detector.builder()
     .rules(maintenance, overdueService)
     .history(stored)
@@ -662,7 +676,7 @@ Runnable end-to-end examples from different domains, each a test with its expect
 
 ## Performance
 
-Conditions are bound to the Detector once, in `build()`. After that, pushing a Sample does not look anything up by name. In steady state (no Event starting or ending) it allocates nothing, so memory stays bounded however long an Event lasts. Moving averages use fixed ring buffers with compensated sums, so they neither allocate nor drift.
+Conditions are bound to the Detector once, in `build()`. After that, Rules read Channel state directly, and pushing a Sample costs one hash lookup per value. In steady state (no Event starting or ending) it allocates nothing, so memory stays bounded however long an Event lasts. Moving averages use fixed ring buffers with compensated sums, so they neither allocate nor drift.
 
 Measured with `mvn test -Pperformance` (Apple M2, JDK 21):
 

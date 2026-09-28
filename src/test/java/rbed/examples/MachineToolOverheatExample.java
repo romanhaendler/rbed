@@ -53,11 +53,12 @@ class MachineToolOverheatExample {
     Rule overheat = Rule.named("Overheat")
         .when(TEMP.above(80)).forDuration(30 * SECOND)
         .endWhen(TEMP.below(70)).forDuration(60 * SECOND);
+    Rule overheatUnderLoad = Rule.named("OverheatUnderLoad")
+        .when(during(overheat).and(during(highLoad)));
+    Rule fastHeating = Rule.named("FastHeating").when(TEMP.rate().above(0.5)).forSamples(5);
     Detector detector = Detector.builder()
         .samplingRate(1)
-        .rules(highLoad, overheat)
-        .rules(Rule.named("OverheatUnderLoad").when(during(overheat).and(during(highLoad))))
-        .rules(Rule.named("FastHeating").when(TEMP.rate().above(0.5)).forSamples(5))
+        .rules(highLoad, overheat, overheatUnderLoad, fastHeating)
         .build();
 
     List<Sample> series = Samples.every(1, 0, 600, SECOND,

@@ -1,19 +1,20 @@
 package rbed;
 
 import java.util.Objects;
-import java.util.function.Function;
 
 /**
- * A named signal within a time series, such as "weight". Create each Channel once and use it in
+ * A named quantity of a time series, such as "weight". Create each Channel once and use it in
  * Conditions, when pushing values and when reading Aggregates. Channels are equal by name, so a
  * Channel created from external data (e.g. a CSV header) matches the one the Rules use.
  */
 public final class Channel extends ChannelExpression {
   private final String name;
-  private final boolean pulse;
+  final boolean pulse;
 
   private Channel(String name, boolean pulse) {
-    super(track(name, pulse));
+    if (Objects.requireNonNull(name, "name").isEmpty()) {
+      throw new IllegalArgumentException("Channel name is empty");
+    }
     this.name = name;
     this.pulse = pulse;
   }
@@ -37,16 +38,14 @@ public final class Channel extends ChannelExpression {
     return name;
   }
 
-  /** This Channel's state in a Detector, without recording it as a lookup of the Rule. */
-  ChannelState state(Detector detector) {
-    return detector.channel(name, pulse);
+  @Override
+  ValueTrack track(Detector detector) {
+    return detector.referencedChannel(this);
   }
 
-  private static Function<Detector, ValueTrack> track(String name, boolean pulse) {
-    if (Objects.requireNonNull(name, "name").isEmpty()) {
-      throw new IllegalArgumentException("Channel name is empty");
-    }
-    return detector -> detector.referencedChannel(name, pulse);
+  /** This Channel's state in a Detector, without recording it as a lookup of the Rule. */
+  ChannelState state(Detector detector) {
+    return detector.channel(this);
   }
 
   @Override

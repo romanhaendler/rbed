@@ -2,16 +2,14 @@ package rbed;
 
 /** One Channel inside one Detector. */
 final class ChannelState extends ValueTrack {
+  /** The Channel as first referenced by a Rule or, if no Rule uses it, as first pushed. */
   final Channel channel;
-  /** Whether a Rule refers to this Channel, and then whether as a Pulse Channel. */
-  boolean referenced;
-  boolean pulse;
   /** Whether the Sample being applied carried this Channel; only maintained for pulses. */
   boolean carried;
   private boolean absent;
 
-  ChannelState(String name) {
-    this.channel = Channel.named(name);
+  ChannelState(Channel channel) {
+    this.channel = channel;
   }
 
   @Override

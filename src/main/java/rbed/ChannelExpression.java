@@ -1,7 +1,6 @@
 package rbed;
 
 import java.time.Duration;
-import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -9,17 +8,15 @@ import java.util.function.Supplier;
  * how it developed. Functions of the past use the track's own updates (a Channel's values, not the
  * Samples in which it was absent) and are undefined until enough of them exist.
  */
-public class ChannelExpression extends Expression {
-  /** Resolves the track in a Detector; each call on a moving average creates its own window. */
-  private final Function<Detector, ValueTrack> track;
+public abstract class ChannelExpression extends Expression {
+  ChannelExpression() {}
 
-  ChannelExpression(Function<Detector, ValueTrack> track) {
-    this.track = track;
-  }
+  /** Resolves the track in a Detector; each call on a moving average creates its own window. */
+  abstract ValueTrack track(Detector detector);
 
   @Override
   Bound bind(Detector detector) {
-    ValueTrack t = track.apply(detector);
+    ValueTrack t = track(detector);
     return new Bound() {
       @Override public double value() {
         return t.value;
@@ -45,7 +42,7 @@ public class ChannelExpression extends Expression {
   public Expression rate() {
     return new Expression() {
       @Override Bound bind(Detector detector) {
-        return track.apply(detector)::rate;
+        return track(detector)::rate;
       }
     };
   }
@@ -57,7 +54,7 @@ public class ChannelExpression extends Expression {
   public Expression age() {
     return new Expression() {
       @Override Bound bind(Detector detector) {
-        ValueTrack t = track.apply(detector);
+        ValueTrack t = track(detector);
         return () -> t.age(detector.now());
       }
     };
@@ -86,7 +83,7 @@ public class ChannelExpression extends Expression {
   private Condition trend(boolean rising) {
     return new Condition() {
       @Override Bound bind(Detector detector) {
-        ValueTrack t = track.apply(detector);
+        ValueTrack t = track(detector);
         return rising
             ? () -> t.absent() ? Truth.FALSE : Truth.greater(t.value, t.previous)
             : () -> t.absent() ? Truth.FALSE : Truth.less(t.value, t.previous);
@@ -96,6 +93,11 @@ public class ChannelExpression extends Expression {
 
   /** Each binding gets its own window, fed with every value of the source from the start. */
   private ChannelExpression average(Supplier<Window> newWindow) {
-    return new ChannelExpression(detector -> track.apply(detector).average(newWindow.get()));
+    ChannelExpression source = this;
+    return new ChannelExpression() {
+      @Override ValueTrack track(Detector detector) {
+        return source.track(detector).average(newWindow.get());
+      }
+    };
   }
 }

@@ -41,16 +41,16 @@ class CraneScenarioTest {
         .when(WEIGHT.above(500)).forDuration(Duration.ofSeconds(2))
         .endWhen(WEIGHT.below(50)).forDuration(Duration.ofSeconds(1))
         .maxGap(Duration.ofSeconds(5));
+    Rule overload = Rule.named("Overload")
+        .when(WEIGHT.above(RATED_LOAD).and(during(loadLifted)))
+        .forSamples(2);
+    Rule partialSetDown = Rule.named("PartialSetDown")
+        .when(during(loadLifted)
+            .and(WEIGHT.below(latest(loadLifted).max(WEIGHT).times(0.5)))
+            .and(WEIGHT.above(50)))  // still a load on the hook
+        .forSamples(2);
     Detector crane = Detector.builder()
-        .rules(loadLifted)
-        .rules(Rule.named("Overload")
-            .when(WEIGHT.above(RATED_LOAD).and(during(loadLifted)))
-            .forSamples(2))
-        .rules(Rule.named("PartialSetDown")
-            .when(during(loadLifted)
-                .and(WEIGHT.below(latest(loadLifted).max(WEIGHT).times(0.5)))
-                .and(WEIGHT.above(50)))  // still a load on the hook
-            .forSamples(2))
+        .rules(loadLifted, overload, partialSetDown)
         .listener(new EventListener() {
           @Override public void onConfirmed(Event e) {
             pickedUp.add(e.name() + "@" + e.start());

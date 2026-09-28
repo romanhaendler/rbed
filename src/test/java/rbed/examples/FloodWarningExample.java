@@ -32,15 +32,16 @@ class FloodWarningExample {
 
   @Test
   void warnsWhileRisingAndLiftsWithHysteresis() {
+    Rule floodWarning = Rule.named("FloodWarning")
+        .when(LEVEL.above(300)
+            .and(LEVEL.averageOverSamples(4).rate().above(10.0 / (HOUR / 1000))))
+        .forDuration(HOUR / 2)
+        .endWhen(LEVEL.below(250)).forDuration(2 * HOUR)
+        .maxGap(2 * HOUR);
+    Rule receding = Rule.named("Receding")
+        .when(LEVEL.falling().and(LEVEL.above(300)));
     Detector detector = Detector.builder()
-        .rules(Rule.named("FloodWarning")
-            .when(LEVEL.above(300)
-                .and(LEVEL.averageOverSamples(4).rate().above(10.0 / (HOUR / 1000))))
-            .forDuration(HOUR / 2)
-            .endWhen(LEVEL.below(250)).forDuration(2 * HOUR)
-            .maxGap(2 * HOUR))
-        .rules(Rule.named("Receding")
-            .when(LEVEL.falling().and(LEVEL.above(300))))
+        .rules(floodWarning, receding)
         .build();
 
     List<Sample> series = Samples.every(0.25, 0, 72, HOUR, h -> Map.of(LEVEL, levelCm(h)))

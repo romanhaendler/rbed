@@ -35,11 +35,12 @@ class TradingSignalsExample {
 
   @Test
   void detectsMovingAverageCrosses() {
+    Rule deathCross = Rule.named("DeathCross").when(
+        PRICE.averageOverSamples(50).below(PRICE.averageOverSamples(200)));
+    Rule goldenCross = Rule.named("GoldenCross").when(
+        PRICE.averageOverSamples(50).above(PRICE.averageOverSamples(200)));
     Detector detector = Detector.builder()
-        .rules(Rule.named("DeathCross").when(
-            PRICE.averageOverSamples(50).below(PRICE.averageOverSamples(200))))
-        .rules(Rule.named("GoldenCross").when(
-            PRICE.averageOverSamples(50).above(PRICE.averageOverSamples(200))))
+        .rules(deathCross, goldenCross)
         .build();
 
     List<Event> events = detector.detect(

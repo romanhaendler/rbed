@@ -39,13 +39,13 @@ class DeploymentRegressionExample {
   @Test
   void attributesErrorSpikesToDeployments() {
     Rule deployment = Rule.named("Deployment").when(DEPLOY.above(0.5));
+    Rule errorSpike = Rule.named("ErrorSpike").when(ERRORS.above(5)).forDuration(2 * MINUTE);
+    Rule regression = Rule.named("Regression")
+        .when(after(deployment).within(30 * MINUTE).and(ERRORS.above(5)))
+        .forDuration(2 * MINUTE);
+    Rule highCpu = Rule.named("HighCpu").when(CPU.above(90)).forDuration(5 * MINUTE);
     Detector detector = Detector.builder()
-        .rules(deployment)
-        .rules(Rule.named("ErrorSpike").when(ERRORS.above(5)).forDuration(2 * MINUTE))
-        .rules(Rule.named("Regression")
-            .when(after(deployment).within(30 * MINUTE).and(ERRORS.above(5)))
-            .forDuration(2 * MINUTE))
-        .rules(Rule.named("HighCpu").when(CPU.above(90)).forDuration(5 * MINUTE))
+        .rules(deployment, errorSpike, regression, highCpu)
         .build();
 
     List<Event> events = detector.detect(Samples.every(1, 0, 120, MINUTE, m -> {

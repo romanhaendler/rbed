@@ -43,11 +43,11 @@ class VitalSignsExample {
     Rule desaturation = Rule.named("Desaturation")
         .when(SPO2.below(90)).forDuration(10 * SECOND)
         .endWhen(SPO2.below(92).not());
+    Rule hypoxicTachycardia = Rule.named("HypoxicTachycardia")
+        .when(during(tachycardia).and(during(desaturation)));
+    Rule sensorLost = Rule.named("SensorLost").when(HR.age().above(5 * SECOND));
     Detector detector = Detector.builder()
-        .rules(tachycardia, desaturation)
-        .rules(Rule.named("HypoxicTachycardia")
-            .when(during(tachycardia).and(during(desaturation))))
-        .rules(Rule.named("SensorLost").when(HR.age().above(5 * SECOND)))
+        .rules(tachycardia, desaturation, hypoxicTachycardia, sensorLost)
         .listener(new EventListener() {
           @Override public void onEnded(Event e) {
             ended.add(e);

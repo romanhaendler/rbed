@@ -41,14 +41,15 @@ class FleetTelematicsExample {
 
   @Test
   void detectsTripsHarshBrakingAndIdling() {
+    Rule trip = Rule.named("Trip")
+        .when(SPEED.above(1)).forDuration(10 * SECOND)
+        .endWhen(SPEED.below(0.5)).forDuration(3 * MINUTE);
+    Rule harshBraking = Rule.named("HarshBraking").when(SPEED.rate().below(-4));
+    Rule idling = Rule.named("Idling")
+        .when(SPEED.below(0.5).and(RPM.above(600)))
+        .forDuration(2 * MINUTE);
     Detector detector = Detector.builder()
-        .rules(Rule.named("Trip")
-            .when(SPEED.above(1)).forDuration(10 * SECOND)
-            .endWhen(SPEED.below(0.5)).forDuration(3 * MINUTE))
-        .rules(Rule.named("HarshBraking").when(SPEED.rate().below(-4)))
-        .rules(Rule.named("Idling")
-            .when(SPEED.below(0.5).and(RPM.above(600)))
-            .forDuration(2 * MINUTE))
+        .rules(trip, harshBraking, idling)
         .build();
 
     List<Event> events = detector.detect(Samples.every(1, 0, 1500, SECOND,

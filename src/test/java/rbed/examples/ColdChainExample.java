@@ -42,11 +42,12 @@ class ColdChainExample {
         .when(TEMP.above(8)).forDuration(15 * MINUTE)
         .endWhen(TEMP.above(8).not());
     Rule doorOpen = Rule.named("DoorOpen").when(DOOR.above(0.5));
+    Rule excursionAfterDoor = Rule.named("ExcursionAfterDoor")
+        .when(after(doorOpen).within(30 * MINUTE).and(TEMP.above(8)));
+    Rule cumulativeLimit = Rule.named("CumulativeLimit")
+        .when(totalDuration(excursion).above(45 * MINUTE));
     Detector detector = Detector.builder()
-        .rules(excursion, doorOpen)
-        .rules(Rule.named("ExcursionAfterDoor")
-            .when(after(doorOpen).within(30 * MINUTE).and(TEMP.above(8))))
-        .rules(Rule.named("CumulativeLimit").when(totalDuration(excursion).above(45 * MINUTE)))
+        .rules(excursion, doorOpen, excursionAfterDoor, cumulativeLimit)
         .build();
 
     List<Event> events = detector.detect(Samples.every(1, 0, 480, MINUTE, m -> Map.of(

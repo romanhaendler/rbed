@@ -43,13 +43,14 @@ class HvacShortCyclingExample {
     Rule run = Rule.named("Run")
         .when(POWER.above(500)).forDuration(30 * SECOND)
         .endWhen(POWER.below(100)).forDuration(30 * SECOND);
+    Rule quickRestart = Rule.named("QuickRestart")
+        .when(after(run).within(3 * MINUTE).and(POWER.above(500)))
+        .forDuration(30 * SECOND)
+        .endWhen(POWER.below(100));
+    Rule frequentStarts = Rule.named("FrequentStarts")
+        .when(count(run).within(60 * MINUTE).above(2));
     Detector detector = Detector.builder()
-        .rules(run)
-        .rules(Rule.named("QuickRestart")
-            .when(after(run).within(3 * MINUTE).and(POWER.above(500)))
-            .forDuration(30 * SECOND)
-            .endWhen(POWER.below(100)))
-        .rules(Rule.named("FrequentStarts").when(count(run).within(60 * MINUTE).above(2)))
+        .rules(run, quickRestart, frequentStarts)
         .build();
 
     List<Event> events = detector.detect(

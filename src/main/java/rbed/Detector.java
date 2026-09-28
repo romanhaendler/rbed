@@ -24,7 +24,7 @@ public final class Detector implements AutoCloseable {
 
   final EventListener listener;
   private final double samplingRate;
-  private final Map<String, ChannelState> channels = new HashMap<>();
+  private final Map<Channel, ChannelState> channels = new HashMap<>();
   private final Map<String, EventState> events = new HashMap<>();
   private final boolean hasHistory;
   private final long latestHistoryEnd;
@@ -45,7 +45,7 @@ public final class Detector implements AutoCloseable {
    */
   private final BiConsumer<Channel, Double> validateValue = Detector::validate;
   private final BiConsumer<Channel, Double> applyValue =
-      (channel, value) -> channel(channel.name()).update(sampleTimestamp, value);
+      (channel, value) -> state(channel).update(sampleTimestamp, value);
 
   /**
    * While binding Rules: the Rule being bound, the names of all Rules and of those bound before
@@ -71,7 +71,9 @@ public final class Detector implements AutoCloseable {
     added = null;
     addedBefore = null;
     bindingRule = null;
-    pulses = channels.values().stream().filter(c -> c.pulse).toArray(ChannelState[]::new);
+    pulses = channels.values().stream()
+        .filter(state -> state.channel.pulse)
+        .toArray(ChannelState[]::new);
 
     hasHistory = !b.history.isEmpty();
     latestHistoryEnd = remember(b.history); // after binding, so that Event counts see it too
@@ -226,12 +228,12 @@ public final class Detector implements AutoCloseable {
     listener.onEnded(event);
   }
 
-  /** A Channel's state, created when first pushed or referenced. */
-  ChannelState channel(String name) {
-    ChannelState state = channels.get(name);
+  /** A Channel's state, created when first referenced or pushed. */
+  private ChannelState state(Channel channel) {
+    ChannelState state = channels.get(channel);
     if (state == null) {
-      state = new ChannelState(name);
-      channels.put(name, state);
+      state = new ChannelState(channel);
+      channels.put(channel, state);
     }
     return state;
   }
@@ -241,20 +243,18 @@ public final class Detector implements AutoCloseable {
    *
    * @throws IllegalArgumentException if another reference disagrees on whether it is a pulse
    */
-  ChannelState channel(String name, boolean pulse) {
-    ChannelState state = channel(name);
-    if (state.referenced && state.pulse != pulse) {
+  ChannelState channel(Channel channel) {
+    ChannelState state = state(channel);
+    if (state.channel.pulse != channel.pulse) {
       throw new IllegalArgumentException(
-          "Channel " + name + " is used both as a Pulse Channel and as an ordinary Channel");
+          "Channel " + channel + " is used both as a Pulse Channel and as an ordinary Channel");
     }
-    state.referenced = true;
-    state.pulse = pulse;
     return state;
   }
 
   /** A Channel that a Condition being bound refers to; recorded for the Rule's Aggregates. */
-  ChannelState referencedChannel(String name, boolean pulse) {
-    ChannelState state = channel(name, pulse);
+  ChannelState referencedChannel(Channel channel) {
+    ChannelState state = channel(channel);
     if (channelLookups != null) channelLookups.add(state);
     return state;
   }
@@ -311,7 +311,9 @@ public final class Detector implements AutoCloseable {
     public Builder rules(Rule... rules) {
       for (Rule rule : rules) {
         String name = rule.name();
-        if (rule.when == null) throw new IllegalArgumentException("Rule " + name + " has no when()");
+        if (rule.when == null) {
+          throw new IllegalArgumentException("Rule " + name + " has no when()");
+        }
         if (this.rules.containsKey(name)) {
           throw new IllegalArgumentException("Duplicate rule " + name);
         }
