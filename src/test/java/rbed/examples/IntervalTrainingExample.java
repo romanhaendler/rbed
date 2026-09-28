@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import rbed.Channel;
 import rbed.Detector;
 import rbed.Event;
+import rbed.Rule;
 import rbed.EventListener;
 
 /**
@@ -41,13 +42,14 @@ class IntervalTrainingExample {
   @Test
   void detectsRepsAndRecoveryTimes() {
     List<Long> recoverySeconds = new ArrayList<>();
+    Rule sprint = Rule.named("Sprint")
+        .when(SPEED.above(6)).forDuration(5 * SECOND)
+        .endWhen(SPEED.below(4));
     Detector detector = Detector.builder()
-        .rule("Sprint", r -> r
-            .when(SPEED.above(6)).forDuration(5 * SECOND)
-            .endWhen(SPEED.below(4)))
-        .rule("Recovered", r -> r
-            .when(after("Sprint").within(2 * MINUTE).and(HR.below(120))))
-        .rule("SessionDone", r -> r.when(count("Sprint").above(2)))
+        .rules(sprint)
+        .rules(Rule.named("Recovered")
+            .when(after(sprint).within(2 * MINUTE).and(HR.below(120))))
+        .rules(Rule.named("SessionDone").when(count(sprint).above(2)))
         .listener(new EventListener() {
           private long lastSprintEnd;
 

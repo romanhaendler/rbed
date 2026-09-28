@@ -56,7 +56,7 @@ class PerformanceTest {
   /** One Rule, one Channel: the minimum cost of a push. */
   static Detector singleThreshold() {
     return Detector.builder()
-        .rule("High", r -> r.when(X.above(50)))
+        .rules(Rule.named("High").when(X.above(50)))
         .build();
   }
 
@@ -67,30 +67,31 @@ class PerformanceTest {
    * age.
    */
   static Detector realisticRuleSet() {
+    Rule lift = Rule.named("Lift")
+        .when(WEIGHT.above(500)).forDuration(2_000)
+        .endWhen(WEIGHT.below(50)).forDuration(1_000)
+        .maxGap(5_000);
+    Rule overload = Rule.named("Overload")
+        .when(WEIGHT.above(LIMIT).and(during(lift))).forSamples(3);
     return Detector.builder()
-        .rule("Lift", r -> r
-            .when(WEIGHT.above(500)).forDuration(2_000)
-            .endWhen(WEIGHT.below(50)).forDuration(1_000)
-            .maxGap(5_000))
-        .rule("Overload", r -> r
-            .when(WEIGHT.above(LIMIT).and(during("Lift"))).forSamples(3))
-        .rule("FastRise", r -> r.when(WEIGHT.rate().above(2_000)))
-        .rule("Swinging", r -> r
+        .rules(lift, overload)
+        .rules(Rule.named("FastRise").when(WEIGHT.rate().above(2_000)))
+        .rules(Rule.named("Swinging")
             .when(ANGLE.averageOverSamples(50).above(5)
                 .or(ANGLE.averageOverDuration(Duration.ofSeconds(10)).below(-5))))
-        .rule("LiftAfterOverload", r -> r
-            .when(after("Overload").unless("Lift").within(60_000)
+        .rules(Rule.named("LiftAfterOverload")
+            .when(after(overload).unless(lift).within(60_000)
                 .and(WEIGHT.rising())))
-        .rule("NearLimit", r -> r
+        .rules(Rule.named("NearLimit")
             .when(LIMIT.minus(WEIGHT).abs().below(100)))
-        .rule("SmoothRise", r -> r
+        .rules(Rule.named("SmoothRise")
             .when(WEIGHT.averageOverSamples(10).rate().above(100)))
-        .rule("FrequentLifts", r -> r.when(count("Lift").within(60_000).above(3)))
-        .rule("LongLifting", r -> r.when(totalDuration("Lift").above(3_600_000)))
-        .rule("PartialSetDown", r -> r
-            .when(during("Lift")
-                .and(WEIGHT.below(latest("Lift").max(WEIGHT).times(0.5)))))
-        .rule("AngleSensorSilent", r -> r.when(ANGLE.age().above(5_000)))
+        .rules(Rule.named("FrequentLifts").when(count(lift).within(60_000).above(3)))
+        .rules(Rule.named("LongLifting").when(totalDuration(lift).above(3_600_000)))
+        .rules(Rule.named("PartialSetDown")
+            .when(during(lift)
+                .and(WEIGHT.below(latest(lift).max(WEIGHT).times(0.5)))))
+        .rules(Rule.named("AngleSensorSilent").when(ANGLE.age().above(5_000)))
         .build();
   }
 
@@ -99,7 +100,7 @@ class PerformanceTest {
     Detector.Builder b = Detector.builder();
     for (int i = 0; i < 50; i++) {
       Channel c = Channel.named("c" + (i % 20));
-      b.rule("R" + i, r -> r
+      b.rules(Rule.named("R" + i)
           .when(c.above(50)).forSamples(5)
           .endWhen(c.below(10)).forSamples(2));
     }
@@ -117,12 +118,12 @@ class PerformanceTest {
   @Test
   void steadyStateSamplesDoNotAllocate() {
     Detector detector = Detector.builder()
-        .rule("Long", r -> r
+        .rules(Rule.named("Long")
             .when(X.above(0))
             .endWhen(X.below(-1_000)))
-        .rule("AvgSamples", r -> r.when(X.averageOverSamples(1_000).above(0)))
-        .rule("AvgTime", r -> r.when(X.averageOverDuration(60_000).above(0)))
-        .rule("Rate", r -> r.when(X.rate().above(1e9)))
+        .rules(Rule.named("AvgSamples").when(X.averageOverSamples(1_000).above(0)))
+        .rules(Rule.named("AvgTime").when(X.averageOverDuration(60_000).above(0)))
+        .rules(Rule.named("Rate").when(X.rate().above(1e9)))
         .build();
     Feed feed = new Feed(8, X, i -> 1.0 + (i % 7)); // always > 0, never rising 1e9/s
 

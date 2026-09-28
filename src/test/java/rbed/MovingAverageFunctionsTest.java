@@ -29,15 +29,15 @@ class MovingAverageFunctionsTest {
     assertEquals(List.of("ended Raw 1000..2000 truncatedStart", "ended Raw 3000..5000 truncatedEnd",
             "ended Smooth 4000..5000 truncatedEnd"),
         run(Detector.builder()
-            .rule("Raw", r -> r.when(X.rate().above(5)))
-            .rule("Smooth", r -> r.when(X.averageOverSamples(2).rate().above(5))),
+            .rules(Rule.named("Raw").when(X.rate().above(5)))
+            .rules(Rule.named("Smooth").when(X.averageOverSamples(2).rate().above(5))),
             NOISY));
   }
 
   @Test
   void risingAndFallingOfAMovingAverage() {
     assertEquals(List.of("ended Up 4000..5000 truncatedEnd"), run(Detector.builder()
-            .rule("Up", r -> r.when(X.averageOverSamples(2).rising())),
+            .rules(Rule.named("Up").when(X.averageOverSamples(2).rising())),
         NOISY));
   }
 
@@ -45,7 +45,7 @@ class MovingAverageFunctionsTest {
   void averageOfAnAverage() {
     // average of 2 of the average above: -, -, 5, 5, 10, 20
     assertEquals(List.of("ended E 4000..5000 truncatedEnd"), run(Detector.builder()
-            .rule("E", r -> r.when(
+            .rules(Rule.named("E").when(
                 X.averageOverSamples(2).averageOverDuration(1000).above(9))),
         NOISY));
   }
@@ -54,7 +54,7 @@ class MovingAverageFunctionsTest {
   void movingAverageInEndConditionFillsFromTheFirstSample() {
     // Confirmed at 2 s; average of 2 is falling first at 5 s ((200 + 5) / 2 < 200)
     assertEquals(List.of("ended E 0..5000 truncatedStart"), run(Detector.builder()
-            .rule("E", r -> r
+            .rules(Rule.named("E")
                 .when(X.above(100)).forSamples(3)
                 .endWhen(X.averageOverSamples(2).falling())),
         200, 200, 200, 200, 200, 5, 5));

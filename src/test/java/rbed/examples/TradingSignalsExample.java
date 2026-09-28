@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import rbed.Channel;
 import rbed.Detector;
 import rbed.Event;
+import rbed.Rule;
 
 /**
  * Finance: daily closing prices, falling for 300 days and then rising. Golden and death crosses
@@ -35,9 +36,9 @@ class TradingSignalsExample {
   @Test
   void detectsMovingAverageCrosses() {
     Detector detector = Detector.builder()
-        .rule("DeathCross", r -> r.when(
+        .rules(Rule.named("DeathCross").when(
             PRICE.averageOverSamples(50).below(PRICE.averageOverSamples(200))))
-        .rule("GoldenCross", r -> r.when(
+        .rules(Rule.named("GoldenCross").when(
             PRICE.averageOverSamples(50).above(PRICE.averageOverSamples(200))))
         .build();
 

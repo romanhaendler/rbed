@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import rbed.Channel;
 import rbed.Detector;
 import rbed.Event;
+import rbed.Rule;
 
 /**
  * IT operations: per-minute metrics of a web service (errors per minute, CPU %) and a Channel
@@ -37,13 +38,14 @@ class DeploymentRegressionExample {
 
   @Test
   void attributesErrorSpikesToDeployments() {
+    Rule deployment = Rule.named("Deployment").when(DEPLOY.above(0.5));
     Detector detector = Detector.builder()
-        .rule("Deployment", r -> r.when(DEPLOY.above(0.5)))
-        .rule("ErrorSpike", r -> r.when(ERRORS.above(5)).forDuration(2 * MINUTE))
-        .rule("Regression", r -> r
-            .when(after("Deployment").within(30 * MINUTE).and(ERRORS.above(5)))
+        .rules(deployment)
+        .rules(Rule.named("ErrorSpike").when(ERRORS.above(5)).forDuration(2 * MINUTE))
+        .rules(Rule.named("Regression")
+            .when(after(deployment).within(30 * MINUTE).and(ERRORS.above(5)))
             .forDuration(2 * MINUTE))
-        .rule("HighCpu", r -> r.when(CPU.above(90)).forDuration(5 * MINUTE))
+        .rules(Rule.named("HighCpu").when(CPU.above(90)).forDuration(5 * MINUTE))
         .build();
 
     List<Event> events = detector.detect(Samples.every(1, 0, 120, MINUTE, m -> {

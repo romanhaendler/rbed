@@ -18,7 +18,7 @@ class AggregatesTest {
   @Test
   void aggregatesCoverEventSamplesExcludingTheEndSample() {
     Detector d = Detector.builder()
-        .rule("Lift", r -> r.when(WEIGHT.above(500)).aggregate(HEIGHT))
+        .rules(Rule.named("Lift").when(WEIGHT.above(500)).aggregate(HEIGHT))
         .listener(rec).build();
     d.push(0, Map.of(WEIGHT, 0.0, HEIGHT, 1.0));
     d.push(1, Map.of(WEIGHT, 600.0));
@@ -34,7 +34,7 @@ class AggregatesTest {
   @Test
   void requestedChannelWithoutValuesHasEmptyAggregates() {
     Detector d = Detector.builder()
-        .rule("Lift", r -> r.when(WEIGHT.above(500)).aggregate(NOPE))
+        .rules(Rule.named("Lift").when(WEIGHT.above(500)).aggregate(NOPE))
         .listener(rec).build();
     d.push(0, Map.of(WEIGHT, 600.0));
     d.close();
@@ -46,7 +46,7 @@ class AggregatesTest {
   @Test
   void interruptedEndPhaseSamplesCountAndFinalEndPhaseSamplesDoNot() {
     Detector d = Detector.builder()
-        .rule("Lift", r -> r
+        .rules(Rule.named("Lift")
             .when(WEIGHT.above(500))
             .endWhen(WEIGHT.below(50)).forSamples(2))
         .listener(rec).build();
@@ -58,7 +58,7 @@ class AggregatesTest {
   @Test
   void truncatedEndIncludesLastSample() {
     Detector d = Detector.builder()
-        .rule("Lift", r -> r.when(WEIGHT.above(500)))
+        .rules(Rule.named("Lift").when(WEIGHT.above(500)))
         .listener(rec).build();
     d.push(0, Map.of(WEIGHT, 600.0));
     d.push(1, Map.of(WEIGHT, 800.0));
@@ -70,7 +70,7 @@ class AggregatesTest {
   void confirmedSnapshotHasAggregatesSoFar() {
     List<Event> confirmed = new ArrayList<>();
     Detector d = Detector.builder()
-        .rule("Lift", r -> r.when(WEIGHT.above(500)).forSamples(2))
+        .rules(Rule.named("Lift").when(WEIGHT.above(500)).forSamples(2))
         .listener(new EventListener() {
           @Override public void onConfirmed(Event e) { confirmed.add(e); }
         }).build();

@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import rbed.Channel;
 import rbed.Detector;
 import rbed.Event;
+import rbed.Rule;
 
 /**
  * Automotive: a vehicle's speed (m/s) and engine rpm at 1 Hz.
@@ -41,11 +42,11 @@ class FleetTelematicsExample {
   @Test
   void detectsTripsHarshBrakingAndIdling() {
     Detector detector = Detector.builder()
-        .rule("Trip", r -> r
+        .rules(Rule.named("Trip")
             .when(SPEED.above(1)).forDuration(10 * SECOND)
             .endWhen(SPEED.below(0.5)).forDuration(3 * MINUTE))
-        .rule("HarshBraking", r -> r.when(SPEED.rate().below(-4)))
-        .rule("Idling", r -> r
+        .rules(Rule.named("HarshBraking").when(SPEED.rate().below(-4)))
+        .rules(Rule.named("Idling")
             .when(SPEED.below(0.5).and(RPM.above(600)))
             .forDuration(2 * MINUTE))
         .build();

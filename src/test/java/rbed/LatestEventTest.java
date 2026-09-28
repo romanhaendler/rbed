@@ -21,13 +21,14 @@ class LatestEventTest {
 
   @Test
   void partialSetDownComparesWithTheRunningLift() {
+    Rule loadLifted = Rule.named("LoadLifted")
+        .when(WEIGHT.above(500))
+        .endWhen(WEIGHT.below(50));
     Detector d = Detector.builder()
-        .rule("LoadLifted", r -> r
-            .when(WEIGHT.above(500))
-            .endWhen(WEIGHT.below(50)))
-        .rule("PartialSetDown", r -> r
-            .when(during("LoadLifted")
-                .and(WEIGHT.below(latest("LoadLifted").max(WEIGHT).times(0.5))))
+        .rules(loadLifted)
+        .rules(Rule.named("PartialSetDown")
+            .when(during(loadLifted)
+                .and(WEIGHT.below(latest(loadLifted).max(WEIGHT).times(0.5))))
             .forSamples(2))
         .listener(rec).build();
     double[] weights = {0, 1000, 1000, 1000, 400, 400, 0};
@@ -38,9 +39,10 @@ class LatestEventTest {
 
   @Test
   void valuesOfTheEndedEventRemainUntilTheNextIsConfirmed() {
+    Rule a = Rule.named("A").when(Y.above(0));
+    Rule b = Rule.named("B").when(X.above(latest(a).mean(Y)));
     Detector d = Detector.builder()
-        .rule("A", r -> r.when(Y.above(0)))
-        .rule("B", r -> r.when(X.above(latest("A").mean(Y))))
+        .rules(a, b)
         .listener(rec).build();
     d.push(0, Map.of(X, 100.0, Y, 0.0));  // no A yet: undefined, no B
     d.push(1, Map.of(X, 0.0, Y, 10.0));
@@ -53,9 +55,10 @@ class LatestEventTest {
 
   @Test
   void durationGrowsWhileRunningAndStaysAfterTheEnd() {
+    Rule a = Rule.named("A").when(Y.above(0));
     Detector d = Detector.builder()
-        .rule("A", r -> r.when(Y.above(0)))
-        .rule("Long", r -> r.when(latest("A").duration().above(1500)))
+        .rules(a)
+        .rules(Rule.named("Long").when(latest(a).duration().above(1500)))
         .listener(rec).build();
     for (long t = 0; t <= 5000; t += 1000) {
       d.push(t, Map.of(Y, t >= 1000 && t < 4000 ? 1.0 : 0.0));
@@ -67,13 +70,15 @@ class LatestEventTest {
 
   @Test
   void historyGivesDurationButNoChannelValues() {
-    Event a = new Event("A", -2000, OptionalLong.of(-1900), OptionalLong.of(-100), false, false,
-        Map.of());
+    Event stored = new Event("A", -2000, OptionalLong.of(-1900), OptionalLong.of(-100), false,
+        false, Map.of());
+    Rule a = Rule.named("A").when(X.above(0)).aggregate(Y);
     Detector d = Detector.builder()
-        .rule("Long", r -> r.when(latest("A").duration().above(1500)))
-        .rule("Mean", r -> r.when(latest("A").mean(Y).above(-1e9).or(
-            latest("A").mean(Y).above(-1e9).not())))
-        .history(List.of(a))
+        .rules(a)
+        .rules(Rule.named("Long").when(latest(a).duration().above(1500)))
+        .rules(Rule.named("Mean").when(latest(a).mean(Y).above(-1e9).or(
+            latest(a).mean(Y).above(-1e9).not())))
+        .history(List.of(stored))
         .listener(rec).build();
     d.push(0, Map.of(Y, 1.0));
     assertEquals(List.of("pending Long 0", "confirmed Long 0"), rec.log);
@@ -81,9 +86,10 @@ class LatestEventTest {
 
   @Test
   void referencedChannelsAreAggregatedByTheReferencedRule() {
+    Rule a = Rule.named("A").when(Y.above(0));
+    Rule b = Rule.named("B").when(latest(a).mean(Z).above(0));
     Detector d = Detector.builder()
-        .rule("A", r -> r.when(Y.above(0)))
-        .rule("B", r -> r.when(latest("A").mean(Z).above(0)))
+        .rules(a, b)
         .listener(rec).build();
     d.push(0, Map.of(Y, 1.0, Z, 5.0));
     d.push(1, Map.of(Y, 0.0));
@@ -93,21 +99,22 @@ class LatestEventTest {
 
   @Test
   void referencesMustBeToEarlierRules() {
-    assertThrows(IllegalArgumentException.class, () -> Detector.builder()
-        .rule("A", r -> r.when(latest("B").duration().above(0)))
-        .rule("B", r -> r.when(X.above(0))).build());
+    Rule b = Rule.named("B").when(X.above(0));
+    Rule a = Rule.named("A").when(latest(b).duration().above(0));
+    assertThrows(IllegalArgumentException.class, () -> Detector.builder().rules(a, b).build());
   }
 
   @Test
   void readingLatestValuesDoesNotAggregateTheChannelInTheReadingRule() {
+    Rule a = Rule.named("A").when(Y.above(0));
+    Rule b = Rule.named("B").when(latest(a).mean(Z).above(0).and(Y.above(0)));
     Detector d = Detector.builder()
-        .rule("A", r -> r.when(Y.above(0)))
-        .rule("B", r -> r.when(latest("A").mean(Z).above(0).and(Y.above(0))))
+        .rules(a, b)
         .listener(rec).build();
     d.push(0, Map.of(Y, 1.0, Z, 5.0));
     d.push(1, Map.of(Y, 0.0));
-    Event b = rec.ended.get(1);
-    assertEquals("B", b.name());
-    assertThrows(IllegalArgumentException.class, () -> b.aggregates(Z));
+    Event ended = rec.ended.get(1);
+    assertTrue(ended.is(b));
+    assertThrows(IllegalArgumentException.class, () -> ended.aggregates(Z));
   }
 }

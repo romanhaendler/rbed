@@ -4,11 +4,11 @@
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Configuring a Rule returns a new Rule; the original is unchanged and can be used in several Detectors
-- [ ] `build()` throws `IllegalArgumentException` for: a Rule without `when`, duplicate Rule names, a reference to a Rule not added, a reference to itself or to a Rule added later, a History Event whose name matches no added Rule
-- [ ] `event.is(rule)` is true exactly for Events of that Rule
-- [ ] No string-based Rule reference remains in the public API
-- [ ] All tests, examples and the README migrated; expected Events unchanged
-- [ ] The performance test's zero-allocation check still passes
+- [x] Configuring a Rule returns a new Rule; the original is unchanged and can be used in several Detectors
+- [x] `build()` throws `IllegalArgumentException` for: a Rule without `when`, duplicate Rule names, a reference to a Rule not added, a reference to itself or to a Rule added later, a History Event whose name matches no added Rule
+- [x] `event.is(rule)` is true exactly for Events of that Rule
+- [x] No string-based Rule reference remains in the public API
+- [x] All tests, examples and the README migrated; expected Events unchanged
+- [x] The performance test's zero-allocation check still passes

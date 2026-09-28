@@ -21,7 +21,7 @@ class TimeWeightedAggregatesTest {
   @Test
   void irregularSamplingIsWeightedByTime() {
     Detector d = Detector.builder()
-        .rule("E", r -> r.when(X.above(0))).listener(rec).build();
+        .rules(Rule.named("E").when(X.above(0))).listener(rec).build();
     d.push(0, Map.of(X, 0.0));
     d.push(1000, Map.of(X, 10.0));  // holds 3 s
     d.push(4000, Map.of(X, 20.0));  // holds 1 s
@@ -34,7 +34,7 @@ class TimeWeightedAggregatesTest {
   @Test
   void endPhaseIsExcludedUntilItResets() {
     Detector d = Detector.builder()
-        .rule("E", r -> r.when(X.above(0)).endWhen(X.below(0)).forSamples(2))
+        .rules(Rule.named("E").when(X.above(0)).endWhen(X.below(0)).forSamples(2))
         .listener(rec).build();
     d.push(0, Map.of(X, 0.0));
     d.push(1000, Map.of(X, 10.0));  // 10 for 1 s
@@ -49,7 +49,7 @@ class TimeWeightedAggregatesTest {
   @Test
   void truncatedEndExtendsToTheLatestAdvance() {
     Detector d = Detector.builder()
-        .rule("E", r -> r.when(X.above(0))).listener(rec).build();
+        .rules(Rule.named("E").when(X.above(0))).listener(rec).build();
     d.push(0, Map.of(X, 0.0));
     d.push(1000, Map.of(X, 4.0));
     d.advanceTo(3000);
@@ -62,7 +62,7 @@ class TimeWeightedAggregatesTest {
   void snapshotsExtendToTheCurrentMoment() {
     List<Event> confirmed = new ArrayList<>();
     Detector d = Detector.builder()
-        .rule("E", r -> r.when(X.above(0)).forDuration(2000))
+        .rules(Rule.named("E").when(X.above(0)).forDuration(2000))
         .listener(new EventListener() {
           @Override public void onConfirmed(Event e) { confirmed.add(e); }
         }).build();
@@ -77,7 +77,7 @@ class TimeWeightedAggregatesTest {
   @Test
   void channelWithoutValueAtTheStartCountsFromItsFirstValue() {
     Detector d = Detector.builder()
-        .rule("E", r -> r.when(X.above(0)).aggregate(Y)).listener(rec).build();
+        .rules(Rule.named("E").when(X.above(0)).aggregate(Y)).listener(rec).build();
     d.push(0, Map.of(X, 0.0));
     d.push(1000, Map.of(X, 1.0));
     d.push(2000, Map.of(Y, 6.0));
@@ -90,7 +90,7 @@ class TimeWeightedAggregatesTest {
   @Test
   void zeroSpanHasUndefinedTimeWeightedMean() {
     Detector d = Detector.builder()
-        .rule("E", r -> r.when(X.above(0))).listener(rec).build();
+        .rules(Rule.named("E").when(X.above(0))).listener(rec).build();
     d.push(0, Map.of(X, 1.0));
     d.close();
     assertEquals(0, endedX().integral());
@@ -100,7 +100,7 @@ class TimeWeightedAggregatesTest {
   @Test
   void eventStartingOnAnAdvanceIntegratesHeldValuesFromItsStart() {
     Detector d = Detector.builder()
-        .rule("E", r -> r.when(X.age().above(50))).listener(rec).build();
+        .rules(Rule.named("E").when(X.age().above(50))).listener(rec).build();
     d.push(0, Map.of(X, 10.0));
     d.advanceTo(100);             // starts: x has held 10 since 0
     d.push(300, Map.of(X, 10.0)); // fresh value: ends
@@ -111,7 +111,7 @@ class TimeWeightedAggregatesTest {
   @Test
   void eventWithoutSamplesStillHasTimeWeightedValues() {
     Detector d = Detector.builder()
-        .rule("E", r -> r.when(X.age().above(50))).listener(rec).build();
+        .rules(Rule.named("E").when(X.age().above(50))).listener(rec).build();
     d.push(0, Map.of(X, 10.0));
     d.advanceTo(100);
     d.advanceTo(200);

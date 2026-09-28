@@ -1,6 +1,6 @@
 # Spec: typed handles for Channels and Rules
 
-Status: ready-for-agent
+Status: done
 
 ## Problem Statement
 

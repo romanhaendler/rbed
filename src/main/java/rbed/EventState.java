@@ -13,8 +13,8 @@ final class EventState {
   long lastConfirmed;
   /** Events Confirmed so far. */
   long count;
-  /** The Rule producing these Events; null for names only known from History. */
-  private Rule producer;
+  /** The Rule producing these Events. */
+  private RuleState producer;
   private long lastDuration;
   private long runningStart;
   private long endedDuration;
@@ -22,17 +22,16 @@ final class EventState {
   private Timestamps confirmations;
   private long countWindow;
 
-  void producedBy(Rule rule) {
+  void producedBy(RuleState rule) {
     producer = rule;
   }
 
   /**
    * An Aggregate of a Channel over the latest Confirmed Event, running or Ended; the producing
-   * Rule starts aggregating the Channel. Always undefined for names only known from History.
+   * Rule starts aggregating the Channel.
    */
   Expression.Bound latest(ChannelState channel, Accumulator.Aggregate aggregate) {
-    Rule rule = producer;
-    if (rule == null) return () -> Double.NaN;
+    RuleState rule = producer;
     int index = rule.aggregate(channel);
     return () -> rule.latest(index, aggregate);
   }

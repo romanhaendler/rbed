@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import rbed.Channel;
 import rbed.Detector;
 import rbed.Event;
+import rbed.Rule;
 import rbed.Sample;
 
 /**
@@ -24,7 +25,7 @@ import rbed.Sample;
  *   <li>FastHeating: heating faster than 0.5 °C/s for 5 consecutive Samples.
  * </ul>
  *
- * <p>Note: {@code during("Overheat")} stays true until Overheat's End Condition is confirmed
+ * <p>Note: {@code during(overheat)} stays true until Overheat's End Condition is confirmed
  * (391 s), although its end timestamp is where the End Condition began (331 s). A streaming
  * Detector cannot know earlier that the Event is over.
  */
@@ -46,16 +47,17 @@ class MachineToolOverheatExample {
 
   @Test
   void detectsOverheatingUnderLoad() {
+    Rule highLoad = Rule.named("HighLoad")
+        .when(LOAD.above(80)).forDuration(10 * SECOND)
+        .endWhen(LOAD.below(60));
+    Rule overheat = Rule.named("Overheat")
+        .when(TEMP.above(80)).forDuration(30 * SECOND)
+        .endWhen(TEMP.below(70)).forDuration(60 * SECOND);
     Detector detector = Detector.builder()
         .samplingRate(1)
-        .rule("HighLoad", r -> r
-            .when(LOAD.above(80)).forDuration(10 * SECOND)
-            .endWhen(LOAD.below(60)))
-        .rule("Overheat", r -> r
-            .when(TEMP.above(80)).forDuration(30 * SECOND)
-            .endWhen(TEMP.below(70)).forDuration(60 * SECOND))
-        .rule("OverheatUnderLoad", r -> r.when(during("Overheat").and(during("HighLoad"))))
-        .rule("FastHeating", r -> r.when(TEMP.rate().above(0.5)).forSamples(5))
+        .rules(highLoad, overheat)
+        .rules(Rule.named("OverheatUnderLoad").when(during(overheat).and(during(highLoad))))
+        .rules(Rule.named("FastHeating").when(TEMP.rate().above(0.5)).forSamples(5))
         .build();
 
     List<Sample> series = Samples.every(1, 0, 600, SECOND,

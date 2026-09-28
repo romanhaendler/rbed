@@ -3,15 +3,15 @@ package rbed;
 import java.util.Objects;
 
 /**
- * Values of the most recent Event with a given name that was Confirmed, whether still running or
+ * Values of the most recent Event of a given Rule that was Confirmed, whether still running or
  * Ended: its Aggregates and its duration. Undefined while there is none. History Events have no
  * Aggregates, only a duration. Create with {@link Conditions#latest}.
  */
 public final class LatestEvent {
-  private final String name;
+  private final Rule rule;
 
-  LatestEvent(String name) {
-    this.name = Objects.requireNonNull(name, "eventName");
+  LatestEvent(Rule rule) {
+    this.rule = Objects.requireNonNull(rule, "rule");
   }
 
   /** The mean of a Channel over the latest Event (so far, if it is running). */
@@ -33,7 +33,7 @@ public final class LatestEvent {
   public Expression duration() {
     return new Expression() {
       @Override Bound bind(Detector detector) {
-        EventState events = detector.referencedEvent(name);
+        EventState events = detector.referencedEvent(rule);
         return () -> events.latestDuration(detector.now());
       }
     };
@@ -44,7 +44,7 @@ public final class LatestEvent {
     return new Expression() {
       @Override Bound bind(Detector detector) {
         // not a Channel lookup of the reading Rule: the referenced Rule aggregates it
-        return detector.referencedEvent(name).latest(channel.state(detector), aggregate);
+        return detector.referencedEvent(rule).latest(channel.state(detector), aggregate);
       }
     };
   }

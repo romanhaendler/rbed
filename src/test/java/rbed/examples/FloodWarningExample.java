@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import rbed.Channel;
 import rbed.Detector;
 import rbed.Event;
+import rbed.Rule;
 import rbed.Sample;
 
 /**
@@ -32,13 +33,13 @@ class FloodWarningExample {
   @Test
   void warnsWhileRisingAndLiftsWithHysteresis() {
     Detector detector = Detector.builder()
-        .rule("FloodWarning", r -> r
+        .rules(Rule.named("FloodWarning")
             .when(LEVEL.above(300)
                 .and(LEVEL.averageOverSamples(4).rate().above(10.0 / (HOUR / 1000))))
             .forDuration(HOUR / 2)
             .endWhen(LEVEL.below(250)).forDuration(2 * HOUR)
             .maxGap(2 * HOUR))
-        .rule("Receding", r -> r
+        .rules(Rule.named("Receding")
             .when(LEVEL.falling().and(LEVEL.above(300))))
         .build();
 

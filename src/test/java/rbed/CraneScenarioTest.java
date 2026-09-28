@@ -37,17 +37,18 @@ class CraneScenarioTest {
   @Test
   void liftsOverloadAndSetDownsWithClassifiedLoads() {
     List<String> pickedUp = new ArrayList<>();
+    Rule loadLifted = Rule.named("LoadLifted")
+        .when(WEIGHT.above(500)).forDuration(Duration.ofSeconds(2))
+        .endWhen(WEIGHT.below(50)).forDuration(Duration.ofSeconds(1))
+        .maxGap(Duration.ofSeconds(5));
     Detector crane = Detector.builder()
-        .rule("LoadLifted", r -> r
-            .when(WEIGHT.above(500)).forDuration(Duration.ofSeconds(2))
-            .endWhen(WEIGHT.below(50)).forDuration(Duration.ofSeconds(1))
-            .maxGap(Duration.ofSeconds(5)))
-        .rule("Overload", r -> r
-            .when(WEIGHT.above(RATED_LOAD).and(during("LoadLifted")))
+        .rules(loadLifted)
+        .rules(Rule.named("Overload")
+            .when(WEIGHT.above(RATED_LOAD).and(during(loadLifted)))
             .forSamples(2))
-        .rule("PartialSetDown", r -> r
-            .when(during("LoadLifted")
-                .and(WEIGHT.below(latest("LoadLifted").max(WEIGHT).times(0.5)))
+        .rules(Rule.named("PartialSetDown")
+            .when(during(loadLifted)
+                .and(WEIGHT.below(latest(loadLifted).max(WEIGHT).times(0.5)))
                 .and(WEIGHT.above(50)))  // still a load on the hook
             .forSamples(2))
         .listener(new EventListener() {
@@ -76,7 +77,7 @@ class CraneScenarioTest {
             "LoadLifted 8500..12500 container"),
         events.stream()
             .map(e -> e.name() + " " + e.start() + ".." + e.end().getAsLong()
-                + (e.name().equals("LoadLifted") ? " " + load(e) : ""))
+                + (e.is(loadLifted) ? " " + load(e) : ""))
             .toList());
   }
 }

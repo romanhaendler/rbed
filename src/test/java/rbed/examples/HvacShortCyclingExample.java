@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import rbed.Channel;
 import rbed.Detector;
 import rbed.Event;
+import rbed.Rule;
 
 /**
  * Building services: an air conditioner's compressor power, every 10 s. Short cycling (starting
@@ -39,15 +40,16 @@ class HvacShortCyclingExample {
 
   @Test
   void detectsShortCyclesAndQuickRestarts() {
+    Rule run = Rule.named("Run")
+        .when(POWER.above(500)).forDuration(30 * SECOND)
+        .endWhen(POWER.below(100)).forDuration(30 * SECOND);
     Detector detector = Detector.builder()
-        .rule("Run", r -> r
-            .when(POWER.above(500)).forDuration(30 * SECOND)
-            .endWhen(POWER.below(100)).forDuration(30 * SECOND))
-        .rule("QuickRestart", r -> r
-            .when(after("Run").within(3 * MINUTE).and(POWER.above(500)))
+        .rules(run)
+        .rules(Rule.named("QuickRestart")
+            .when(after(run).within(3 * MINUTE).and(POWER.above(500)))
             .forDuration(30 * SECOND)
             .endWhen(POWER.below(100)))
-        .rule("FrequentStarts", r -> r.when(count("Run").within(60 * MINUTE).above(2)))
+        .rules(Rule.named("FrequentStarts").when(count(run).within(60 * MINUTE).above(2)))
         .build();
 
     List<Event> events = detector.detect(
@@ -63,6 +65,6 @@ class HvacShortCyclingExample {
             "FrequentStarts 1630..2390 truncatedEnd"),
         Samples.describe(events, SECOND));
     assertEquals(List.of(false, true, false), events.stream()
-        .filter(e -> e.name().equals("Run")).map(HvacShortCyclingExample::shortCycle).toList());
+        .filter(e -> e.is(run)).map(HvacShortCyclingExample::shortCycle).toList());
   }
 }

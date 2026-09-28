@@ -14,7 +14,7 @@ class ChannelTest {
   void channelsWithTheSameNameAreTheSameChannel() {
     Channel weight = Channel.named("weight");
     Detector d = Detector.builder()
-        .rule("Lift", r -> r.when(weight.above(500)))
+        .rules(Rule.named("Lift").when(weight.above(500)))
         .listener(rec).build();
     Channel fromData = Channel.named("weight"); // e.g. created from a CSV header
     d.push(0, Map.of(fromData, 0.0));
@@ -30,8 +30,8 @@ class ChannelTest {
     Channel pulse = Channel.pulse("deploy");
     Channel held = Channel.named("deploy");
     Detector.Builder b = Detector.builder()
-        .rule("A", r -> r.when(pulse.above(0)))
-        .rule("B", r -> r.when(Channel.named("x").above(0)).aggregate(held));
+        .rules(Rule.named("A").when(pulse.above(0)))
+        .rules(Rule.named("B").when(Channel.named("x").above(0)).aggregate(held));
     assertThrows(IllegalArgumentException.class, b::build);
   }
 
@@ -39,7 +39,7 @@ class ChannelTest {
   void aPulseChannelIsAbsentInSamplesThatDoNotCarryIt() {
     Channel deploy = Channel.pulse("deploy");
     Detector d = Detector.builder()
-        .rule("Deploying", r -> r.when(deploy.above(0.5)))
+        .rules(Rule.named("Deploying").when(deploy.above(0.5)))
         .listener(rec).build();
     d.push(0, Map.of(deploy, 1.0));
     d.push(1, Map.of(Channel.named("other"), 0.0));
@@ -50,7 +50,7 @@ class ChannelTest {
   void aggregatesAreReadByChannel() {
     Channel weight = Channel.named("weight");
     Detector d = Detector.builder()
-        .rule("Lift", r -> r.when(weight.above(500)))
+        .rules(Rule.named("Lift").when(weight.above(500)))
         .listener(rec).build();
     d.push(0, Map.of(weight, 600.0));
     d.push(1, Map.of(weight, 0.0));

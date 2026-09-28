@@ -24,6 +24,11 @@ public record Event(
     boolean truncatedEnd,
     Map<Channel, Aggregates> aggregates) {
 
+  /** Whether this Event was produced by the given Rule, i.e. has its name. */
+  public boolean is(Rule rule) {
+    return name.equals(rule.name());
+  }
+
   /**
    * Aggregates of one Channel; {@link Aggregates#count()} is 0 if it had no value.
    *

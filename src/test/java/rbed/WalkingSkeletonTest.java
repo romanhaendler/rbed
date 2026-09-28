@@ -14,7 +14,7 @@ class WalkingSkeletonTest {
 
   Detector liftDetector() {
     return Detector.builder()
-        .rule("Lift", r -> r.when(WEIGHT.above(500)))
+        .rules(Rule.named("Lift").when(WEIGHT.above(500)))
         .listener(rec)
         .build();
   }

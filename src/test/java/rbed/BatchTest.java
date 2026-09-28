@@ -14,8 +14,8 @@ class BatchTest {
 
   Detector.Builder lift() {
     return Detector.builder()
-        .rule("Lift", r -> r.when(WEIGHT.above(500)))
-        .rule("Heavy", r -> r.when(WEIGHT.above(900)))
+        .rules(Rule.named("Lift").when(WEIGHT.above(500)))
+        .rules(Rule.named("Heavy").when(WEIGHT.above(900)))
         .listener(rec);
   }
 

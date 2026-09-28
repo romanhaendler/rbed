@@ -14,8 +14,8 @@ class EndConditionTest {
 
   final Recorder rec = new Recorder();
 
-  Detector detector(UnaryOperator<RuleBuilder> rule) {
-    return Detector.builder().rule("Lift", rule).listener(rec).build();
+  Detector detector(UnaryOperator<Rule> rule) {
+    return Detector.builder().rules(rule.apply(Rule.named("Lift"))).listener(rec).build();
   }
 
   void push(Detector d, long[] ts, double... weights) {
@@ -78,7 +78,7 @@ class EndConditionTest {
   @Test
   void newEventNeedsWhenToStopHoldingFirst() {
     Detector d = Detector.builder()
-        .rule("E", r -> r.when(X.above(10)).endWhen(Y.above(0)))
+        .rules(Rule.named("E").when(X.above(10)).endWhen(Y.above(0)))
         .listener(rec).build();
     d.push(0, Map.of(X, 0.0, Y, 0.0));
     d.push(1, Map.of(X, 20.0));

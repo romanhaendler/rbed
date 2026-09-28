@@ -13,8 +13,8 @@ class DurationTest {
 
   final Recorder rec = new Recorder();
 
-  Detector detector(java.util.function.UnaryOperator<RuleBuilder> rule) {
-    return Detector.builder().rule("E", rule).listener(rec).build();
+  Detector detector(java.util.function.UnaryOperator<Rule> rule) {
+    return Detector.builder().rules(rule.apply(Rule.named("E"))).listener(rec).build();
   }
 
   @Test

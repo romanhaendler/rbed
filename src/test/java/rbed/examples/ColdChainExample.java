@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import rbed.Channel;
 import rbed.Detector;
 import rbed.Event;
+import rbed.Rule;
 
 /**
  * Logistics: a refrigerated truck carrying vaccines (2-8 °C), temperature and door sensor every
@@ -37,14 +38,15 @@ class ColdChainExample {
 
   @Test
   void detectsExcursionsAndTheirCause() {
+    Rule excursion = Rule.named("Excursion")
+        .when(TEMP.above(8)).forDuration(15 * MINUTE)
+        .endWhen(TEMP.above(8).not());
+    Rule doorOpen = Rule.named("DoorOpen").when(DOOR.above(0.5));
     Detector detector = Detector.builder()
-        .rule("Excursion", r -> r
-            .when(TEMP.above(8)).forDuration(15 * MINUTE)
-            .endWhen(TEMP.above(8).not()))
-        .rule("DoorOpen", r -> r.when(DOOR.above(0.5)))
-        .rule("ExcursionAfterDoor", r -> r
-            .when(after("DoorOpen").within(30 * MINUTE).and(TEMP.above(8))))
-        .rule("CumulativeLimit", r -> r.when(totalDuration("Excursion").above(45 * MINUTE)))
+        .rules(excursion, doorOpen)
+        .rules(Rule.named("ExcursionAfterDoor")
+            .when(after(doorOpen).within(30 * MINUTE).and(TEMP.above(8))))
+        .rules(Rule.named("CumulativeLimit").when(totalDuration(excursion).above(45 * MINUTE)))
         .build();
 
     List<Event> events = detector.detect(Samples.every(1, 0, 480, MINUTE, m -> Map.of(

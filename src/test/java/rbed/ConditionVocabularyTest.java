@@ -16,7 +16,7 @@ class ConditionVocabularyTest {
 
   /** Pushes one single-channel Sample per value at timestamps 0, 1, 2, ... */
   List<String> run(Condition c, double... xs) {
-    Detector d = Detector.builder().rule("E", r -> r.when(c)).listener(rec).build();
+    Detector d = Detector.builder().rules(Rule.named("E").when(c)).listener(rec).build();
     for (int i = 0; i < xs.length; i++) d.push(i, Map.of(X, xs[i]));
     d.close();
     return rec.endedLines();
@@ -51,7 +51,7 @@ class ConditionVocabularyTest {
   @Test
   void channelAgainstChannel() {
     Detector d = Detector.builder()
-        .rule("Overload", r -> r.when(WEIGHT.above(LIMIT)))
+        .rules(Rule.named("Overload").when(WEIGHT.above(LIMIT)))
         .listener(rec).build();
     d.push(0, Map.of(WEIGHT, 100.0, LIMIT, 200.0));
     d.push(1, Map.of(WEIGHT, 300.0));        // limit held at 200
@@ -63,9 +63,9 @@ class ConditionVocabularyTest {
   @Test
   void unknownChannelIsFalseEvenWhenNegated() {
     Detector d = Detector.builder()
-        .rule("A", r -> r.when(MISSING.above(0)))
-        .rule("B", r -> r.when(MISSING.above(0).not()))
-        .rule("C", r -> r.when(MISSING.above(0).or(X.above(0))))
+        .rules(Rule.named("A").when(MISSING.above(0)))
+        .rules(Rule.named("B").when(MISSING.above(0).not()))
+        .rules(Rule.named("C").when(MISSING.above(0).or(X.above(0))))
         .listener(rec).build();
     d.push(0, Map.of(X, 1.0));
     assertEquals(List.of("pending C 0", "confirmed C 0"), rec.log);

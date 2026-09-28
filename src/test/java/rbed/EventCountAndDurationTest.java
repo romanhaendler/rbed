@@ -26,9 +26,10 @@ class EventCountAndDurationTest {
 
   @Test
   void countWithinASlidingWindow() {
+    Rule run = Rule.named("Run").when(X.above(0));
     Detector d = Detector.builder()
-        .rule("Run", r -> r.when(X.above(0)))
-        .rule("TooManyStarts", r -> r.when(count("Run").within(40).above(2)))
+        .rules(run)
+        .rules(Rule.named("TooManyStarts").when(count(run).within(40).above(2)))
         .listener(rec).build();
     // Runs Confirmed at 10, 30, 50 and 130
     push(d, new long[] {0, 10, 20, 30, 40, 50, 60, 100, 130, 140}, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0);
@@ -39,9 +40,10 @@ class EventCountAndDurationTest {
 
   @Test
   void countWithoutWindowCountsSinceStart() {
+    Rule rep = Rule.named("Rep").when(X.above(0));
     Detector d = Detector.builder()
-        .rule("Rep", r -> r.when(X.above(0)))
-        .rule("ThirdRep", r -> r.when(count("Rep").above(2)))
+        .rules(rep)
+        .rules(Rule.named("ThirdRep").when(count(rep).above(2)))
         .listener(rec).build();
     push(d, new long[] {0, 10, 20, 30, 40, 1000}, 0, 1, 0, 1, 0, 1);
     assertEquals("confirmed ThirdRep 1000", rec.log.get(rec.log.size() - 1));
@@ -49,9 +51,10 @@ class EventCountAndDurationTest {
 
   @Test
   void countIncludesHistory() {
+    Rule run = Rule.named("Run").when(X.above(0));
     Detector d = Detector.builder()
-        .rule("Run", r -> r.when(X.above(0)))
-        .rule("Twice", r -> r.when(count("Run").within(40).above(1)))
+        .rules(run)
+        .rules(Rule.named("Twice").when(count(run).within(40).above(1)))
         .history(List.of(ended("Run", -20, -10, -5)))
         .listener(rec).build();
     push(d, new long[] {0, 10}, 0, 1);
@@ -60,9 +63,10 @@ class EventCountAndDurationTest {
 
   @Test
   void totalDurationSumsEndedAndRunningEvents() {
+    Rule excursion = Rule.named("Excursion").when(X.above(8));
     Detector d = Detector.builder()
-        .rule("Excursion", r -> r.when(X.above(8)))
-        .rule("Limit", r -> r.when(totalDuration("Excursion").above(25)))
+        .rules(excursion)
+        .rules(Rule.named("Limit").when(totalDuration(excursion).above(25)))
         .listener(rec).build();
     // Excursions 10..20 (10 ms) and from 30: running total at 45 is 10 + 15 = 25
     push(d, new long[] {0, 10, 20, 30, 40, 45, 46}, 5, 9, 5, 9, 9, 9, 9);
@@ -71,9 +75,10 @@ class EventCountAndDurationTest {
 
   @Test
   void totalDurationIncludesHistory() {
+    Rule excursion = Rule.named("Excursion").when(X.above(8));
     Detector d = Detector.builder()
-        .rule("Excursion", r -> r.when(X.above(8)))
-        .rule("Limit", r -> r.when(totalDuration("Excursion").above(25)))
+        .rules(excursion)
+        .rules(Rule.named("Limit").when(totalDuration(excursion).above(25)))
         .history(List.of(ended("Excursion", -100, -90, -70)))
         .listener(rec).build();
     push(d, new long[] {0}, 5);
@@ -82,10 +87,10 @@ class EventCountAndDurationTest {
 
   @Test
   void referencesMustBeToEarlierRules() {
-    assertThrows(IllegalArgumentException.class, () -> Detector.builder()
-        .rule("A", r -> r.when(count("B").above(1)))
-        .rule("B", r -> r.when(X.above(0))).build());
-    assertThrows(IllegalArgumentException.class, () -> Detector.builder()
-        .rule("A", r -> r.when(totalDuration("A").above(1))).build());
+    Rule b = Rule.named("B").when(X.above(0));
+    Rule a = Rule.named("A").when(count(b).above(1));
+    assertThrows(IllegalArgumentException.class, () -> Detector.builder().rules(a, b).build());
+    Rule self = Rule.named("A").when(totalDuration(Rule.named("A")).above(1));
+    assertThrows(IllegalArgumentException.class, () -> Detector.builder().rules(self).build());
   }
 }

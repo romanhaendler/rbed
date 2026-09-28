@@ -12,7 +12,6 @@ import java.util.Objects;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.BiConsumer;
-import java.util.function.UnaryOperator;
 
 /**
  * Receives Samples one at a time and evaluates Rules against them, reporting Event lifecycles to
@@ -29,7 +28,7 @@ public final class Detector implements AutoCloseable {
   private final Map<String, EventState> events = new HashMap<>();
   private final boolean hasHistory;
   private final long latestHistoryEnd;
-  private final Rule[] rules;
+  private final RuleState[] rules;
   private final ChannelState[] pulses;
   /** The latest moment processed: a Sample or a time advance. */
   private long now;
@@ -49,25 +48,28 @@ public final class Detector implements AutoCloseable {
       (channel, value) -> channel(channel.name()).update(sampleTimestamp, value);
 
   /**
-   * While binding Rules: the Rule being bound, the names it must not reference, and the Channels
-   * its Conditions refer to.
+   * While binding Rules: the Rule being bound, the names of all Rules and of those bound before
+   * it, and the Channels its Conditions refer to.
    */
   private String bindingRule;
-  private Set<String> notDeclaredBefore;
+  private Set<String> added;
+  private Set<String> declaredBefore;
   private Set<ChannelState> channelLookups;
 
   private Detector(Builder b) {
     listener = b.listener;
     samplingRate = b.samplingRate;
-    notDeclaredBefore = new HashSet<>(b.rules.keySet());
-    rules = new Rule[b.rules.size()];
+    added = b.rules.keySet();
+    declaredBefore = new HashSet<>();
+    rules = new RuleState[b.rules.size()];
     int i = 0;
-    for (Map.Entry<String, RuleBuilder> rule : b.rules.entrySet()) {
-      bindingRule = rule.getKey();
-      rules[i++] = new Rule(this, rule.getKey(), rule.getValue());
-      notDeclaredBefore.remove(rule.getKey());
+    for (Rule rule : b.rules.values()) {
+      bindingRule = rule.name();
+      rules[i++] = new RuleState(this, rule);
+      declaredBefore.add(rule.name());
     }
-    notDeclaredBefore = null;
+    added = null;
+    declaredBefore = null;
     bindingRule = null;
     pulses = channels.values().stream().filter(c -> c.pulse).toArray(ChannelState[]::new);
 
@@ -81,6 +83,9 @@ public final class Detector implements AutoCloseable {
     ordered.sort(Comparator.comparingLong(e -> e.confirmed().getAsLong()));
     long latestEnd = Long.MIN_VALUE;
     for (Event e : ordered) {
+      if (!events.containsKey(e.name())) {
+        throw new IllegalArgumentException("History Event " + e.name() + " matches no Rule");
+      }
       event(e.name()).remember(e);
       latestEnd = Math.max(latestEnd, e.end().getAsLong());
     }
@@ -139,7 +144,7 @@ public final class Detector implements AutoCloseable {
   public void close() {
     if (closed) return;
     closed = true;
-    if (started) for (Rule rule : rules) rule.close();
+    if (started) for (RuleState rule : rules) rule.close();
   }
 
   private List<Event> batch(Runnable pushAll) {
@@ -182,7 +187,7 @@ public final class Detector implements AutoCloseable {
 
   /** Evaluates every Rule, in declaration order, at the current moment. */
   private void evaluate(long timestamp, boolean isSample) {
-    for (Rule rule : rules) rule.step(timestamp, isSample);
+    for (RuleState rule : rules) rule.step(timestamp, isSample);
   }
 
   private static void validate(Channel channel, Double value) {
@@ -278,34 +283,40 @@ public final class Detector implements AutoCloseable {
   /**
    * The state of Events a Condition refers to, while binding a Rule.
    *
-   * @throws IllegalArgumentException if the Rule refers to itself or a Rule declared after it
+   * @throws IllegalArgumentException if the Rule refers to itself, to a Rule added after it or to
+   *     a Rule not added to this Detector
    */
-  EventState referencedEvent(String name) {
-    if (notDeclaredBefore != null && notDeclaredBefore.contains(name)) {
-      throw new IllegalArgumentException(
-          "Rule " + bindingRule + " references " + name + ", which is not declared before it");
+  EventState referencedEvent(Rule rule) {
+    String name = rule.name();
+    if (!declaredBefore.contains(name)) {
+      throw new IllegalArgumentException("Rule " + bindingRule + " references " + name
+          + (added.contains(name) ? ", which is not added before it" : ", which is not added"));
     }
     return event(name);
   }
 
   /** Builds a {@link Detector}. */
   public static final class Builder {
-    private final Map<String, RuleBuilder> rules = new LinkedHashMap<>();
+    private final Map<String, Rule> rules = new LinkedHashMap<>();
     private final List<Event> history = new ArrayList<>();
     private EventListener listener = new EventListener() {};
     private double samplingRate;
 
     private Builder() {}
 
-    /** Adds a Rule; its name becomes the name of the Events it produces. */
-    public Builder rule(String name, UnaryOperator<RuleBuilder> config) {
-      if (name == null || name.isEmpty()) throw new IllegalArgumentException("Rule name is empty");
-      if (rules.containsKey(name)) throw new IllegalArgumentException("Duplicate rule " + name);
-      RuleBuilder rule = config.apply(new RuleBuilder());
-      if (rule == null || rule.when == null) {
-        throw new IllegalArgumentException("Rule " + name + " has no when()");
+    /**
+     * Adds Rules, evaluated in the order they are added. A Rule may only refer to Rules added
+     * before it.
+     */
+    public Builder rules(Rule... rules) {
+      for (Rule rule : rules) {
+        String name = rule.name();
+        if (rule.when == null) throw new IllegalArgumentException("Rule " + name + " has no when()");
+        if (this.rules.containsKey(name)) {
+          throw new IllegalArgumentException("Duplicate rule " + name);
+        }
+        this.rules.put(name, rule);
       }
-      rules.put(name, rule);
       return this;
     }
 
@@ -342,7 +353,8 @@ public final class Detector implements AutoCloseable {
     }
 
     /**
-     * @throws IllegalArgumentException if a Rule references itself or a Rule declared after it
+     * @throws IllegalArgumentException if a Rule references itself, a Rule added after it or a
+     *     Rule not added, or if History contains an Event of no added Rule
      */
     public Detector build() {
       return new Detector(this);

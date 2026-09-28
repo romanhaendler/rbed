@@ -13,14 +13,14 @@ class TimeAdvanceTest {
 
   final Recorder rec = new Recorder();
 
-  Detector detector(java.util.function.UnaryOperator<RuleBuilder> rule) {
-    return Detector.builder().rule("E", rule).listener(rec).build();
+  Detector detector(java.util.function.UnaryOperator<Rule> rule) {
+    return Detector.builder().rules(rule.apply(Rule.named("E"))).listener(rec).build();
   }
 
   @Test
   void silentSensorRaisesAnEventWhileNoSamplesArrive() {
     Detector d = Detector.builder()
-        .rule("SensorLost", r -> r.when(HR.age().above(10_000)))
+        .rules(Rule.named("SensorLost").when(HR.age().above(10_000)))
         .listener(rec).build();
     d.push(0, Map.of(HR, 70.0));
     d.advanceTo(5_000);
@@ -101,7 +101,7 @@ class TimeAdvanceTest {
     d.close();
     assertThrows(IllegalStateException.class, () -> d.advanceTo(20));
     Detector sampled = Detector.builder().samplingRate(1)
-        .rule("E", r -> r.when(X.above(0))).build();
+        .rules(Rule.named("E").when(X.above(0))).build();
     assertThrows(IllegalStateException.class, () -> sampled.advanceTo(20));
   }
 

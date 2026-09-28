@@ -25,9 +25,10 @@ class SequenceTest {
 
   @Test
   void duringHoldsWhileOtherEventIsConfirmed() {
+    Rule lift = Rule.named("Lift").when(WEIGHT.above(500)).forSamples(2);
     Detector d = Detector.builder()
-        .rule("Lift", r -> r.when(WEIGHT.above(500)).forSamples(2))
-        .rule("Overload", r -> r.when(WEIGHT.above(1000).and(during("Lift"))))
+        .rules(lift)
+        .rules(Rule.named("Overload").when(WEIGHT.above(1000).and(during(lift))))
         .listener(rec).build();
     double[] ws = {0, 2000, 2000, 2000, 0};
     for (int i = 0; i < ws.length; i++) d.push(i, Map.of(WEIGHT, ws[i]));
@@ -35,11 +36,12 @@ class SequenceTest {
     assertEquals(List.of("ended Lift 1..4", "ended Overload 2..4"), ended());
   }
 
+  final Rule maintenance = Rule.named("Maintenance").when(M.above(0));
+  final Rule fault = Rule.named("Fault").when(F.above(0));
+
   Detector.Builder maintenanceThenStart(Condition startCondition) {
     return Detector.builder()
-        .rule("Maintenance", r -> r.when(M.above(0)))
-        .rule("Fault", r -> r.when(F.above(0)))
-        .rule("Start", r -> r.when(startCondition.and(X.above(0))))
+        .rules(maintenance, fault, Rule.named("Start").when(startCondition.and(X.above(0))))
         .listener(rec);
   }
 
@@ -49,7 +51,7 @@ class SequenceTest {
 
   @Test
   void afterWithinWindow() {
-    Detector d = maintenanceThenStart(after("Maintenance").within(100)).build();
+    Detector d = maintenanceThenStart(after(maintenance).within(100)).build();
     push(d, 0, 0, 0, 1);    // no Maintenance yet: no Start
     push(d, 5, 1, 0, 0);
     push(d, 10, 0, 0, 0);   // Maintenance Ended at 10
@@ -61,7 +63,7 @@ class SequenceTest {
 
   @Test
   void afterUnlessInterruptingEvent() {
-    Detector d = maintenanceThenStart(after("Maintenance").unless("Fault")).build();
+    Detector d = maintenanceThenStart(after(maintenance).unless(fault)).build();
     push(d, 0, 1, 0, 0);
     push(d, 10, 0, 0, 0);
     push(d, 20, 0, 1, 0);   // Fault after Maintenance
@@ -75,9 +77,10 @@ class SequenceTest {
 
   @Test
   void laterRuleSeesEarlierRulesEffectsOnSameSample() {
+    Rule a = Rule.named("A").when(A.above(0));
+    Rule b = Rule.named("B").when(after(a));
     Detector d = Detector.builder()
-        .rule("A", r -> r.when(A.above(0)))
-        .rule("B", r -> r.when(after("A")))
+        .rules(a, b)
         .listener(rec).build();
     d.push(0, Map.of(A, 1.0));
     d.push(1, Map.of(A, 0.0));
@@ -85,22 +88,27 @@ class SequenceTest {
   }
 
   @Test
-  void selfAndForwardReferencesAreRejected() {
-    assertThrows(IllegalArgumentException.class, () -> Detector.builder()
-        .rule("A", r -> r.when(during("A"))).build());
-    assertThrows(IllegalArgumentException.class, () -> Detector.builder()
-        .rule("A", r -> r.when(X.above(0)).endWhen(after("B").unless("C")))
-        .rule("C", r -> r.when(X.above(0))).build());
-    // names no Rule produces are fine: they can only come from History
-    Detector.builder().rule("A", r -> r.when(after("External"))).build();
+  void selfAndLaterAndMissingReferencesAreRejected() {
+    Rule self = Rule.named("A").when(during(Rule.named("A")));
+    assertThrows(IllegalArgumentException.class, () -> Detector.builder().rules(self).build());
+    Rule b = Rule.named("B").when(X.above(0));
+    Rule c = Rule.named("C").when(X.above(0));
+    Rule a = Rule.named("A").when(X.above(0)).endWhen(after(b).unless(c));
+    assertThrows(IllegalArgumentException.class, () -> Detector.builder().rules(b, a, c).build());
+    assertThrows(IllegalArgumentException.class, () -> Detector.builder().rules(c, a).build());
+    Detector.builder().rules(b, c, a).build();
+  }
+
+  /** A Rule whose Events are only known from History: its Channel never has a value here. */
+  static Rule historic(String name) {
+    return Rule.named(name).when(Channel.named("unused").above(0));
   }
 
   @Test
   void historyEnablesAfterFromTheFirstSampleAndIsNotReported() {
-    Event maintenance = ended("Maintenance", -80, -70, -50);
     Detector d = Detector.builder()
-        .rule("Start", r -> r.when(after("Maintenance").within(100)))
-        .history(List.of(maintenance))
+        .rules(maintenance, Rule.named("Start").when(after(maintenance).within(100)))
+        .history(List.of(ended("Maintenance", -80, -70, -50)))
         .listener(rec).build();
     d.push(0, Map.of());
     d.push(60, Map.of()); // 110 ms after Maintenance
@@ -123,23 +131,26 @@ class SequenceTest {
 
   @Test
   void historyMustHaveEndedBeforeTheFirstSample() {
+    Rule a = historic("A");
     Detector d = Detector.builder()
-        .rule("B", r -> r.when(after("A")))
+        .rules(a, Rule.named("B").when(after(a)))
         .history(List.of(ended("A", 0, 10, 5000))).build();
     assertThrows(IllegalArgumentException.class, () -> d.push(1000, Map.of()));
   }
 
   @Test
   void historyUnlessUsesConfirmationTime() {
-    Event a = ended("A", 0, 0, 100);
-    Condition bAfterA = after("A").unless("C");
-    Detector blocked = Detector.builder().rule("B", r -> r.when(bAfterA))
-        .history(List.of(a, ended("C", 50, 150, 300))).listener(rec).build();
+    Rule a = historic("A");
+    Rule c = historic("C");
+    Rule b = Rule.named("B").when(after(a).unless(c));
+    Event aEnded = ended("A", 0, 0, 100);
+    Detector blocked = Detector.builder().rules(a, c, b)
+        .history(List.of(aEnded, ended("C", 50, 150, 300))).listener(rec).build();
     blocked.push(400, Map.of());
     assertEquals(List.of(), rec.log);
 
-    Detector notBlocked = Detector.builder().rule("B", r -> r.when(bAfterA))
-        .history(List.of(a, ended("C", 50, 60, 300))).listener(rec).build();
+    Detector notBlocked = Detector.builder().rules(a, c, b)
+        .history(List.of(aEnded, ended("C", 50, 60, 300))).listener(rec).build();
     notBlocked.push(400, Map.of());
     assertEquals(List.of("pending B 400", "confirmed B 400"), rec.log);
   }

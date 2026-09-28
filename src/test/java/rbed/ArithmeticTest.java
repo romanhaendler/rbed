@@ -18,7 +18,7 @@ class ArithmeticTest {
 
   /** Returns the timestamps at which a Rule on {@code c} is Confirmed, one Sample per map. */
   List<String> confirmations(Condition c, List<Map<Channel, Double>> samples) {
-    Detector d = Detector.builder().rule("E", r -> r.when(c)).listener(rec).build();
+    Detector d = Detector.builder().rules(Rule.named("E").when(c)).listener(rec).build();
     for (int i = 0; i < samples.size(); i++) d.push(i, samples.get(i));
     return rec.log.stream().filter(line -> line.startsWith("confirmed")).toList();
   }

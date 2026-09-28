@@ -1,212 +1,119 @@
 package rbed;
 
-import java.util.OptionalLong;
+import java.time.Duration;
+import java.util.LinkedHashSet;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.UnaryOperator;
 
 /**
- * Runtime state machine of one Rule inside one Detector. Evaluates its {@code when} Condition at
- * most once per moment (a Sample or a time advance).
+ * One or more Conditions combined with timing logic that produces Events named after the Rule.
+ * Rules are immutable: every configuration method returns a new Rule, so one Rule can be used in
+ * several Detectors. Other Rules refer to it with {@link Conditions#during}, {@link
+ * Conditions#after} and the like. {@link #forSamples} and {@link #forDuration} apply to the most
+ * recent {@link #when} or {@link #endWhen}; when both are given, both must be met.
  */
-final class Rule {
-  private enum State { IDLE, PENDING, CONFIRMED }
-
-  private final Detector detector;
+public final class Rule {
   private final String name;
-  private final EventState events;
-  private final Condition.Bound when;
-  private final Progress holding;
-  private final Condition.Bound end;
-  private final Progress ending;
-  private final long maxGap;
-  private final AggregatedChannels channels = new AggregatedChannels();
-  private Accumulator aggregates = new Accumulator();
-  private final Accumulator endPhaseAggregates = new Accumulator();
-  /** Aggregates of the latest Ended Event, for {@link LatestEvent}; swapped, never copied. */
-  private Accumulator latestEnded = new Accumulator();
-  private boolean hasEnded;
+  final Phase when;
+  final Phase end;
+  final long maxGap;
+  final Set<Channel> aggregated;
+  private final boolean durationsApplyToEnd;
 
-  private State state = State.IDLE;
-  /** {@code when} has stopped holding since the last Event started, so a new one may start. */
-  private boolean armed = true;
-  /** {@code when} was seen false since observation began or resumed after a gap. */
-  private boolean seenFalse;
-  private boolean truncatedStart;
-  private long confirmedAt;
-  private boolean inEndPhase;
-  /** The latest moment this Rule was evaluated with data no older than {@code maxGap}. */
-  private long lastValidMoment;
-
-  /** Binds the Rule's Conditions; the Detector must be ready to resolve their references. */
-  Rule(Detector detector, String name, RuleBuilder spec) {
-    this.detector = detector;
+  private Rule(String name, Phase when, Phase end, long maxGap, Set<Channel> aggregated,
+      boolean durationsApplyToEnd) {
     this.name = name;
-    this.events = detector.event(name);
-    events.producedBy(this);
-    detector.recordChannelLookups();
-    this.when = spec.when.condition().bind(detector);
-    this.holding = new Progress(spec.when);
-    this.end = spec.end == null ? null : spec.end.condition().bind(detector);
-    this.ending = spec.end == null ? null : new Progress(spec.end);
-    for (ChannelState referenced : detector.recordedChannelLookups()) aggregate(referenced);
-    for (Channel channel : spec.aggregated) aggregate(channel.state(detector));
-    this.maxGap = spec.maxGap;
+    this.when = when;
+    this.end = end;
+    this.maxGap = maxGap;
+    this.aggregated = aggregated;
+    this.durationsApplyToEnd = durationsApplyToEnd;
   }
 
-  /** Keeps Aggregates for this Channel too; returns its index in the Accumulators. */
-  int aggregate(ChannelState channel) {
-    return channels.indexOf(channel);
+  /** A Rule without Conditions yet; its name becomes the name of the Events it produces. */
+  public static Rule named(String name) {
+    if (Objects.requireNonNull(name, "name").isEmpty()) {
+      throw new IllegalArgumentException("Rule name is empty");
+    }
+    return new Rule(name, null, null, Long.MAX_VALUE, Set.of(), false);
   }
 
-  /** An Aggregate of the latest Confirmed Event, running or Ended; NaN if there is none. */
-  double latest(int channelIndex, Accumulator.Aggregate aggregate) {
-    if (state == State.CONFIRMED) return aggregates.aggregate(channelIndex, aggregate);
-    return hasEnded ? latestEnded.aggregate(channelIndex, aggregate) : Double.NaN;
+  public String name() {
+    return name;
   }
 
   /**
-   * Evaluates the current moment: a Sample, or a time advance without one. Advances do not count
-   * for {@code forSamples} or Sample-based Aggregates.
+   * The Conditions under which an Event starts and, without an End Condition, continues. A new
+   * Event only starts after these Conditions have stopped holding since the previous one.
    */
-  void step(long now, boolean isSample) {
-    if (detector.hasSamples() && now - detector.lastSample() > maxGap) {
-      close();
-      armed = true;
-      seenFalse = false;
-      if (!isSample) return; // values are stale until the next Sample
-    }
-    switch (state) {
-      case IDLE -> {
-        Truth holds = when.test();
-        if (holds != Truth.TRUE) stoppedHolding(holds);
-        else if (armed) begin(now, isSample);
-      }
-      case PENDING -> {
-        Truth holds = when.test();
-        if (holds == Truth.TRUE) {
-          if (isSample) holding.advance();
-          continueRecording(aggregates, now, isSample);
-          confirmIfReached(now);
-        } else {
-          discard();
-          stoppedHolding(holds);
-        }
-      }
-      case CONFIRMED -> {
-        if (end == null) stepUntilWhenStops(now, isSample);
-        else stepUntilEndCondition(now, isSample);
-      }
-    }
-    lastValidMoment = now;
+  public Rule when(Condition condition) {
+    Phase phase = new Phase(Objects.requireNonNull(condition, "condition"));
+    return new Rule(name, phase, end, maxGap, aggregated, false);
   }
 
   /**
-   * Stops observation: Discards a Pending Event and Ends a Confirmed one, truncated, at the latest
-   * moment it was evaluated with valid data.
+   * An End Condition: once Confirmed, the Event continues until this holds (for its own
+   * duration), regardless of {@link #when}. The Event's end is where this started holding.
    */
-  void close() {
-    if (state == State.PENDING) {
-      discard();
-    } else if (state == State.CONFIRMED) {
-      leaveEndPhase();
-      finish(lastValidMoment, true);
+  public Rule endWhen(Condition condition) {
+    Phase phase = new Phase(Objects.requireNonNull(condition, "condition"));
+    return new Rule(name, when, phase, maxGap, aggregated, true);
+  }
+
+  /** The preceding Condition must hold for at least {@code n} consecutive Samples. */
+  public Rule forSamples(int n) {
+    if (n < 1) throw new IllegalArgumentException("forSamples must be >= 1: " + n);
+    return updatePhase(phase -> phase.withSamples(n));
+  }
+
+  /** The preceding Condition must hold for at least {@code millis} milliseconds. */
+  public Rule forDuration(long millis) {
+    if (millis < 0) throw new IllegalArgumentException("forDuration must be >= 0: " + millis);
+    return updatePhase(phase -> phase.withMillis(millis));
+  }
+
+  /** The preceding Condition must hold for at least {@code duration}. */
+  public Rule forDuration(Duration duration) {
+    return forDuration(duration.toMillis());
+  }
+
+  /**
+   * If consecutive Samples are more than {@code millis} apart, a Pending Event is Discarded and a
+   * Confirmed Event Ends, truncated, at the last Sample before the gap.
+   */
+  public Rule maxGap(long millis) {
+    if (millis < 0) throw new IllegalArgumentException("maxGap must be >= 0: " + millis);
+    return new Rule(name, when, end, millis, aggregated, durationsApplyToEnd);
+  }
+
+  /** See {@link #maxGap(long)}. */
+  public Rule maxGap(Duration duration) {
+    return maxGap(duration.toMillis());
+  }
+
+  /**
+   * Also keeps Aggregates for these Channels. Channels referenced by the Rule's Conditions are
+   * aggregated anyway.
+   */
+  public Rule aggregate(Channel... channels) {
+    Set<Channel> all = new LinkedHashSet<>(aggregated);
+    for (Channel channel : channels) all.add(Objects.requireNonNull(channel, "channel"));
+    return new Rule(name, when, end, maxGap, all, durationsApplyToEnd);
+  }
+
+  private Rule updatePhase(UnaryOperator<Phase> change) {
+    if (durationsApplyToEnd) {
+      return new Rule(name, when, change.apply(end), maxGap, aggregated, true);
     }
-  }
-
-  private void discard() {
-    state = State.IDLE;
-    detector.listener.onDiscarded(snapshot(OptionalLong.empty(), false));
-  }
-
-  private void stoppedHolding(Truth holds) {
-    armed = true;
-    if (holds == Truth.FALSE) seenFalse = true;
-  }
-
-  private void begin(long now, boolean isSample) {
-    state = State.PENDING;
-    armed = false;
-    truncatedStart = !seenFalse;
-    holding.begin(now, isSample);
-    startRecording(aggregates, now, isSample);
-    detector.listener.onPending(snapshot(OptionalLong.empty(), false));
-    confirmIfReached(now);
-  }
-
-  private void confirmIfReached(long now) {
-    if (!holding.reached(now)) return;
-    state = State.CONFIRMED;
-    confirmedAt = now;
-    inEndPhase = false;
-    events.confirm(now, holding.since);
-    detector.listener.onConfirmed(snapshot(OptionalLong.empty(), false));
-  }
-
-  private void stepUntilWhenStops(long now, boolean isSample) {
-    Truth holds = when.test();
-    if (holds == Truth.TRUE) {
-      continueRecording(aggregates, now, isSample);
-    } else {
-      finish(now, false);
-      stoppedHolding(holds);
+    if (when == null) {
+      throw new IllegalStateException("forSamples/forDuration must follow when() or endWhen()");
     }
+    return new Rule(name, change.apply(when), end, maxGap, aggregated, false);
   }
 
-  private void stepUntilEndCondition(long now, boolean isSample) {
-    if (end.test() != Truth.TRUE) {
-      leaveEndPhase();
-      continueRecording(aggregates, now, isSample);
-      return;
-    }
-    if (inEndPhase) {
-      if (isSample) ending.advance();
-      continueRecording(endPhaseAggregates, now, isSample);
-    } else {
-      inEndPhase = true;
-      ending.begin(now, isSample);
-      startRecording(endPhaseAggregates, now, isSample);
-    }
-    if (ending.reached(now)) finish(ending.since, false);
-  }
-
-  /** The End Condition stopped holding: its moments belong to the Event after all. */
-  private void leaveEndPhase() {
-    if (inEndPhase) aggregates.addAll(endPhaseAggregates);
-    inEndPhase = false;
-  }
-
-  /** Starts Aggregates at a Sample, or at an advance with the values the Channels hold. */
-  private void startRecording(Accumulator accumulator, long now, boolean isSample) {
-    accumulator.clear();
-    if (isSample) accumulator.add(channels, now);
-    else accumulator.hold(channels, now);
-  }
-
-  /** Only Samples add to Aggregates; across an advance the held values simply continue. */
-  private void continueRecording(Accumulator accumulator, long now, boolean isSample) {
-    if (isSample) accumulator.add(channels, now);
-  }
-
-  private void finish(long endTimestamp, boolean truncated) {
-    state = State.IDLE;
-    events.end(endTimestamp);
-    Event ended = snapshot(
-        OptionalLong.of(confirmedAt), OptionalLong.of(endTimestamp), truncated, endTimestamp);
-    Accumulator recycled = latestEnded;
-    latestEnded = aggregates;
-    aggregates = recycled; // cleared when the next Event begins
-    hasEnded = true;
-    detector.ended(ended);
-  }
-
-  /** A Pending, Confirmed or Discarded Event, with Aggregates up to the current moment. */
-  private Event snapshot(OptionalLong end, boolean truncatedEnd) {
-    OptionalLong confirmed =
-        state == State.CONFIRMED ? OptionalLong.of(confirmedAt) : OptionalLong.empty();
-    return snapshot(confirmed, end, truncatedEnd, detector.now());
-  }
-
-  private Event snapshot(
-      OptionalLong confirmed, OptionalLong end, boolean truncatedEnd, long aggregatesUntil) {
-    return new Event(name, holding.since, confirmed, end, truncatedStart, truncatedEnd,
-        aggregates.snapshot(channels, aggregatesUntil));
+  @Override
+  public String toString() {
+    return name;
   }
 }

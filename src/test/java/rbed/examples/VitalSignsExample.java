@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import rbed.Channel;
 import rbed.Detector;
 import rbed.Event;
+import rbed.Rule;
 import rbed.EventListener;
 import rbed.Sample;
 
@@ -35,17 +36,18 @@ class VitalSignsExample {
   @Test
   void detectsCombinedAlarmsAndHandlesSensorDropout() {
     List<Event> ended = new ArrayList<>();
+    Rule tachycardia = Rule.named("Tachycardia")
+        .when(HR.above(100)).forDuration(30 * SECOND)
+        .endWhen(HR.below(95)).forDuration(30 * SECOND)
+        .maxGap(10 * SECOND);
+    Rule desaturation = Rule.named("Desaturation")
+        .when(SPO2.below(90)).forDuration(10 * SECOND)
+        .endWhen(SPO2.below(92).not());
     Detector detector = Detector.builder()
-        .rule("Tachycardia", r -> r
-            .when(HR.above(100)).forDuration(30 * SECOND)
-            .endWhen(HR.below(95)).forDuration(30 * SECOND)
-            .maxGap(10 * SECOND))
-        .rule("Desaturation", r -> r
-            .when(SPO2.below(90)).forDuration(10 * SECOND)
-            .endWhen(SPO2.below(92).not()))
-        .rule("HypoxicTachycardia", r -> r
-            .when(during("Tachycardia").and(during("Desaturation"))))
-        .rule("SensorLost", r -> r.when(HR.age().above(5 * SECOND)))
+        .rules(tachycardia, desaturation)
+        .rules(Rule.named("HypoxicTachycardia")
+            .when(during(tachycardia).and(during(desaturation))))
+        .rules(Rule.named("SensorLost").when(HR.age().above(5 * SECOND)))
         .listener(new EventListener() {
           @Override public void onEnded(Event e) {
             ended.add(e);

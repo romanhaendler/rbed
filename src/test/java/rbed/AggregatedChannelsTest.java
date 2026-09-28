@@ -24,7 +24,7 @@ class AggregatedChannelsTest {
 
   @Test
   void channelsReferencedByTheRuleAreAggregated() {
-    Event e = lift(Detector.builder().rule("Lift", r -> r
+    Event e = lift(Detector.builder().rules(Rule.named("Lift")
         .when(WEIGHT.above(500))
         .endWhen(WEIGHT.below(50).and(HEIGHT.above(-1)))));
     assertEquals(600, e.aggregates(WEIGHT).mean());
@@ -34,7 +34,7 @@ class AggregatedChannelsTest {
 
   @Test
   void otherChannelsMustBeRequested() {
-    Event e = lift(Detector.builder().rule("Lift", r -> r.when(WEIGHT.above(500))));
+    Event e = lift(Detector.builder().rules(Rule.named("Lift").when(WEIGHT.above(500))));
     IllegalArgumentException error =
         assertThrows(IllegalArgumentException.class, () -> e.aggregates(WIND));
     assertEquals("Rule Lift does not aggregate channel wind; add it with aggregate(...)",
@@ -43,7 +43,7 @@ class AggregatedChannelsTest {
 
   @Test
   void requestedChannelsAreAggregatedEvenWithoutValues() {
-    Event e = lift(Detector.builder().rule("Lift", r -> r
+    Event e = lift(Detector.builder().rules(Rule.named("Lift")
         .when(WEIGHT.above(500)).aggregate(WIND, RAIN)));
     assertEquals(3, e.aggregates(WIND).mean());
     assertEquals(0, e.aggregates(RAIN).count());

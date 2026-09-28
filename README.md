@@ -47,8 +47,9 @@ import static rbed.Conditions.*;
 
 Channel temp = Channel.named("temp");
 
+Rule highTemperature = Rule.named("HighTemperature").when(temp.above(80));
 Detector detector = Detector.builder()
-    .rule("HighTemperature", r -> r.when(temp.above(80)))
+    .rules(highTemperature)
     .listener(new EventListener() {
       @Override public void onEnded(Event e) {
         System.out.println(e.name() + " from " + e.start() + " to " + e.end().getAsLong());
@@ -64,7 +65,7 @@ detector.close();
 
 Three steps are always the same:
 
-1. **Build a Detector** with `Detector.builder()`: add Rules with `.rule(name, config)` and a listener with `.listener(...)`, then call `.build()`. The Rule's name becomes the name of the Events it produces.
+1. **Build a Detector**: define each Rule once with `Rule.named(name)`, then add the Rules to `Detector.builder()` with `.rules(...)` and a listener with `.listener(...)`, and call `.build()`. The Rule's name becomes the name of the Events it produces.
 2. **Feed it Samples** with `push(timestamp, values)`, one at a time, in time order. Every Rule is evaluated at every Sample.
 3. **Close it** with `close()` when the data ends, so that an Event still in progress is reported, too. A Detector is `AutoCloseable`, so try-with-resources works.
 
@@ -107,8 +108,9 @@ An Event goes through up to four stages, and the listener is told about each. Al
 The distinction between Pending and Confirmed matters when a Rule requires a duration. Here a temperature must stay above 80 for two seconds:
 
 ```java
+Rule overheat = Rule.named("Overheat").when(temp.above(80)).forDuration(2_000);
 Detector detector = Detector.builder()
-    .rule("Overheat", r -> r.when(temp.above(80)).forDuration(2_000))
+    .rules(overheat)
     .listener(new EventListener() {
       @Override public void onPending(Event e)   { System.out.println("pending at " + e.start()); }
       @Override public void onConfirmed(Event e) { System.out.println("confirmed at " + e.confirmed().getAsLong()); }
@@ -146,26 +148,27 @@ An `Event` is an immutable record. The listener receives a fresh snapshot at eac
 
 | Field              | Meaning                                                                        |
 | ------------------ | ------------------------------------------------------------------------------ |
-| `name()`           | The name of the Rule that produced it.                                         |
+| `name()`           | The name of the Rule that produced it, e.g. to store the Event.                |
+| `is(rule)`         | Whether `rule` produced it.                                                    |
 | `start()`          | Timestamp (ms) of the first moment at which `when` held.                       |
 | `confirmed()`      | `OptionalLong`: when it was Confirmed; empty while Pending or if Discarded.    |
 | `end()`            | `OptionalLong`: when it Ended; empty until then.                               |
 | `truncatedStart()` | It may have begun earlier than `start()`.                                      |
 | `truncatedEnd()`   | Observation stopped while it ran: `close()` or a data gap.                     |
-| `aggregates(x)`  | [Aggregates](#aggregates) of Channel `x` over the Event so far.                |
+| `aggregates(x)`    | [Aggregates](#aggregates) of Channel `x` over the Event so far.                |
 
 The duration of an Ended Event is `e.end().getAsLong() - e.start()`.
 
 ## Building Rules
 
-A Rule is configured in a lambda that receives a `RuleBuilder`. A complete Rule using every option:
+A Rule is an immutable value: `Rule.named(name)` creates it, and every configuration method returns a new Rule, so a Rule can be shared by several Detectors. A complete Rule using every option:
 
 ```java
-.rule("LoadLifted", r -> r
+Rule loadLifted = Rule.named("LoadLifted")
     .when(weight.above(500)).forDuration(Duration.ofSeconds(2))
     .endWhen(weight.below(50)).forDuration(Duration.ofSeconds(1))
     .maxGap(Duration.ofSeconds(5))
-    .aggregate(height))
+    .aggregate(height);
 ```
 
 Every time value accepts either a `long` in milliseconds or a `java.time.Duration`.
@@ -179,9 +182,9 @@ Every time value accepts either a `long` in milliseconds or a `java.time.Duratio
 A Condition that holds only briefly is often noise. `forDuration(ms)` requires the preceding Condition to hold for at least that long, `forSamples(n)` for at least `n` consecutive Samples:
 
 ```java
-.rule("Vibration", r -> r.when(rms.above(4.5)).forSamples(3))
-.rule("Stall", r -> r.when(rpm.below(10)).forDuration(Duration.ofSeconds(5)))
-.rule("Both", r -> r.when(rpm.below(10)).forSamples(3).forDuration(5_000))
+Rule vibration = Rule.named("Vibration").when(rms.above(4.5)).forSamples(3);
+Rule stall = Rule.named("Stall").when(rpm.below(10)).forDuration(Duration.ofSeconds(5));
+Rule both = Rule.named("Both").when(rpm.below(10)).forSamples(3).forDuration(5_000);
 ```
 
 With both, both must be met: at least 3 Samples *and* at least 5 seconds. Until then the Event is Pending; if the Condition stops holding first, it is Discarded. `forDuration` measures from the Event's `start()`, so the required duration is reached at `start() + ms`.
@@ -193,9 +196,9 @@ With both, both must be met: at least 3 Samples *and* at least 5 seconds. Until 
 Real signals hover around thresholds. With `when(weight > 500)` alone, a weight fluctuating between 490 and 510 produces a new Event every few Samples. An End Condition fixes this: once Confirmed, the Event continues until the End Condition holds, whatever `when` does.
 
 ```java
-.rule("LoadLifted", r -> r
+Rule loadLifted = Rule.named("LoadLifted")
     .when(weight.above(500))
-    .endWhen(weight.below(50)))
+    .endWhen(weight.below(50));
 ```
 
 ```java
@@ -215,7 +218,7 @@ While the End Condition's duration is running, the Event is still Confirmed and 
 If a sensor stops reporting, the last values would otherwise hold forever and an Event could run on stale data. `maxGap(ms)` bounds how far apart two Samples may be:
 
 ```java
-.rule("Running", r -> r.when(rpm.above(100)).maxGap(Duration.ofSeconds(10)))
+Rule running = Rule.named("Running").when(rpm.above(100)).maxGap(Duration.ofSeconds(10));
 ```
 
 When the next Sample (or [time advance](#silent-sensors-advancing-time)) comes more than 10 seconds after the previous Sample, a Pending Event is Discarded, and a Confirmed Event Ends with `truncatedEnd()` at the last moment evaluated before the gap. An Event that starts right after the gap has `truncatedStart()`, since its Rule has not seen its Conditions not holding since data resumed. Without `maxGap`, gaps of any length are accepted.
@@ -225,9 +228,9 @@ When the next Sample (or [time advance](#silent-sensors-advancing-time)) comes m
 Each Event carries [Aggregates](#aggregates) (min, max, mean, ...) of the Channels its Rule's Conditions use. To also get them for other Channels, name those Channels:
 
 ```java
-.rule("LoadLifted", r -> r
+Rule loadLifted = Rule.named("LoadLifted")
     .when(weight.above(500))
-    .aggregate(height, windSpeed))   // weight is aggregated anyway
+    .aggregate(height, windSpeed);   // weight is aggregated anyway
 ```
 
 ### Derived values
@@ -246,7 +249,7 @@ static boolean shortCycle(Event run) {
 
 ### Rule order
 
-Rules are evaluated in the order they are declared, at every Sample. A Rule may refer to other Rules' Events (see [Referring to other Rules](#referring-to-other-rules)), but only to Rules declared *before* it. It therefore sees their state at the same Sample, and dependencies can never be circular.
+Rules are evaluated in the order they are added with `rules(...)`, at every Sample. A Rule may refer to other Rules (see [Referring to other Rules](#referring-to-other-rules)), but only to Rules added *before* it. It therefore sees their state at the same Sample, and dependencies can never be circular. Since a Rule refers to another Rule object, not to a name, a misspelled reference does not compile, and `build()` rejects a reference to a Rule that was not added or is added later.
 
 ## Conditions and Expressions
 
@@ -303,7 +306,7 @@ A threshold tells you *where* a signal is. Often it matters more *where it is go
 *A sustained trend*, with `forSamples`. This Rule detects a temperature that has risen at five consecutive Samples, even while it is still far below any alarm threshold:
 
 ```java
-.rule("Warming", r -> r.when(temp.rising()).forSamples(5))
+Rule warming = Rule.named("Warming").when(temp.rising()).forSamples(5);
 ```
 
 ```java
@@ -316,13 +319,13 @@ A threshold tells you *where* a signal is. Often it matters more *where it is go
 *Level plus direction*, with `and`. A high value that is still climbing needs action; a high value that is already falling is recovering:
 
 ```java
-.rule("PressureEscalating", r -> r.when(pressure.above(8).and(pressure.rising())))
+Rule pressureEscalating = Rule.named("PressureEscalating").when(pressure.above(8).and(pressure.rising()));
 ```
 
 *Peaks and troughs.* An Event of `rising()` lasts exactly as long as a climb. It Ends at the first Sample that is not higher, and its `max` Aggregate is the peak value:
 
 ```java
-.rule("Climb", r -> r.when(x.rising()))
+Rule climb = Rule.named("Climb").when(x.rising());
 // x: 1 2 5 9 7 3 1 at 0..6 s  ->  Climb 1000..4000, e.aggregates(x).max() is 9.0
 ```
 
@@ -330,13 +333,13 @@ A threshold tells you *where* a signal is. Often it matters more *where it is go
 
 ```java
 // hard braking: speed in m/s drops by more than 4 m/s per second
-.rule("HardBraking", r -> r.when(speed.rate().below(-4)))
+Rule hardBraking = Rule.named("HardBraking").when(speed.rate().below(-4));
 
 // leak: the tank level falls faster than any consumer can draw, for a whole minute
-.rule("Leak", r -> r.when(level.rate().below(-0.5)).forDuration(60_000))
+Rule leak = Rule.named("Leak").when(level.rate().below(-0.5)).forDuration(60_000);
 
 // heat treatment: heating faster than 2 °C per minute (rate is per second)
-.rule("RampTooSteep", r -> r.when(furnaceTemp.rate().above(2.0 / 60)))
+Rule rampTooSteep = Rule.named("RampTooSteep").when(furnaceTemp.rate().above(2.0 / 60));
 ```
 
 Because `rate()` looks at only two values, noise in the signal shows up in full in the rate. For noisy signals, take the rate of a [moving average](#moving-averages) instead: `level.averageOverSamples(4).rate()`.
@@ -372,8 +375,8 @@ level.averageOverSamples(4).rate().above(0.2)
 Two averages of the same Channel make a classic crossover signal:
 
 ```java
-.rule("GoldenCross", r -> r.when(
-    price.averageOverSamples(50).above(price.averageOverSamples(200))))
+Rule goldenCross = Rule.named("GoldenCross").when(
+    price.averageOverSamples(50).above(price.averageOverSamples(200)));
 ```
 
 While an average warms up it is undefined, so Events of such a Rule that start right after the warm-up have `truncatedStart()`: the Rule could not tell whether the Condition held earlier.
@@ -410,17 +413,17 @@ So a Rule never fires because data is missing. To detect missing data explicitly
 
 ## Referring to other Rules
 
-Rules can refer to the Events of Rules declared before them. This composes simple Rules into sequences, combinations and statistics.
+Rules can refer to the Events of Rules added before them, by passing the Rule itself. This composes simple Rules into sequences, combinations and statistics.
 
 ### `during`: while another Event runs
 
-`during("A")` holds while an A Event is Confirmed and has not Ended. It turns an Event into a state that other Rules can use. Two uses are common.
+`during(a)` holds while an A Event is Confirmed and has not Ended. It turns an Event into a state that other Rules can use. Two uses are common.
 
 *Restricting a Rule to a phase.* Many criteria only make sense in a certain operating state. Vibration of a stopped machine is irrelevant, and a Rule for it would fire on every truck driving past. Define the phase once as a Rule and refer to it:
 
 ```java
-.rule("Running", r -> r.when(rpm.above(100)).forDuration(10_000))
-.rule("RoughRunning", r -> r.when(during("Running").and(vibration.above(4))))
+Rule running = Rule.named("Running").when(rpm.above(100)).forDuration(10_000);
+Rule roughRunning = Rule.named("RoughRunning").when(during(running).and(vibration.above(4)));
 ```
 
 `RoughRunning` Ends at the latest when `Running` Ends. The phase Rule brings its own timing, here ten seconds of start-up during which vibration is ignored, which a plain `rpm.above(100)` could not express.
@@ -428,56 +431,56 @@ Rules can refer to the Events of Rules declared before them. This composes simpl
 *Combining Events that have their own timing.* Each part keeps its own duration, End Condition and hysteresis, and the combination holds while both are Confirmed:
 
 ```java
-.rule("Tachycardia", r -> r.when(hr.above(100)).forDuration(30_000))
-.rule("Desaturation", r -> r.when(spo2.below(90)).forDuration(10_000))
-.rule("HypoxicTachycardia", r -> r.when(during("Tachycardia").and(during("Desaturation"))))
+Rule tachycardia = Rule.named("Tachycardia").when(hr.above(100)).forDuration(30_000);
+Rule desaturation = Rule.named("Desaturation").when(spo2.below(90)).forDuration(10_000);
+Rule hypoxicTachycardia = Rule.named("HypoxicTachycardia").when(during(tachycardia).and(during(desaturation)));
 ```
 
 ### `after`: sequences
 
-`after("A")` holds once an A Event has Ended. On its own this stays true forever, so it is narrowed:
+`after(a)` holds once an A Event has Ended. On its own this stays true forever, so it is narrowed:
 
 - `.within(ms)`: the most recent A Event Ended at most `ms` ago.
-- `.unless("B", "C", ...)`: no B or C Event has been Confirmed since the most recent A Event Ended.
+- `.unless(b, c, ...)`: no B or C Event has been Confirmed since the most recent A Event Ended.
 
 ```java
-.rule("DoorOpen", r -> r.when(door.above(0.5)))
-.rule("ExcursionAfterDoor", r -> r
-    .when(after("DoorOpen").within(Duration.ofMinutes(30)).and(temp.above(8))))
+Rule doorOpen = Rule.named("DoorOpen").when(door.above(0.5));
+Rule excursionAfterDoor = Rule.named("ExcursionAfterDoor")
+    .when(after(doorOpen).within(Duration.ofMinutes(30)).and(temp.above(8)));
 ```
 
 ```java
-.rule("Lift", r -> r.when(weight.above(500)))
-.rule("Maintenance", r -> r.when(serviceMode.above(0.5)))
-.rule("LiftSinceService", r -> r.when(after("Lift").unless("Maintenance")))
+Rule lift = Rule.named("Lift").when(weight.above(500));
+Rule maintenance = Rule.named("Maintenance").when(serviceMode.above(0.5));
+Rule liftSinceService = Rule.named("LiftSinceService").when(after(lift).unless(maintenance));
 ```
 
 Interrupting Events are named explicitly with `unless` rather than implied, so a sequence means exactly what it says. [ADR-0002](docs/adr/0002-explicit-unless-for-sequences.md) explains why.
 
 ### `count`: how many Events
 
-`count("A")` is the number of A Events Confirmed so far, an Expression like any other. `.within(ms)` counts only those Confirmed in a sliding window ending now:
+`count(a)` is the number of A Events Confirmed so far, an Expression like any other. `.within(ms)` counts only those Confirmed in a sliding window ending now:
 
 ```java
-.rule("Run", r -> r.when(power.above(500)).forDuration(30_000))
-.rule("FrequentStarts", r -> r.when(count("Run").within(Duration.ofHours(1)).above(3)))
-.rule("ServiceDue", r -> r.when(count("Run").above(10_000)))
+Rule run = Rule.named("Run").when(power.above(500)).forDuration(30_000);
+Rule frequentStarts = Rule.named("FrequentStarts").when(count(run).within(Duration.ofHours(1)).above(3));
+Rule serviceDue = Rule.named("ServiceDue").when(count(run).above(10_000));
 ```
 
 An Event counts from the moment it is Confirmed, so a running Event is included.
 
 ### `totalDuration`: time spent in Events
 
-`totalDuration("A")` is the summed duration in milliseconds of all A Events: the Ended ones in full, plus a running one up to now. It grows continuously while an A Event runs, so a limit is detected the moment it is crossed:
+`totalDuration(a)` is the summed duration in milliseconds of all A Events: the Ended ones in full, plus a running one up to now. It grows continuously while an A Event runs, so a limit is detected the moment it is crossed:
 
 ```java
-.rule("Excursion", r -> r.when(temp.above(8)))
-.rule("CumulativeLimit", r -> r.when(totalDuration("Excursion").above(45 * 60_000)))
+Rule excursion = Rule.named("Excursion").when(temp.above(8));
+Rule cumulativeLimit = Rule.named("CumulativeLimit").when(totalDuration(excursion).above(45 * 60_000));
 ```
 
 ### `latest`: values of the most recent Event
 
-`latest("A")` gives access to the most recent Confirmed A Event, whether still running or Ended:
+`latest(a)` gives access to the most recent Confirmed A Event, whether still running or Ended:
 
 - `.min(x)`, `.max(x)`, `.mean(x)`: its [Aggregates](#aggregates) of Channel `x`, so far if it is running. Rule A aggregates `x` for this automatically.
 - `.duration()`: its duration in ms, up to now if it is running.
@@ -485,16 +488,16 @@ An Event counts from the moment it is Confirmed, so a running Event is included.
 Each is an Expression, undefined while there has been no A Event. This relates the present to an earlier Event, for example a partial set-down of a lifted load:
 
 ```java
-.rule("LoadLifted", r -> r.when(weight.above(500)).endWhen(weight.below(50)))
-.rule("PartialSetDown", r -> r.when(during("LoadLifted")
-    .and(weight.below(latest("LoadLifted").max(weight).times(0.5)))))
+Rule loadLifted = Rule.named("LoadLifted").when(weight.above(500)).endWhen(weight.below(50));
+Rule partialSetDown = Rule.named("PartialSetDown").when(during(loadLifted)
+    .and(weight.below(latest(loadLifted).max(weight).times(0.5))));
 ```
 
 or a machine cycle that is taking too long, detected while it is still running:
 
 ```java
-.rule("Cycle", r -> r.when(spindle.above(0.5)))
-.rule("SlowCycle", r -> r.when(during("Cycle").and(latest("Cycle").duration().above(120_000))))
+Rule cycle = Rule.named("Cycle").when(spindle.above(0.5));
+Rule slowCycle = Rule.named("SlowCycle").when(during(cycle).and(latest(cycle).duration().above(120_000)));
 ```
 
 ## Aggregates
@@ -525,8 +528,9 @@ Aggregates in the Pending and Confirmed snapshots cover the Event so far. Readin
 For a recorded series, `detect` runs all Samples through a fresh Detector, closes it and returns every Ended Event, in the order they Ended:
 
 ```java
+Rule loadLifted = Rule.named("LoadLifted").when(weight.above(500));
 Detector detector = Detector.builder()
-    .rule("LoadLifted", r -> r.when(weight.above(500)))
+    .rules(loadLifted)
     .build();
 
 List<Event> events = detector.detect(List.of(
@@ -540,9 +544,10 @@ List<Event> events = detector.detect(List.of(
 **Sampling rate.** For regularly sampled data without timestamps, declare the rate on the builder and push only values. The timestamp of Sample `i` (from 0) is `round(i * 1000 / hz)`:
 
 ```java
+Rule spike = Rule.named("Spike").when(accel.above(3)).forSamples(5);
 Detector detector = Detector.builder()
     .samplingRate(50)    // 50 Hz: Samples are 20 ms apart
-    .rule("Spike", r -> r.when(accel.above(3)).forSamples(5))
+    .rules(spike)
     .build();
 
 detector.push(Map.of(accel, 0.1));                     // timestamp 0
@@ -558,8 +563,9 @@ The rate may be at most 1000 Hz, since timestamps have millisecond resolution. W
 A Detector only evaluates Rules when something happens. If Samples stop arriving, nothing happens: a duration is never reached, and a sensor that fell silent goes unnoticed. `advanceTo(timestamp)` tells the Detector that time has passed without new data, typically driven by a timer:
 
 ```java
+Rule sensorLost = Rule.named("SensorLost").when(hr.age().above(10_000));
 Detector detector = Detector.builder()
-    .rule("SensorLost", r -> r.when(hr.age().above(10_000)))
+    .rules(sensorLost)
     .build();
 
 detector.push(0, Map.of(hr, 72.0));
@@ -580,10 +586,11 @@ Some Channels report one-off occurrences rather than a state: a deployment, a bu
 Channel deploy = Channel.pulse("deploy");
 Channel errors = Channel.named("errors");
 
+Rule deployment = Rule.named("Deployment").when(deploy.above(0.5));
+Rule regression = Rule.named("Regression")
+    .when(after(deployment).within(30 * 60_000).and(errors.above(5)));
 Detector detector = Detector.builder()
-    .rule("Deployment", r -> r.when(deploy.above(0.5)))
-    .rule("Regression", r -> r
-        .when(after("Deployment").within(30 * 60_000).and(errors.above(5))))
+    .rules(deployment, regression)
     .build();
 
 detector.push(0,      Map.of(errors, 1.0));
@@ -599,20 +606,21 @@ A Pulse Channel's value exists only in the Sample that carries it. In every othe
 
 ## Restarts: History
 
-A Detector keeps its state in memory. After a restart, Rules like `after("Maintenance")` would have forgotten the last maintenance. Pass Events stored before the restart as History:
+A Detector keeps its state in memory. After a restart, Rules like `after(maintenance)` would have forgotten the last maintenance. Pass Events stored before the restart as History:
 
 ```java
 // before the restart: store Ended Events, e.g. in onEnded
 List<Event> stored = loadFromDatabase();
 
+Rule maintenance = Rule.named("Maintenance").when(serviceMode.above(0.5));
+Rule overdueService = Rule.named("OverdueService").when(after(maintenance).within(Duration.ofDays(90)).not());
 Detector detector = Detector.builder()
-    .rule("Maintenance", r -> r.when(serviceMode.above(0.5)))
-    .rule("OverdueService", r -> r.when(after("Maintenance").within(Duration.ofDays(90)).not()))
+    .rules(maintenance, overdueService)
     .history(stored)
     .build();
 ```
 
-History Events must be Confirmed and Ended (both `confirmed()` and `end()` present), and the first Sample must come after the latest of their ends. `after`, `unless`, `count`, `totalDuration` and `latest(...).duration()` take them into account. They carry no Aggregates for `latest(...).min/max/mean`, and they are not reported to the listener again.
+History Events are matched to Rules by `name()`, so each must belong to a Rule added to the Detector. They must be Confirmed and Ended (both `confirmed()` and `end()` present), and the first Sample must come after the latest of their ends. `after`, `unless`, `count`, `totalDuration` and `latest(...).duration()` take them into account. They carry no Aggregates for `latest(...).min/max/mean`, and they are not reported to the listener again.
 
 ## Errors and validation
 
@@ -620,12 +628,14 @@ Mistakes are reported as early as possible, most of them when the Detector is bu
 
 | Mistake                                                               | Reported by                         |
 | --------------------------------------------------------------------- | ----------------------------------- |
-| A Rule without `when`, an empty or duplicate Rule name                | `rule(...)`: `IllegalArgumentException` |
+| An empty Rule name                                                    | `Rule.named(...)`: `IllegalArgumentException` |
+| A Rule without `when`, or two Rules with the same name                | `rules(...)`: `IllegalArgumentException` |
 | `forDuration`/`forSamples` before any `when`/`endWhen`                | `IllegalStateException`             |
 | Negative durations, `forSamples(0)`, `between` with `low > high`      | `IllegalArgumentException`          |
 | A sampling rate outside (0, 1000] Hz                                  | `samplingRate(...)`: `IllegalArgumentException` |
 | A History Event that has not Ended                                    | `history(...)`: `IllegalArgumentException` |
-| A Rule referring to itself or to a Rule declared after it             | `build()`: `IllegalArgumentException` |
+| A Rule referring to itself, to a Rule added after it or not added     | `build()`: `IllegalArgumentException` |
+| A History Event whose name matches no added Rule                      | `build()`: `IllegalArgumentException` |
 | One Channel name used both as a Pulse Channel and as an ordinary one  | `build()`: `IllegalArgumentException` |
 | An empty Channel name                                                 | `Channel.named`/`Channel.pulse`: `IllegalArgumentException` |
 | A timestamp not after the previous one or the History's latest end    | `push`/`advanceTo`: `IllegalArgumentException` |
