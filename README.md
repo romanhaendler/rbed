@@ -22,7 +22,7 @@ Vocabulary (Sample, Channel, Condition, Rule, Event, Detector, ...) is defined i
 - [Pulse Channels](#pulse-channels)
 - [Restarts: History](#restarts-history)
 - [Errors and validation](#errors-and-validation)
-- [Examples](#examples), [Performance](#performance), [Notes](#notes)
+- [Examples](#examples), [Performance](#performance), [Notes](#notes), [License](#license)
 
 ## Install
 
@@ -697,3 +697,7 @@ The performance tests are excluded from the default build because timings depend
 - A Detector is single-use and not thread-safe. Use one per data stream, and feed it from one thread at a time.
 - Rules and the listener are fixed when the Detector is built. To change Rules, build a new Detector and pass the Events so far as [History](#restarts-history).
 - `EventListener` shares its simple name with `java.util.EventListener`. With `import java.util.*;`, import `io.github.romanhaendler.rbed.EventListener` explicitly.
+
+## License
+
+[MIT](LICENSE)
