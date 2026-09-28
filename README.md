@@ -1,6 +1,6 @@
 # rbed: rule-based event detection
 
-[![CI](https://github.com/romanhaendler/rbed/actions/workflows/ci.yml/badge.svg)](https://github.com/romanhaendler/rbed/actions/workflows/ci.yml)
+[![CI](https://github.com/romanhaendler/rbed/actions/workflows/ci.yml/badge.svg)](https://github.com/romanhaendler/rbed/actions/workflows/ci.yml) [![Maven Central](https://img.shields.io/maven-central/v/io.github.romanhaendler/rbed)](https://central.sonatype.com/artifact/io.github.romanhaendler/rbed)
 
 A small Java 17 library that finds **Events** in multi-channel time series by evaluating declarative **Rules**, on a live stream or over a recorded series. Zero runtime dependencies.
 
