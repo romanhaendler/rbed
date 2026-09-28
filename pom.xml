@@ -6,7 +6,7 @@
 
   <groupId>io.github.romanhaendler</groupId>
   <artifactId>rbed</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <version>0.1.0</version>
   <name>rbed</name>
   <description>Rule-based event detection in time series. Zero runtime dependencies.</description>
   <url>https://github.com/romanhaendler/rbed</url>

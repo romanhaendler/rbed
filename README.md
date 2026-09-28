@@ -26,18 +26,20 @@ Vocabulary (Sample, Channel, Condition, Rule, Event, Detector, ...) is defined i
 
 ## Install
 
-Not yet published. Build and install locally:
-
-```sh
-mvn install
-```
+rbed is on Maven Central and needs Java 17 or later. Maven:
 
 ```xml
 <dependency>
   <groupId>io.github.romanhaendler</groupId>
   <artifactId>rbed</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <version>0.1.0</version>
 </dependency>
+```
+
+Gradle:
+
+```kotlin
+implementation("io.github.romanhaendler:rbed:0.1.0")
 ```
 
 The library is the Java module `io.github.romanhaendler.rbed` (`requires io.github.romanhaendler.rbed;`) and has a single package of the same name. It also works on the class path.
