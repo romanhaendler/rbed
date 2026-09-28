@@ -4,11 +4,34 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>io.github.rbed</groupId>
+  <groupId>io.github.romanhaendler</groupId>
   <artifactId>rbed</artifactId>
   <version>0.1.0-SNAPSHOT</version>
   <name>rbed</name>
   <description>Rule-based event detection in time series. Zero runtime dependencies.</description>
+  <url>https://github.com/romanhaendler/rbed</url>
+
+  <licenses>
+    <license>
+      <name>MIT License</name>
+      <url>https://opensource.org/license/mit</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <id>romanhaendler</id>
+      <name>Roman Händler</name>
+      <url>https://github.com/romanhaendler</url>
+    </developer>
+  </developers>
+
+  <scm>
+    <connection>scm:git:https://github.com/romanhaendler/rbed.git</connection>
+    <developerConnection>scm:git:ssh://git@github.com/romanhaendler/rbed.git</developerConnection>
+    <url>https://github.com/romanhaendler/rbed</url>
+  </scm>
 
   <properties>
     <maven.compiler.release>17</maven.compiler.release>
@@ -41,7 +64,7 @@
                 <arg>--add-modules</arg>
                 <arg>jdk.management</arg>
                 <arg>--add-reads</arg>
-                <arg>rbed=jdk.management,java.management</arg>
+                <arg>io.github.romanhaendler.rbed=jdk.management,java.management</arg>
               </compilerArgs>
             </configuration>
           </execution>
@@ -59,13 +82,77 @@
           <groups>${surefire.groups}</groups>
           <excludedGroups>${surefire.excludedGroups}</excludedGroups>
           <!-- lets the performance tests measure allocations via the platform MXBean -->
-          <argLine>--add-modules jdk.management --add-reads rbed=jdk.management,java.management</argLine>
+          <argLine>--add-modules jdk.management --add-reads io.github.romanhaendler.rbed=jdk.management,java.management</argLine>
         </configuration>
       </plugin>
     </plugins>
   </build>
 
   <profiles>
+    <profile>
+      <!-- Sources, javadoc, signatures and the upload to Maven Central: mvn deploy -Prelease -->
+      <id>release</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-source-plugin</artifactId>
+            <version>3.4.0</version>
+            <executions>
+              <execution>
+                <id>attach-sources</id>
+                <goals>
+                  <goal>jar-no-fork</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <version>3.12.0</version>
+            <configuration>
+              <!-- the API is documented in summary sentences, not @param/@return tags -->
+              <doclint>all,-missing</doclint>
+            </configuration>
+            <executions>
+              <execution>
+                <id>attach-javadocs</id>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>3.2.8</version>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <version>0.11.0</version>
+            <extensions>true</extensions>
+            <configuration>
+              <publishingServerId>central</publishingServerId>
+              <!-- uploads and validates; publishing is a manual click on central.sonatype.com -->
+              <autoPublish>false</autoPublish>
+              <waitUntil>validated</waitUntil>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
     <profile>
       <id>performance</id>
       <properties>

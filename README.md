@@ -1,5 +1,7 @@
 # rbed: rule-based event detection
 
+[![CI](https://github.com/romanhaendler/rbed/actions/workflows/ci.yml/badge.svg)](https://github.com/romanhaendler/rbed/actions/workflows/ci.yml)
+
 A small Java 17 library that finds **Events** in multi-channel time series by evaluating declarative **Rules**, on a live stream or over a recorded series. Zero runtime dependencies.
 
 You describe *what* an Event is ("the weight is above 500 kg for 2 seconds", "the temperature rises again within 10 minutes after the door was opened"), and rbed tells you *when* it happened: when it started, when it was confirmed, when it ended, and what the data looked like in between.
@@ -32,18 +34,18 @@ mvn install
 
 ```xml
 <dependency>
-  <groupId>io.github.rbed</groupId>
+  <groupId>io.github.romanhaendler</groupId>
   <artifactId>rbed</artifactId>
   <version>0.1.0-SNAPSHOT</version>
 </dependency>
 ```
 
-The library is the Java module `rbed` (`requires rbed;`) and has a single package, `rbed`.
+The library is the Java module `io.github.romanhaendler.rbed` (`requires io.github.romanhaendler.rbed;`) and has a single package of the same name. It also works on the class path.
 
 ## A first Rule
 
 ```java
-import static rbed.Conditions.*;
+import static io.github.romanhaendler.rbed.Conditions.*;
 
 Channel temp = Channel.named("temp");
 
@@ -264,7 +266,7 @@ Rules are evaluated in the order they are added with `rules(...)`, at every Samp
 Conditions are built from static factory methods:
 
 ```java
-import static rbed.Conditions.*;
+import static io.github.romanhaendler.rbed.Conditions.*;
 ```
 
 There are two kinds of building blocks:
@@ -661,18 +663,18 @@ Mistakes are reported as early as possible, most of them when the Detector is bu
 
 Runnable end-to-end examples from different domains, each a test with its expected Events:
 
-| Domain           | Example                                                           | Shows                                                    |
-| ---------------- | ----------------------------------------------------------------- | -------------------------------------------------------- |
-| Cranes           | `src/test/java/rbed/CraneScenarioTest.java`                       | hysteresis, `during`, classifying a load, partial set-down via `latest` |
-| Manufacturing    | `src/test/java/rbed/examples/MachineToolOverheatExample.java`     | sampling-rate mode, `rate`, combined `during`s           |
-| Building services | `src/test/java/rbed/examples/HvacShortCyclingExample.java`       | `after().within()`, `count().within()`                   |
-| Healthcare       | `src/test/java/rbed/examples/VitalSignsExample.java`              | `advanceTo` and `age()` for a silent sensor, `maxGap`    |
-| Automotive       | `src/test/java/rbed/examples/FleetTelematicsExample.java`         | deceleration via `rate`, distance via `integral`         |
-| Finance          | `src/test/java/rbed/examples/TradingSignalsExample.java`          | moving-average crosses, truncated start after warm-up    |
-| Logistics        | `src/test/java/rbed/examples/ColdChainExample.java`               | attributing a cause with `after`, `totalDuration` limit  |
-| Environment      | `src/test/java/rbed/examples/FloodWarningExample.java`            | smoothed rate of a moving average, hysteresis            |
-| Sports           | `src/test/java/rbed/examples/IntervalTrainingExample.java`        | `after`, rep count via `count`, listener-side timing     |
-| IT operations    | `src/test/java/rbed/examples/DeploymentRegressionExample.java`    | a Pulse Channel reporting deployments                    |
+| Domain | Example | Shows |
+| --- | --- | --- |
+| Cranes | [CraneScenarioTest](src/test/java/io/github/romanhaendler/rbed/CraneScenarioTest.java) | hysteresis, `during`, classifying a load, partial set-down via `latest` |
+| Manufacturing | [MachineToolOverheatExample](src/test/java/io/github/romanhaendler/rbed/examples/MachineToolOverheatExample.java) | sampling-rate mode, `rate`, combined `during`s |
+| Building services | [HvacShortCyclingExample](src/test/java/io/github/romanhaendler/rbed/examples/HvacShortCyclingExample.java) | `after().within()`, `count().within()` |
+| Healthcare | [VitalSignsExample](src/test/java/io/github/romanhaendler/rbed/examples/VitalSignsExample.java) | `advanceTo` and `age()` for a silent sensor, `maxGap` |
+| Automotive | [FleetTelematicsExample](src/test/java/io/github/romanhaendler/rbed/examples/FleetTelematicsExample.java) | deceleration via `rate`, distance via `integral` |
+| Finance | [TradingSignalsExample](src/test/java/io/github/romanhaendler/rbed/examples/TradingSignalsExample.java) | moving-average crosses, truncated start after warm-up |
+| Logistics | [ColdChainExample](src/test/java/io/github/romanhaendler/rbed/examples/ColdChainExample.java) | attributing a cause with `after`, `totalDuration` limit |
+| Environment | [FloodWarningExample](src/test/java/io/github/romanhaendler/rbed/examples/FloodWarningExample.java) | smoothed rate of a moving average, hysteresis |
+| Sports | [IntervalTrainingExample](src/test/java/io/github/romanhaendler/rbed/examples/IntervalTrainingExample.java) | `after`, rep count via `count`, listener-side timing |
+| IT operations | [DeploymentRegressionExample](src/test/java/io/github/romanhaendler/rbed/examples/DeploymentRegressionExample.java) | a Pulse Channel reporting deployments |
 
 ## Performance
 
@@ -694,4 +696,4 @@ The performance tests are excluded from the default build because timings depend
 
 - A Detector is single-use and not thread-safe. Use one per data stream, and feed it from one thread at a time.
 - Rules and the listener are fixed when the Detector is built. To change Rules, build a new Detector and pass the Events so far as [History](#restarts-history).
-- `rbed.EventListener` shares its simple name with `java.util.EventListener`. With `import java.util.*;`, import `rbed.EventListener` explicitly.
+- `EventListener` shares its simple name with `java.util.EventListener`. With `import java.util.*;`, import `io.github.romanhaendler.rbed.EventListener` explicitly.
