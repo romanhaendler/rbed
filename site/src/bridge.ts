@@ -19,6 +19,8 @@ export type Scenario = {
   channels: string[];
   /** Those of the Channels that are Pulse Channels: a value only in the Samples that carry one. */
   pulse: string[];
+  /** The Rule whose latest Event the Rules read with latest(...), if any. */
+  latest?: string;
   /** Names of the Rules, which are the names of their Events. */
   rules: string[];
   parameters: Parameter[];
@@ -37,6 +39,10 @@ export type Event = {
   aggregates: Record<string, Aggregates>;
 };
 
+/** A value at every Sample that a Rule compares with its limit, such as a running count of Events;
+    derived from the Events rbed reported. */
+export type Running = { label: string; unit: string; limit: number; values: number[] };
+
 /** A Pending Event that stopped holding before it was Confirmed, and when that was noticed. */
 export type Discard = { name: string; start: number; discarded: number };
 
@@ -45,6 +51,7 @@ export type Result =
       samples: { timestamp: number; values: Record<string, number | null> }[];
       events: Event[];
       discarded: Discard[];
+      running?: Running;
     }
   | { error: string };
 

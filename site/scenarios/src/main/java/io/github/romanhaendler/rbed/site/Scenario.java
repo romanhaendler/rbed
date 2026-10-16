@@ -1,6 +1,7 @@
 package io.github.romanhaendler.rbed.site;
 
 import io.github.romanhaendler.rbed.Channel;
+import io.github.romanhaendler.rbed.Event;
 import io.github.romanhaendler.rbed.Rule;
 import io.github.romanhaendler.rbed.Sample;
 import java.util.List;
@@ -39,8 +40,26 @@ abstract class Scenario {
     return List.of();
   }
 
+  /** The name of the Rule whose latest Event the Scenario's Rules read, or null for none. */
+  String readsLatest() {
+    return null;
+  }
+
   /** The Rules for the given value of every parameter, by parameter id. */
   abstract Rule[] rules(Map<String, Double> values);
+
+  /**
+   * A value at every Sample, plotted against the limit a Rule compares it with, such as a running
+   * count of Events. rbed does not expose an Expression's value, so it is derived from the Events
+   * rbed reported; BridgeTest checks that it is above its limit exactly while that Rule's Events
+   * run. None by default.
+   */
+  Running running(Map<String, Double> values, List<Sample> samples, List<Event> events) {
+    return null;
+  }
+
+  /** The value of {@link #running} at every Sample, its label and unit, and its limit. */
+  record Running(String label, String unit, double limit, double[] values) {}
 
   /** A number the reader can change, with its default and the limits of its control. */
   record Parameter(String id, String label, double defaultValue, double min, double max,

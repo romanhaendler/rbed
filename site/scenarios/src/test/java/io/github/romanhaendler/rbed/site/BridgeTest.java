@@ -223,6 +223,157 @@ class BridgeTest {
   }
 
   @Test
+  void duringAtDefaultsHoldsOnlyWhileBothGatingEventsAreConfirmed() {
+    Map<String, Object> result = run("during", "{}");
+    assertEquals(List.of("Desaturation 100000..160000", "HypoxicTachycardia 110000..160000",
+            "Tachycardia 40000..200000", "Desaturation 230000..260000"),
+        events(result));
+    assertEquals(List.of("110000", "110000", "70000", "240000"), confirmed(result));
+    assertEquals(List.of("Desaturation 20000..25000", "Tachycardia 230000..250000"),
+        discarded(result));
+  }
+
+  @Test
+  void aShorterTachycardiaDurationGatesTheLateDesaturationToo() {
+    assertEquals(List.of("Desaturation 100000..160000", "HypoxicTachycardia 110000..160000",
+            "Tachycardia 40000..200000", "Tachycardia 230000..250000",
+            "HypoxicTachycardia 245000..250000", "Desaturation 230000..260000"),
+        events(run("during", "{\"tachycardia\": 15}")));
+  }
+
+  @Test
+  void afterAtDefaultsAttributesOnlyTheExcursionSoonAfterTheDoor() {
+    assertEquals(List.of("DoorOpen 600000..720000", "ExcursionAfterDoor 900000..1500000",
+            "DoorOpen 3600000..3660000"),
+        events(run("after", "{}")));
+  }
+
+  @Test
+  void aWiderAfterWindowAttributesTheLateExcursionUntilTheWindowCloses() {
+    assertEquals(List.of("DoorOpen 600000..720000", "ExcursionAfterDoor 900000..1500000",
+            "DoorOpen 3600000..3660000", "ExcursionAfterDoor 6000000..6420000"),
+        events(run("after", "{\"window\": 45}")));
+  }
+
+  @Test
+  void aNarrowAfterWindowCutsTheExcursionShort() {
+    assertEquals(List.of("DoorOpen 600000..720000", "ExcursionAfterDoor 900000..1080000",
+            "DoorOpen 3600000..3660000"),
+        events(run("after", "{\"window\": 5}")));
+  }
+
+  @Test
+  void countAtDefaultsFindsTheFourthStartWithinAnHour() {
+    assertEquals(List.of("Run 600000..900000", "Run 1800000..2100000", "Run 2700000..3000000",
+            "Run 3600000..3900000", "FrequentStarts 3660000..4320000", "Run 9000000..9300000",
+            "Run 12000000..12300000"),
+        events(run("count", "{}")));
+  }
+
+  @Test
+  void aShorterCountWindowNeverHoldsFourStarts() {
+    assertEquals(List.of(), events(run("count", "{\"window\": 30}")).stream()
+        .filter(e -> e.startsWith("FrequentStarts")).toList());
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void countPlotsTheRunsConfirmedWithinTheWindowAgainstItsLimit() {
+    Map<String, Object> running = (Map<String, Object>) run("count", "{}").get("running");
+    assertEquals("count(run).within(60 min)", running.get("label"));
+    assertEquals(3.0, running.get("limit"));
+    List<Double> values = (List<Double>) running.get("values");   // one per minute
+    assertEquals(List.of(0.0, 1.0), values.subList(10, 12));      // Run Confirmed at 11
+    assertEquals(List.of(3.0, 4.0), values.subList(60, 62));      // the fourth Confirmed at 61
+    assertEquals(List.of(4.0, 3.0), values.subList(71, 73));      // the first leaves at 72
+  }
+
+  @Test
+  void countPlotIsAboveItsLimitExactlyWhileFrequentStartsRuns() {
+    assertPlotAboveLimitExactlyDuring("count", "{}", "FrequentStarts");
+    assertPlotAboveLimitExactlyDuring("count", "{\"window\": 120, \"limit\": 4}", "FrequentStarts");
+    assertPlotAboveLimitExactlyDuring("count", "{\"window\": 30, \"limit\": 1}", "FrequentStarts");
+  }
+
+  @Test
+  void totalDurationAtDefaultsCrossesFortyFiveMinutesInTheThirdExcursionAndStaysAbove() {
+    assertEquals(List.of("Excursion 1200000..2400000", "Excursion 4800000..5700000",
+            "Excursion 9000000..10500000", "CumulativeLimit 9660000..14400000 truncatedEnd"),
+        events(run("total-duration", "{}")));
+  }
+
+  @Test
+  void aTotalDurationLimitOfAnHourIsNeverExceeded() {
+    assertEquals(List.of("Excursion 1200000..2400000", "Excursion 4800000..5700000",
+            "Excursion 9000000..10500000"),
+        events(run("total-duration", "{\"limit\": 60}")));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void totalDurationPlotsTheMinutesSpentInExcursionsAgainstItsLimit() {
+    Map<String, Object> running = (Map<String, Object>) run("total-duration", "{}").get("running");
+    assertEquals("totalDuration(excursion)", running.get("label"));
+    assertEquals("min", running.get("unit"));
+    assertEquals(45.0, running.get("limit"));
+    List<Double> values = (List<Double>) running.get("values");   // one per minute
+    assertEquals(List.of(0.0, 1.0), values.subList(20, 22));      // grows while one runs
+    assertEquals(List.of(20.0, 20.0), values.subList(40, 42));     // and keeps it after
+    assertEquals(List.of(35.0, 45.0, 46.0), List.of(values.get(150), values.get(160), values.get(161)));
+    assertEquals(60.0, values.get(240));
+  }
+
+  @Test
+  void totalDurationPlotIsAboveItsLimitExactlyWhileCumulativeLimitRuns() {
+    assertPlotAboveLimitExactlyDuring("total-duration", "{}", "CumulativeLimit");
+    assertPlotAboveLimitExactlyDuring("total-duration", "{\"limit\": 30}", "CumulativeLimit");
+    assertPlotAboveLimitExactlyDuring("total-duration", "{\"limit\": 0}", "CumulativeLimit");
+  }
+
+  @Test
+  void latestAtDefaultsComparesEachLiftWithItsOwnMaximum() {
+    assertEquals(List.of("PartialSetDown 25000..30000", "LoadLifted 10000..40000",
+            "LoadLifted 60000..90000"),
+        events(run("latest", "{}")));
+  }
+
+  @Test
+  void aHigherLatestFractionFindsTheSecondLiftsSetDownToo() {
+    assertEquals(List.of("PartialSetDown 25000..30000", "LoadLifted 10000..40000",
+            "PartialSetDown 75000..80000", "LoadLifted 60000..90000"),
+        events(run("latest", "{\"fraction\": 0.6}")));
+  }
+
+  @Test
+  void catalogueNamesTheRuleWhoseLatestEventIsRead() {
+    Map<String, Map<String, Object>> byId = new HashMap<>();
+    for (Map<String, Object> s : scenarios()) byId.put((String) s.get("id"), s);
+    assertEquals("LoadLifted", byId.get("latest").get("latest"));
+    assertEquals(null, byId.get("first-rule").get("latest"));
+  }
+
+  /**
+   * The plotted value of a result is above its limit at exactly the Samples where an Event of the
+   * Rule that compares it runs: from its start, up to its end, which is included only for a
+   * Truncated end, since the Condition still held there.
+   */
+  @SuppressWarnings("unchecked")
+  static void assertPlotAboveLimitExactlyDuring(String scenarioId, String parameters, String rule) {
+    Map<String, Object> result = run(scenarioId, parameters);
+    Map<String, Object> running = (Map<String, Object>) result.get("running");
+    List<Double> values = (List<Double>) running.get("values");
+    List<Map<String, Object>> samples = (List<Map<String, Object>>) result.get("samples");
+    List<Map<String, Object>> events = ((List<Map<String, Object>>) result.get("events")).stream()
+        .filter(e -> rule.equals(e.get("name"))).toList();
+    for (int i = 0; i < samples.size(); i++) {
+      double t = (Double) samples.get(i).get("timestamp");
+      boolean runs = events.stream().anyMatch(e -> (Double) e.get("start") <= t
+          && (t < (Double) e.get("end") || e.get("truncatedEnd") == Boolean.TRUE && t == (Double) e.get("end")));
+      assertEquals(runs, values.get(i) > (Double) running.get("limit"), parameters + " at " + t);
+    }
+  }
+
+  @Test
   void catalogueHasTheFirstRuleWithItsThresholdAndSource() {
     Map<String, Object> first = scenarios().get(0);
     assertEquals("first-rule", first.get("id"));

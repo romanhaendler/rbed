@@ -21,7 +21,12 @@ public final class Bridge {
       new FirstRule(),
       new EventLifecycle(),
       new AggregatesScenario(),
-      new PulseChannels());
+      new PulseChannels(),
+      new During(),
+      new AfterScenario(),
+      new CountScenario(),
+      new TotalDuration(),
+      new Latest());
 
   private Bridge() {}
 
@@ -48,7 +53,9 @@ public final class Bridge {
         if (i > 0) out.append(',');
         Json.string(out, s.pulseChannels().get(i).name());
       }
-      out.append("],\"rules\":[");
+      out.append(']');
+      if (s.readsLatest() != null) Json.string(out.append(",\"latest\":"), s.readsLatest());
+      out.append(",\"rules\":[");
       Rule[] rules = s.rules(values(s, "{}"));
       for (int i = 0; i < rules.length; i++) {
         if (i > 0) out.append(',');
@@ -78,7 +85,8 @@ public final class Bridge {
    *     null stands for NaN
    * @param drawnChannels JSON object reserved for Channel values the reader drew; ignored for now
    * @return JSON object with the Samples, the Events and the Discarded Pending Events (with the
-   *     timestamp they were Discarded), or {@code {"error": message}} if rbed
+   *     timestamp they were Discarded), for a Scenario that plots one the {@code running} value
+   *     at every Sample with its limit, or {@code {"error": message}} if rbed
    *     rejected the Rules or the input was invalid
    */
   @JSExport
@@ -86,9 +94,10 @@ public final class Bridge {
     try {
       Scenario scenario = scenario(scenarioId);
       List<Sample> samples = scenario.samples();
+      Map<String, Double> values = values(scenario, parameters);
       Lifecycle lifecycle = new Lifecycle();
       Detector detector = Detector.builder()
-          .rules(scenario.rules(values(scenario, parameters)))
+          .rules(scenario.rules(values))
           .listener(lifecycle)
           .build();
       for (Sample sample : samples) {
@@ -96,7 +105,8 @@ public final class Bridge {
         detector.push(sample.timestamp(), sample.values());
       }
       detector.close();
-      return result(scenario, samples, lifecycle);
+      return result(scenario, samples, lifecycle,
+          scenario.running(values, samples, lifecycle.ended));
     } catch (RuntimeException e) {
       return Json.string(new StringBuilder("{\"error\":"), String.valueOf(e.getMessage()))
           .append('}').toString();
@@ -127,7 +137,8 @@ public final class Bridge {
     return values;
   }
 
-  private static String result(Scenario scenario, List<Sample> samples, Lifecycle lifecycle) {
+  private static String result(Scenario scenario, List<Sample> samples, Lifecycle lifecycle,
+      Scenario.Running running) {
     List<Event> events = lifecycle.ended;
     StringBuilder out = new StringBuilder("{\"samples\":[");
     for (int i = 0; i < samples.size(); i++) {
@@ -165,7 +176,18 @@ public final class Bridge {
           .append(",\"discarded\":").append(d.at())
           .append('}');
     }
-    return out.append("]}").toString();
+    out.append(']');
+    if (running != null) {
+      Json.string(out.append(",\"running\":{\"label\":"), running.label());
+      Json.string(out.append(",\"unit\":"), running.unit());
+      Json.number(out.append(",\"limit\":"), running.limit()).append(",\"values\":[");
+      for (int i = 0; i < running.values().length; i++) {
+        if (i > 0) out.append(',');
+        Json.number(out, running.values()[i]);
+      }
+      out.append("]}");
+    }
+    return out.append('}').toString();
   }
 
   /** The Event's Aggregates by Channel name, in the Scenario's Channel order; NaN becomes null. */

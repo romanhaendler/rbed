@@ -4,11 +4,11 @@
 // Aggregates, whose rows and the chart's bands select each other; a selected Event's Aggregates
 // are shown in full under the chart. Non-default values live in the address. The Detector runs
 // again on every change.
-import { LimitBand, Tooltip, type TooltipHit, useChart } from '@umriss-ui/charts';
+import { LimitBand, LimitLine, Tooltip, type TooltipHit, useChart } from '@umriss-ui/charts';
 import { Alert, Button, Checkbox, FormField, Slider, VisuallyHidden } from '@umriss-ui/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { type Aggregates, aggregatesLine, formatNumber } from './aggregates.ts';
-import { type Discard, type Event, type Scenario, run, source } from './bridge';
+import { type Discard, type Event, type Running, type Scenario, run, source } from './bridge';
 import { CodeBlock } from './CodeBlock';
 import { fromQuery, toQuery } from './parameters';
 
@@ -40,6 +40,8 @@ const channelColour = (scenario: Scenario, channel: string) =>
   CHANNEL_COLOURS[scenario.channels.indexOf(channel) % CHANNEL_COLOURS.length];
 
 const eventKey = (e: Event) => `${e.name} ${e.start}`;
+/** The highlight of the Event latest(...) reads at the hovered time. */
+const LATEST_COLOUR = 'var(--u-color-warning)';
 
 function niceStep(rough: number): number {
   const power = 10 ** Math.floor(Math.log10(rough));
@@ -97,12 +99,31 @@ function ruleState(lifecycle: Lifecycle, t: number, millis: number): string {
   return 'no Event';
 }
 
-type Shown = { scenario: Scenario; rows: Row[]; lifecycle: Lifecycle; channels: string[]; rules: string[] };
+/** The Event latest(...) reads at time t: the most recently Confirmed one, running or Ended. */
+const latestEvent = (events: Event[], t: number, millis: number) => events.findLast((e) => e.confirmed / millis <= t);
+
+type Shown = {
+  scenario: Scenario;
+  rows: Row[];
+  lifecycle: Lifecycle;
+  channels: string[];
+  rules: string[];
+  /** Told the key of the Event latest(...) reads at the hovered time; undefined when there is
+      none. A state setter, so it stays the same function across renders. */
+  hoverLatest: (key: string | undefined) => void;
+};
 
 /** The tooltip: every shown Channel's value and Rule's state at the hovered time. */
 function Readout({ shown, t }: { shown: Shown; t: number }) {
   const { scenario, rows, lifecycle, channels, rules } = shown;
   const row = rows.findLast((r) => r.t <= t) ?? rows[0];
+  const { millis } = scenario.timeUnit;
+  const latest = scenario.latest && latestEvent(ofRule(lifecycle, scenario.latest).events, t, millis);
+  const latestKey = latest ? eventKey(latest) : undefined;
+  // The chart highlights that Event; there is no hover callback, so the readout reports it.
+  const { hoverLatest } = shown;
+  useEffect(() => hoverLatest(latestKey), [hoverLatest, latestKey]);
+  useEffect(() => () => hoverLatest(undefined), [hoverLatest]);
   const line = (name: string, colour: string, value: string) => (
     <div className="uc-tooltip-row" key={name}>
       <span className="uc-tooltip-chip" style={{ background: colour }} />
@@ -117,7 +138,13 @@ function Readout({ shown, t }: { shown: Shown; t: number }) {
       </div>
       <div className="uc-tooltip-list">
         {channels.map((c) => line(c, channelColour(scenario, c), String(row[c] ?? '–')))}
-        {rules.map((r) => line(r, EVENT_COLOUR, ruleState(ofRule(lifecycle, r), t, scenario.timeUnit.millis)))}
+        {rules.map((r) => line(r, EVENT_COLOUR, ruleState(ofRule(lifecycle, r), t, millis)))}
+        {scenario.latest &&
+          line(
+            `latest(${scenario.latest}) reads`,
+            LATEST_COLOUR,
+            latest ? `${latest.start / millis} to ${latest.end / millis} ${scenario.timeUnit.name}` : 'no Event yet',
+          )}
       </div>
     </>
   );
@@ -126,10 +153,13 @@ function Readout({ shown, t }: { shown: Shown; t: number }) {
 function EventChart({
   shown,
   selected,
+  latest,
   select,
 }: {
   shown: Shown;
   selected?: Event;
+  /** The Event latest(...) reads at the hovered time. */
+  latest?: Event;
   select: (key: string | undefined) => void;
 }) {
   const { scenario, rows, lifecycle, channels, rules } = shown;
@@ -150,6 +180,7 @@ function EventChart({
   return (
     <Chart
       height={300}
+      syncId={scenario.id}
       ariaLabel={`${scenario.channels.join(', ')} over time in ${unit}, with the Events of ${scenario.rules.join(', ')} as bands, Pending then Confirmed, and their lifecycle marked`}
     >
       <XAxis value="t" domain={[rows[0].t, rows[rows.length - 1].t]} label={`Time (${unit})`} />
@@ -167,6 +198,7 @@ function EventChart({
       {selected && (
         <LimitBand orientation="x" from={selected.start / millis} to={selected.end / millis} color="var(--u-color-accent)" />
       )}
+      {latest && <LimitBand orientation="x" from={latest.start / millis} to={latest.end / millis} color={LATEST_COLOUR} />}
       {rules.map((rule, i) => (
         <StateBand<BandRow>
           key={rule}
@@ -199,6 +231,27 @@ function EventChart({
         ),
       )}
       <Tooltip mode="x" render={(hit: TooltipHit<Row>) => <Readout shown={live.current} t={hit.xValue} />} />
+    </Chart>
+  );
+}
+
+/** A value a Rule compares with its limit, such as a running count of Events, at every Sample,
+    under the Events on the same time axis. */
+function RunningChart({ scenario, rows, running }: { scenario: Scenario; rows: Row[]; running: Running }) {
+  const data = rows.map((r, i) => ({ t: r.t, value: running.values[i] }));
+  const { Chart, XAxis, YAxis, Line } = useChart(data);
+  const { name: unit } = scenario.timeUnit;
+  return (
+    <Chart
+      height={160}
+      syncId={scenario.id}
+      ariaLabel={`${running.label} in ${running.unit} at every Sample, over time in ${unit}, against its limit ${running.limit}`}
+    >
+      <XAxis value="t" domain={[data[0].t, data[data.length - 1].t]} label={`Time (${unit})`} />
+      <YAxis label={`${running.label} (${running.unit})`} />
+      <LimitLine value={running.limit} label={`limit ${running.limit}`} severity="alarm" />
+      <Line value="value" name={running.label} color="var(--uc-series-4)" />
+      <Tooltip mode="x" />
     </Chart>
   );
 }
@@ -402,6 +455,7 @@ export function ScenarioView({ scenario }: { scenario: Scenario }) {
   const [parameters, setParameters] = useState(() => fromQuery(window.location.search, scenario.parameters));
   const [hidden, setHidden] = useState<string[]>([]);
   const [selected, select] = useState<string>();
+  const [hoveredLatest, hoverLatest] = useState<string>();
   const result = useMemo(() => run(scenario.id, parameters), [scenario.id, parameters]);
   const rows = useMemo<Row[]>(
     () => ('error' in result ? [] : result.samples.map((s) => ({ t: s.timestamp / scenario.timeUnit.millis, ...s.values }))),
@@ -451,6 +505,7 @@ export function ScenarioView({ scenario }: { scenario: Scenario }) {
       lifecycle: result,
       channels: scenario.channels.filter((c) => !hidden.includes(c)),
       rules: scenario.rules.filter((r) => !hidden.includes(r)),
+      hoverLatest,
     };
     const event = result.events.find((e) => eventKey(e) === selected);
     stage = (
@@ -459,8 +514,10 @@ export function ScenarioView({ scenario }: { scenario: Scenario }) {
           key={`${scenario.id} ${shown.rules.join(' ')}`}
           shown={shown}
           selected={event}
+          latest={result.events.find((e) => eventKey(e) === hoveredLatest)}
           select={select}
         />
+        {result.running && <RunningChart key={scenario.id} scenario={scenario} rows={rows} running={result.running} />}
         <LifecycleKey />
         <EventSummary scenario={scenario} lifecycle={result} />
         {event && <AggregatesPanel scenario={scenario} event={event} />}
