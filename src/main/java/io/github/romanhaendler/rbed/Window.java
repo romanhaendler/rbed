@@ -85,7 +85,15 @@ abstract class Window {
         started = true;
         first = time;
       }
-      if (size == detector.retentionLimit()) { // full: drop the oldest like one leaving by time
+      // evict by time first: an entry leaving by time is not a drop
+      while (size > 0 && time - times[head] > millis) {
+        sum.add(-values[head]);
+        head = (head + 1) % times.length;
+        size--;
+        detector.release();
+        evictedSinceExactSum++;
+      }
+      if (size == detector.retentionLimit()) { // still full: drop the oldest like one leaving by time
         sum.add(-values[head]);
         head = (head + 1) % times.length;
         size--;

@@ -273,6 +273,28 @@ class RetentionTest {
     assertEquals(1 + 3, d.retainedValues());
     d.push(100, Map.of(X, 1.0)); // the older entries leave by time
     assertEquals(1 + 1, d.retainedValues());
-    assertEquals(4, d.droppedValues()); // 3 while filling, 1 when the full window got the new value
+    assertEquals(3, d.droppedValues()); // only the 3 while filling; leaving by time is not a drop
+  }
+
+  @Test
+  void aGapWithAFullWindowLogsNoWarning() {
+    java.util.logging.Logger logger = java.util.logging.Logger.getLogger("io.github.romanhaendler.rbed");
+    List<java.util.logging.LogRecord> records = new ArrayList<>();
+    java.util.logging.Handler handler = new java.util.logging.Handler() {
+      @Override public void publish(java.util.logging.LogRecord r) { records.add(r); }
+      @Override public void flush() {}
+      @Override public void close() {}
+    };
+    logger.addHandler(handler);
+    Detector d = Detector.builder().retentionLimit(3)
+        .rules(Rule.named("R").when(X.averageOverDuration(10).above(0))).build();
+    try {
+      for (int i = 0; i < 3; i++) d.push(i, Map.of(X, 1.0));
+      d.push(100, Map.of(X, 1.0));
+    } finally {
+      logger.removeHandler(handler);
+    }
+    assertEquals(0, records.size());
+    assertEquals(0, d.droppedValues());
   }
 }
