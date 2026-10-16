@@ -2,7 +2,9 @@
 // for any list of pages: a page added to the manifest gets all of them.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { llmsFull, llmsTxt, pageHtml, sitemap, twin } from '../prerender.mjs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { javadocLinkErrors, llmsFull, llmsTxt, notFoundHtml, pageHtml, sitemap, twin } from '../prerender.mjs';
 
 const pages = [
   { path: '/', title: 'rbed', description: 'Rule-based event detection.' },
@@ -133,6 +135,69 @@ test("a page's HTML holds its head, its text, its Java source and its default Ev
   assert.throws(() => pageHtml('<html></html>', pages[1], markdown, facts), /template/);
 });
 
+test('the twin and the prerendered page leave out what speaks of the live controls', () => {
+  const live = 'Intro.\n\n<!-- live -->\nDrag the line.\n\nOutro.\n';
+  assert.equal(twin(live, facts, pages[1]), 'Intro.\n\nOutro.\n');
+  const html = pageHtml(template, pages[1], live, facts, pages);
+  assert.ok(html.includes('<p>Intro.</p>') && html.includes('<p>Outro.</p>'));
+  assert.ok(!html.includes('Drag'));
+});
+
+test("the twin lists a Scenario's parameters under its source, as the address names them", () => {
+  const parameters = [
+    { id: 'maxGap', label: 'Gap over', default: 10, min: 1, max: 60, step: 1, unit: 's' },
+    { id: 'push', label: 'Push', default: 1, min: 0, max: 1, step: 1, unit: '', options: [{ label: 'Each Sample' }, { label: 'Values only' }] },
+  ];
+  const withParameters = new Map([['gaps', { ...facts.get('gaps'), parameters }]]);
+  assert.ok(
+    twin(markdown, withParameters, pages[1]).includes(
+      '```\n\nParameters (in the page address as ?maxGap=…):\n\n' +
+        '- Gap over (`maxGap`): 1 to 60 s in steps of 1, default 10\n' +
+        '- Push (`push`): 0 for Each Sample, 1 for Values only (default)\n\nEvents at the default parameters:',
+    ),
+  );
+});
+
+test("a table cell's | does not end the cell in the twin", () => {
+  const piped = new Map([['gaps', { ...facts.get('gaps'), result: { ...facts.get('gaps').result, events: [{ ...facts.get('gaps').result.events[0], name: 'A|B' }] } }]]);
+  assert.ok(twin(markdown, piped, pages[1]).includes('| A\\|B | 2 |'));
+});
+
+test('without JavaScript, a page has the header and the list of pages, and says what the live page adds', () => {
+  const html = pageHtml(template, pages[1], markdown, facts, pages);
+  for (const part of [
+    '<header class="shellHead">',
+    '<a class="shellMark" href="/rbed/">rbed</a>',
+    '<a class="railEntry" href="/rbed/">Overview</a>',
+    '<a class="railEntry" href="/rbed/data-gaps/" aria-current="page">Data gaps</a>',
+    '<p>The live chart and its controls need JavaScript.',
+  ]) {
+    assert.ok(html.includes(part), part);
+  }
+  assert.ok(!html.includes("classList.add('js')"), 'the app marks the page when it runs, not an inline script');
+});
+
+test('404.html says there is no page and lists the pages', () => {
+  const html = notFoundHtml(template, pages);
+  assert.ok(html.includes('<title>No page · rbed</title><meta name="robots" content="noindex" />'));
+  assert.ok(html.includes('No page at this address'));
+  assert.ok(html.includes('<a class="railEntry" href="/rbed/data-gaps/">Data gaps</a>'));
+});
+
+test('a link into the Javadoc must name a type and member the generated Javadoc has', () => {
+  const apidocs = mkdtempSync(`${tmpdir()}/apidocs-`);
+  mkdirSync(`${apidocs}/m/p`, { recursive: true });
+  writeFileSync(`${apidocs}/m/p/Rule.html`, '<section id="when(m.Condition)"></section><a id="named(java.lang.String)"></a>');
+  const links =
+    '[a](../api/m/p/Rule.html#when%28m.Condition%29) [b](../api/m/p/Rule.html) [c](../api/m/p/Nope.html) ' +
+    '[d](../api/m/p/Rule.html#nope%28%29) [e](../cranes/) `[f](../api/x.html)`';
+  assert.deepEqual(javadocLinkErrors([[pages[1], links]], apidocs), [
+    '/data-gaps/ links ../api/m/p/Nope.html',
+    '/data-gaps/ links ../api/m/p/Rule.html#nope%28%29',
+  ]);
+  assert.deepEqual(javadocLinkErrors([[pages[0], '[x](api/m/p/Rule.html#named%28java.lang.String%29)']], apidocs), []);
+});
+
 test('llms.txt lists every twin by rubric, the reference material and llms-full.txt', () => {
   const text = llmsTxt(pages);
   assert.ok(text.startsWith('# rbed\n\n> Rule-based event detection.\n'));
@@ -141,7 +206,7 @@ test('llms.txt lists every twin by rubric, the reference material and llms-full.
     '## Guide\n\n- [Data gaps](https://romanhaendler.github.io/rbed/data-gaps.md): What maxGap does.',
     '- [README](https://github.com/romanhaendler/rbed/blob/main/README.md)',
     '- [Glossary](https://github.com/romanhaendler/rbed/blob/main/CONTEXT.md)',
-    '- [Javadoc](https://javadoc.io/doc/io.github.romanhaendler/rbed)',
+    '- [Javadoc](https://romanhaendler.github.io/rbed/api/)',
     '[llms-full.txt](https://romanhaendler.github.io/rbed/llms-full.txt)',
   ]) {
     assert.ok(text.includes(line), line);
@@ -160,14 +225,19 @@ test('llms-full.txt is the README with absolute links, the glossary and every tw
   );
   const order = ['See [the glossary]', '**Sample**: values.', '# rbed twin', '# Data gaps twin'].map((s) => text.indexOf(s));
   assert.ok(order.every((at, i) => at >= 0 && (i === 0 || at > order[i - 1])), `order ${order}`);
+  assert.ok(text.includes('Source: https://github.com/romanhaendler/rbed/blob/main/README.md\n\n# rbed\n'));
+  assert.ok(
+    text.includes('Source: https://github.com/romanhaendler/rbed/blob/main/CONTEXT.md\n\n# rbed glossary (CONTEXT.md)\n\n**Sample**'),
+    'the glossary is not a second "# rbed"',
+  );
 });
 
-test('the sitemap lists every page', () => {
+test('the sitemap lists every page, without a date that would change on every build', () => {
   assert.equal(
-    sitemap(pages, '2026-10-16'),
+    sitemap(pages),
     '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
-      '  <url><loc>https://romanhaendler.github.io/rbed/</loc><lastmod>2026-10-16</lastmod></url>\n' +
-      '  <url><loc>https://romanhaendler.github.io/rbed/data-gaps/</loc><lastmod>2026-10-16</lastmod></url>\n' +
+      '  <url><loc>https://romanhaendler.github.io/rbed/</loc></url>\n' +
+      '  <url><loc>https://romanhaendler.github.io/rbed/data-gaps/</loc></url>\n' +
       '</urlset>\n',
   );
 });

@@ -24,7 +24,10 @@ implementation("io.github.romanhaendler:rbed:{{version}}")
 
 ## A first Rule
 
-`HighTemperature` is an Event while the Channel `temp` is above a threshold. Move the threshold and the Detector runs again on the same three Samples. Or set Draw to `temp` and draw the values yourself, with the mouse or a finger.
+`HighTemperature` is an Event while the Channel `temp` is above a threshold.
+
+<!-- live -->
+Move the threshold and the Detector runs again on the same three Samples. Or set Draw to `temp` and draw the values yourself, with the mouse or a finger.
 
 <!-- scenario first-rule draw -->
 

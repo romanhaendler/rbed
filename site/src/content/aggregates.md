@@ -12,6 +12,7 @@ Reading a Channel the Rule does not aggregate throws an `IllegalArgumentExceptio
 
 `Drive` is an Event while `speed` is above a threshold. Its Condition uses `speed`, so `speed` is aggregated anyway; `.aggregate(temp)` adds the engine temperature. The log is irregular: a Sample every 2 seconds while the speed changes, every 10 seconds otherwise.
 
+<!-- live -->
 Select a Drive in the chart or in the table to see all its Aggregates. Move the threshold, and the Aggregates change with the Event's span.
 
 <!-- scenario aggregates draw -->

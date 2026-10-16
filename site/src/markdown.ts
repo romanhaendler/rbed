@@ -4,15 +4,19 @@
 //
 // Blocks: # to ### headings, paragraphs, - and 1. lists (one level; a list of nothing but links is
 // shown as tiles), ``` fenced code (```lang Label), and a Scenario marker on a line of its own:
-// <!-- scenario first-rule -->, or <!-- scenario first-rule draw --> to let the reader draw its Channels. Inline: `code`, **strong**, *em*, [text](url). Nothing else, and
-// no raw HTML: every character of the text is escaped.
+// <!-- scenario first-rule -->, or <!-- scenario first-rule draw --> to let the reader draw its
+// Channels. A line <!-- live --> makes the paragraph or list after it a block of its own, marked
+// live: it speaks of the live page's controls, so the prerendered page and the twin leave it out.
+// Inline: `code`, **strong**, *em*, [text](url). Nothing else, and no raw HTML: every character
+// of the text is escaped.
 
 export type Block =
-  | { kind: 'html'; html: string }
+  | { kind: 'html'; html: string; live?: true }
   | { kind: 'code'; language: string; label: string; source: string }
   | { kind: 'scenario'; id: string; draw: boolean };
 
 export const SCENARIO_MARKER = /^<!-- scenario (\S+)( draw)? -->$/;
+export const LIVE_MARKER = '<!-- live -->';
 
 const INLINE = /`([^`]+)`|\[((?:[^\]`]|`[^`]*`)+)\]\(([^)\s]+)\)|\*\*(.+?)\*\*|\*([^*\s][^*]*)\*/g;
 const ITEM = /^(?:[-*]|\d+\.) +/;
@@ -59,15 +63,21 @@ function list(items: string[], ordered: boolean): string {
 export function parse(markdown: string): Block[] {
   const blocks: Block[] = [];
   const html: string[] = [];
+  let live = false;
   const flush = () => {
-    if (html.length > 0) blocks.push({ kind: 'html', html: html.join('\n') });
+    if (html.length > 0) blocks.push({ kind: 'html', html: html.join('\n'), ...(live && { live: true as const }) });
     html.length = 0;
+    live = false;
   };
   const lines = markdown.split('\n');
   for (let i = 0; i < lines.length; ) {
     const line = lines[i].trimEnd();
     let m: RegExpExecArray | null;
     if (line === '') {
+      i++;
+    } else if (line === LIVE_MARKER) {
+      flush();
+      live = true;
       i++;
     } else if (line.startsWith('```')) {
       const [language, ...label] = line.slice(3).trim().split(/\s+/);
@@ -92,12 +102,14 @@ export function parse(markdown: string): Block[] {
         else items[items.length - 1] += ' ' + lines[i].trim();
       }
       html.push(list(items, ordered));
+      if (live) flush();
     } else {
       const text = [line.trim()];
       for (i++; i < lines.length && lines[i].trim() !== '' && !/^(#|```|<!--)/.test(lines[i]) && !ITEM.test(lines[i]); i++) {
         text.push(lines[i].trim());
       }
       html.push(`<p>${inline(text.join(' '))}</p>`);
+      if (live) flush();
     }
   }
   flush();

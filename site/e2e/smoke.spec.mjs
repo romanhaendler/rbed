@@ -42,13 +42,57 @@ test('drawing a Channel puts the drawn values into the Java source', async ({ pa
   const code = page.locator('.configuratorCode');
   await expect(code).toContainText('double[] values = {70, 72, 75, 85,');
   await page.getByRole('radiogroup', { name: 'Draw' }).locator('label', { hasText: 'temp' }).click();
-  const box = await page.locator('.drawStage').boundingBox();
-  await page.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.1);
+  // A level stroke across the whole plot (its rectangle as plotArea.ts reads it, the ends past
+  // it, where the values are clamped) gives every Sample the same value, whatever the margins.
+  const stage = page.locator('.drawStage');
+  const x = await stage.locator('.uc-axis-x.uc-axis-bottom').boundingBox();
+  const y = await stage.locator('.uc-axis-y.uc-axis-left').boundingBox();
+  await page.mouse.move(x.x - 4, y.y + y.height * 0.1);
   await page.mouse.down();
-  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.1, { steps: 5 });
+  await page.mouse.move(x.x + x.width + 4, y.y + y.height * 0.1, { steps: 20 });
   await page.mouse.up();
   await expect(code).not.toContainText('double[] values = {70, 72, 75, 85,');
-  await expect(code).toContainText('double[] values = {70,');
+  const values = /double\[\] values = \{([^}]*)\}/.exec(await code.innerText())[1].split(/,\s*/);
+  expect(new Set(values).size, values.join(', ')).toBe(1);
+  expect(Number(values[0])).toBeGreaterThan(85);
+});
+
+test('an unknown address shows that there is no page, an index.html address its page', async ({ page }) => {
+  await page.goto('no-such-page/');
+  await expect(page.locator('.shellContent h1')).toHaveText('No page at this address');
+  await page.goto('cranes/index.html');
+  await expect(page.locator('.shellContent h1')).toHaveText('Cranes');
+});
+
+test('a link to another page moves without a reload, and Back restores the page and its parameters', async ({ page }) => {
+  await page.goto('?threshold=70');
+  await expect(page.getByRole('slider', { name: 'Threshold' })).toHaveValue('70');
+  await page.evaluate(() => (window.loadedOnce = true));
+  await page.locator('.shellBody .rail a[href$="/event-lifecycle/"]').click();
+  await expect(page.locator('.shellContent h1')).toHaveText(PAGES.find((p) => p.path === '/event-lifecycle/').title);
+  expect(await page.evaluate(() => window.loadedOnce)).toBe(true);
+  await page.goBack();
+  await expect(page.locator('.shellContent h1')).toHaveText('rbed');
+  await expect(page.getByRole('slider', { name: 'Threshold' })).toHaveValue('70');
+  expect(await page.evaluate(() => window.loadedOnce)).toBe(true);
+});
+
+test.describe('without JavaScript', () => {
+  test.use({ javaScriptEnabled: false });
+
+  test('a page has its text, the header and every page in the navigation', async ({ page }) => {
+    await page.goto('end-conditions/');
+    await expect(page.locator('h1')).toHaveText(PAGES.find((p) => p.path === '/end-conditions/').title);
+    await expect(page.locator('.shellHead')).toBeVisible();
+    await expect(page.locator('.rail .railEntry')).toHaveCount(PAGES.length);
+    await expect(page.getByText('The live chart and its controls need JavaScript.')).toBeVisible();
+  });
+
+  test('404.html says there is no page and lists the pages', async ({ page }) => {
+    await page.goto('404.html');
+    await expect(page.locator('h1')).toHaveText('No page at this address');
+    await expect(page.locator('.rail .railEntry')).toHaveCount(PAGES.length);
+  });
 });
 
 test('on a phone, the Event and Discarded tables need no sideways scrolling', async ({ page }) => {

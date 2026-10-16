@@ -56,6 +56,16 @@ test('a Scenario marker ending in draw lets the reader draw its Channels', () =>
   assert.deepEqual(parse('<!-- scenario first-rule draw -->'), [{ kind: 'scenario', id: 'first-rule', draw: true }]);
 });
 
+test('a paragraph or list after a live marker is only for the live page', () => {
+  assert.deepEqual(parse('Before\n\n<!-- live -->\nMove the slider\nnow.\n\nAfter\n\n<!-- live -->\n- drag\n\nEnd'), [
+    { kind: 'html', html: '<p>Before</p>' },
+    { kind: 'html', html: '<p>Move the slider now.</p>', live: true },
+    { kind: 'html', html: '<p>After</p>' },
+    { kind: 'html', html: '<ul><li>drag</li></ul>', live: true },
+    { kind: 'html', html: '<p>End</p>' },
+  ]);
+});
+
 test('a list of nothing but links is a list of tiles', () => {
   assert.deepEqual(parse('- [**A** b](https://a/)\n- [C](https://c/)'), [
     {

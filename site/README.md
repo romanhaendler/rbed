@@ -6,8 +6,8 @@ Needs Java 17+, Maven and Node 22+. From a clean checkout, in this directory:
 
 ```sh
 npm ci
-npm run build     # installs rbed from the repository root, compiles the Scenarios with TeaVM, builds dist/
-npm test          # installs rbed, runs the JUnit tests and TeaVM, then the Node parity tests
+npm run build     # installs rbed from the repository root and builds its Javadoc, compiles the Scenarios with TeaVM, builds dist/
+npm test          # installs rbed (and its Javadoc), runs the JUnit tests and TeaVM, then the Node parity tests
 npm run build:web # builds dist/ from the module npm test compiled, as the Pages workflow does
 npm run preview   # serves dist/ at http://localhost:4173/rbed/
 npm run test:browser  # after build: the Playwright smoke tests against dist/, every page at 1280 and 375 px (once: npx playwright install chromium)
@@ -23,12 +23,15 @@ A page is three things; the build does the rest.
 2. **A manifest entry** in `src/pages.ts` at its README position: `path` (`/event-lifecycle/`), `title`, a one-sentence `description`, and `rubric` (`Guide` for a README chapter, `Examples` for a domain example).
 3. **Its text** in `src/content/<name>.md`, named after the path (`/event-lifecycle/` reads `event-lifecycle.md`; the front page is `index.md`). It starts with `# Title`. The live Scenario stands where a line `<!-- scenario <id> -->` stands; `<!-- scenario <id> draw -->` also lets the reader draw the values of its Channels (not its Pulse Channels), which suits concept pages. `{{version}}` is the rbed version of the build.
 
-The Markdown is a small subset (`src/markdown.ts`): `#` to `###` headings, paragraphs, `-` and `1.` lists (one level; a list of nothing but links is shown as tiles), fenced code with a language and an optional label (```` ```xml Maven ````), and inline `code`, `**strong**`, `*em*` and `[links](url)`; a link to another page is relative to the page (`../cranes/`), and the twin makes it absolute. No raw HTML, no tables.
+The Markdown is a small subset (`src/markdown.ts`): `#` to `###` headings, paragraphs, `-` and `1.` lists (one level; a list of nothing but links is shown as tiles), fenced code with a language and an optional label (```` ```xml Maven ````), and inline `code`, `**strong**`, `*em*` and `[links](url)`; a link to another page is relative to the page (`../cranes/`), and the twin makes it absolute. A link into the Javadoc is relative too (`../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#when%28io.github.romanhaendler.rbed.Condition%29`; `api/…` on the front page), and the build fails if the generated Javadoc has no such file or member. A line `<!-- live -->` before a paragraph or list marks it as speaking of the live page's controls ("Move the threshold…"): the prerendered page and the twin leave it out. No raw HTML, no tables.
 
 From these, `npm run build` (`prerender.mjs`, run at the end of `vite build`) writes for every page in the manifest:
 
-- `dist/<path>/index.html`: the app with the page's head (title, description, canonical, Open Graph, the twin link) and its text prerendered, each Scenario as its Java source and Event table at the default parameters; the app replaces it when it starts;
-- `dist/<name>.md`: the Markdown twin, the same text with each Scenario written out the same way;
-- `llms.txt`, `llms-full.txt` (README, glossary, every twin in navigation order) and `sitemap.xml`.
+- `dist/<path>/index.html`: the app with the page's head (title, description, canonical, Open Graph, the twin link) and its text prerendered in the site's header and navigation, each Scenario as its Java source and Event table at the default parameters; the app replaces it when it starts, and a reader without JavaScript reads it;
+- `dist/<name>.md`: the Markdown twin, the same text with each Scenario written out the same way, with its parameters listed;
+- `llms.txt`, `llms-full.txt` (README, glossary, every twin in navigation order), `sitemap.xml` and `404.html`;
+- `dist/api/`: rbed's Javadoc of the same commit, which `npm run install:rbed` builds (`mvn -Prelease javadoc:javadoc`).
+
+`node version.mjs` prints the rbed version of the root pom, which the scripts pass to the Scenario module (`-Drbed.version`; it has no default). `PORT=4391 npm run test:browser` serves the site on another port than 4173.
 
 The app reads the same Markdown for the page itself and for the search (Ctrl/Cmd+K), which finds a page by its title, its headings, its inline code and the methods its Java source calls. `public/og-image.png` is the sharing image of every page.

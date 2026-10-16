@@ -11,7 +11,7 @@ The documentation site (`site/`) shows Events detected live while the reader cha
 
 ## Consequences
 
-- The Scenario module builds against the rbed of the same commit (`mvn install` from the repository root first; `site/package.json` does both).
+- The Scenario module builds against the rbed of the same commit (`mvn install` from the repository root first; `site/package.json` does both). The site publishes the Javadoc of that rbed too, at `/rbed/api/`, and its pages link there, so a link names a method of the version the page runs; the build fails on a link to a type or member the Javadoc lacks.
 - Its tests run every bridge call on the JVM and repeat it against the compiled JavaScript in Node, so a difference between the two runtimes fails the build.
 - Code in the Scenario module avoids `String.format`, `String.split` and regular expressions, which pull large parts of TeaVM's class library into the module, and `long` in the exported signatures, which becomes a BigInt in JavaScript.
 - The two runtimes are not the same in every corner. `Math.round` of NaN or an infinity throws a `RangeError` in TeaVM, where the JVM returns 0, so the bridge rejects a parameter value that is not a number inside its control's range before any Scenario sees it (and the page moves an address's value into the range first). The parity test only compares what the JVM tests call, so a JVM test covers each such input.
