@@ -2,16 +2,19 @@
 // one time axis with a hover readout, a control per parameter, a reset, toggles for each Rule
 // and Channel, the Java source with the current values, and the Event table with each Event's
 // Aggregates, whose rows and the chart's bands select each other; a selected Event's Aggregates
-// are shown in full under the chart. Non-default values live in the address. The Detector runs
-// again on every change. A Scenario that plots an Expression adds it as a dashed line, with the
-// threshold its Rule compares it to and the stretches where it is undefined.
+// are shown in full under the chart. Non-default values live in the address. Where the page asks
+// for it, the reader can draw a Channel's values on the chart (not kept in the address). The
+// Detector runs again on every change. A Scenario that plots an Expression adds it as a dashed
+// line, with the threshold its Rule compares it to and the stretches where it is undefined.
 import { LimitBand, LimitLine, Tooltip, type TooltipHit, useChart } from '@umriss-ui/charts';
-import { Alert, Button, Checkbox, FormField, RadioGroup, Slider, VisuallyHidden } from '@umriss-ui/core';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Button, Checkbox, FormField, RadioGroup, SegmentedControl, Slider, VisuallyHidden } from '@umriss-ui/core';
+import { type PointerEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { type Aggregates, aggregatesLine, formatNumber } from './aggregates.ts';
 import { type Discard, type Event, type PlottedExpression, type Scenario, run, source } from './bridge';
 import { CodeBlock } from './CodeBlock';
+import { drawTo } from './draw.ts';
 import { fromQuery, toQuery, usedParameters } from './parameters';
+import { valueAt } from './plotArea.ts';
 
 type Row = { t: number } & Record<string, number | null>;
 /** A StateBand row: state 0 Pending, 1 Confirmed, null none; `key` names the Event a segment
@@ -88,6 +91,7 @@ function courseAxis(rows: Row[], channels: string[], lanes: number, also: number
   const domain: [number, number] = [top - ((top - bottom) * (COURSE_UNITS + lanes)) / COURSE_UNITS, top];
   return { ticks, domain };
 }
+type Course = ReturnType<typeof courseAxis>;
 
 /** Events and Discarded Pending Events, of every Rule or of one. */
 type Lifecycle = { events: Event[]; discarded: Discard[] };
@@ -135,6 +139,13 @@ type Shown = {
   restart?: number;
 };
 
+/** The Channels' axis of what is shown (with the plotted Expression and its threshold); it keeps
+    its scale while Channels are hidden. */
+const courseOf = ({ scenario, rows, rules, expression }: Shown): Course =>
+  expression
+    ? courseAxis(rows, [...scenario.channels, EXPRESSION], rules.length, [expression.threshold])
+    : courseAxis(rows, scenario.channels, rules.length);
+
 /** The tooltip: every shown Channel's value and Rule's state at the hovered time. */
 function Readout({ shown, t }: { shown: Shown; t: number }) {
   const { scenario, rows, lifecycle, channels, rules, expression } = shown;
@@ -162,10 +173,13 @@ function Readout({ shown, t }: { shown: Shown; t: number }) {
 
 function EventChart({
   shown,
+  course,
   selected,
   select,
 }: {
   shown: Shown;
+  /** The Channels' axis, from courseAxis; it keeps its scale while Channels are hidden. */
+  course: Course;
   selected?: Event;
   select: (key: string | undefined) => void;
 }) {
@@ -182,10 +196,6 @@ function EventChart({
   const live = useRef(shown);
   live.current = shown;
   const lanes = rules.length;
-  // The axis keeps its scale while Channels are hidden.
-  const course = expression
-    ? courseAxis(rows, [...scenario.channels, EXPRESSION], lanes, [expression.threshold])
-    : courseAxis(rows, scenario.channels, lanes);
   return (
     <Chart
       height={300}
@@ -268,6 +278,49 @@ function EventChart({
       )}
       <Tooltip mode="x" render={(hit: TooltipHit<Row>) => <Readout shown={live.current} t={hit.xValue} />} />
     </Chart>
+  );
+}
+
+/** Over the chart while the reader draws a Channel: a stroke with mouse, pen or finger sets its
+    values, rounded to a tenth of a tick step and kept inside the Channels' part of the plot.
+    `touch-action: none` keeps a finger from scrolling the page. It takes no focus, so keyboard
+    users keep the chart and the controls; drawing itself needs a pointer. */
+function DrawLayer({
+  x,
+  course,
+  draw,
+  end,
+}: {
+  x: [number, number];
+  course: Course;
+  draw: (t: number, value: number, first: boolean) => void;
+  end: () => void;
+}) {
+  const drawing = useRef(false);
+  const point = (e: PointerEvent<HTMLDivElement>, first: boolean) => {
+    const p = valueAt(e.currentTarget.parentElement!, e.clientX, e.clientY, x, course.domain);
+    if (p === undefined) return;
+    const step = course.ticks[1] - course.ticks[0];
+    const value = Math.round(Math.max(p.y, course.ticks[0] - step / 2) / (step / 10)) * (step / 10);
+    draw(p.x, Number(value.toPrecision(12)), first);
+  };
+  const stop = () => {
+    drawing.current = false;
+    end();
+  };
+  return (
+    <div
+      className="drawLayer"
+      onPointerDown={(e) => {
+        if (e.button !== 0) return;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        drawing.current = true;
+        point(e, true);
+      }}
+      onPointerMove={(e) => drawing.current && point(e, false)}
+      onPointerUp={stop}
+      onPointerCancel={stop}
+    />
   );
 }
 
@@ -496,12 +549,19 @@ function EventTable({
   );
 }
 
-export function ScenarioView({ scenario }: { scenario: Scenario }) {
+/** `draw` lets the reader draw the values of the Scenario's Channels other than Pulse Channels. */
+export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; draw?: boolean }) {
   const defaults = Object.fromEntries(scenario.parameters.map((p) => [p.id, p.default]));
   const [parameters, setParameters] = useState(() => fromQuery(window.location.search, scenario.parameters));
   const [hidden, setHidden] = useState<string[]>([]);
   const [selected, select] = useState<string>();
-  const result = useMemo(() => run(scenario.id, parameters), [scenario.id, parameters]);
+  // Drawn values by Channel, one per Sample; the Channel the pointer draws ('' for none); the
+  // Channels' axis held still during a stroke; the stroke's previous point.
+  const [drawn, setDrawn] = useState<Record<string, (number | null)[]>>({});
+  const [pen, setPen] = useState('');
+  const [frozen, setFrozen] = useState<Course>();
+  const stroke = useRef<[number, number]>(undefined);
+  const result = useMemo(() => run(scenario.id, parameters, drawn), [scenario.id, parameters, drawn]);
   const rows = useMemo<Row[]>(
     () =>
       'error' in result
@@ -527,7 +587,9 @@ export function ScenarioView({ scenario }: { scenario: Scenario }) {
 
   // A parameter only an unchosen option uses has no control.
   const used = usedParameters(scenario.source, scenario.parameters, parameters);
-  const atDefaults = scenario.parameters.every((p) => Object.is(parameters[p.id], p.default));
+  const atDefaults =
+    scenario.parameters.every((p) => Object.is(parameters[p.id], p.default)) && Object.keys(drawn).length === 0;
+  const drawable = scenario.channels.filter((c) => !scenario.pulse.includes(c));
   const toggle = (name: string) =>
     setHidden(hidden.includes(name) ? hidden.filter((n) => n !== name) : [...hidden, name]);
   const visibility = (names: string[], colour: (name: string) => string) =>
@@ -564,14 +626,32 @@ export function ScenarioView({ scenario }: { scenario: Scenario }) {
       restart: result.restart,
     };
     const event = result.events.find((e) => eventKey(e) === selected);
+    const course = frozen ?? courseOf(shown);
+    const times = rows.map((r) => r.t);
+    const drawPoint = (t: number, value: number, first: boolean) => {
+      const previous = first ? undefined : stroke.current;
+      const own = rows.map((r) => r[pen] ?? null);
+      setDrawn((d) => {
+        const next = drawTo(d[pen] ?? own, times, t, value, previous);
+        stroke.current = next.last;
+        return { ...d, [pen]: next.values };
+      });
+      if (first) setFrozen(course);
+    };
     stage = (
       <>
-        <EventChart
-          key={`${scenario.id} ${shown.rules.join(' ')}`}
-          shown={shown}
-          selected={event}
-          select={select}
-        />
+        <div className="drawStage">
+          <EventChart
+            key={`${scenario.id} ${shown.rules.join(' ')}`}
+            shown={shown}
+            course={course}
+            selected={event}
+            select={select}
+          />
+          {pen !== '' && (
+            <DrawLayer x={[times[0], times[times.length - 1]]} course={course} draw={drawPoint} end={() => setFrozen(undefined)} />
+          )}
+        </div>
         <LifecycleKey advances={result.advances.length > 0} />
         <EventSummary
           scenario={scenario}
@@ -590,7 +670,15 @@ export function ScenarioView({ scenario }: { scenario: Scenario }) {
         <div className="configuratorPanel">
           <div className="configuratorHead">
             <span>Parameters</span>
-            <Button variant="ghost" size="sm" disabled={atDefaults} onClick={() => setParameters(defaults)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={atDefaults}
+              onClick={() => {
+                setParameters(defaults);
+                setDrawn({});
+              }}
+            >
               Reset
             </Button>
           </div>
@@ -621,6 +709,18 @@ export function ScenarioView({ scenario }: { scenario: Scenario }) {
               />
             </FormField>
           ))}
+          {draw && drawable.length > 0 && (
+            <FormField
+              label="Draw"
+              hint={pen === '' ? 'Choose a Channel to draw its values on the chart.' : `Drag across the chart to draw ${pen}. Reset brings back the Scenario's values.`}
+            >
+              <SegmentedControl
+                options={[{ value: '', label: 'Off' }, ...drawable.map((c) => ({ value: c, label: c }))]}
+                value={pen}
+                onChange={setPen}
+              />
+            </FormField>
+          )}
           <fieldset className="configuratorShow">
             <legend>Show</legend>
             {visibility(scenario.rules, () => EVENT_COLOUR)}

@@ -24,9 +24,9 @@ implementation("io.github.romanhaendler:rbed:{{version}}")
 
 ## A first Rule
 
-`HighTemperature` is an Event while the Channel `temp` is above a threshold. Move the threshold and the Detector runs again on the same three Samples.
+`HighTemperature` is an Event while the Channel `temp` is above a threshold. Move the threshold and the Detector runs again on the same three Samples. Or set Draw to `temp` and draw the values yourself, with the mouse or a finger.
 
-<!-- scenario first-rule -->
+<!-- scenario first-rule draw -->
 
 Three steps are always the same:
 
@@ -36,17 +36,17 @@ Three steps are always the same:
 
 ## Domain examples
 
-Runnable end-to-end examples from different domains, each a test with its expected Events; those with a page of their own run live here.
+Runnable end-to-end examples from different domains, each a test with its expected Events and a page of its own where it runs live.
 
 - [**Cranes** `CraneScenarioTest` hysteresis, during, classifying a load, partial set-down via latest](cranes/)
 - [**Manufacturing** `MachineToolOverheatExample` sampling-rate mode, rate, combined durings](manufacturing/)
 - [**Building services** `HvacShortCyclingExample` after().within(), count().within()](building-services/)
 - [**Healthcare** `VitalSignsExample` advanceTo and age() for a silent sensor, maxGap](healthcare/)
 - [**Automotive** `FleetTelematicsExample` deceleration via rate, distance via integral](automotive/)
-- [**Finance** `TradingSignalsExample` moving-average crosses, truncated start after warm-up](https://github.com/romanhaendler/rbed/blob/main/src/test/java/io/github/romanhaendler/rbed/examples/TradingSignalsExample.java)
-- [**Logistics** `ColdChainExample` attributing a cause with after, totalDuration limit](https://github.com/romanhaendler/rbed/blob/main/src/test/java/io/github/romanhaendler/rbed/examples/ColdChainExample.java)
-- [**Environment** `FloodWarningExample` smoothed rate of a moving average, hysteresis](https://github.com/romanhaendler/rbed/blob/main/src/test/java/io/github/romanhaendler/rbed/examples/FloodWarningExample.java)
-- [**Sports** `IntervalTrainingExample` after, rep count via count, listener-side timing](https://github.com/romanhaendler/rbed/blob/main/src/test/java/io/github/romanhaendler/rbed/examples/IntervalTrainingExample.java)
-- [**IT operations** `DeploymentRegressionExample` a Pulse Channel reporting deployments](https://github.com/romanhaendler/rbed/blob/main/src/test/java/io/github/romanhaendler/rbed/examples/DeploymentRegressionExample.java)
+- [**Finance** `TradingSignalsExample` moving-average crosses, truncated start after warm-up](finance/)
+- [**Logistics** `ColdChainExample` attributing a cause with after, totalDuration limit](logistics/)
+- [**Environment** `FloodWarningExample` smoothed rate of a moving average, hysteresis](environment/)
+- [**Sports** `IntervalTrainingExample` after, rep count via count, listener-side timing](sports/)
+- [**IT operations** `DeploymentRegressionExample` a Pulse Channel reporting deployments](it-operations/)
 
 [Source on GitHub](https://github.com/romanhaendler/rbed) · [Maven Central](https://central.sonatype.com/artifact/io.github.romanhaendler/rbed) · [MIT licence](https://github.com/romanhaendler/rbed/blob/main/LICENSE)

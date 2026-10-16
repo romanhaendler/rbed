@@ -5,6 +5,7 @@ import io.github.romanhaendler.rbed.Channel;
 import io.github.romanhaendler.rbed.Event;
 import io.github.romanhaendler.rbed.Rule;
 import io.github.romanhaendler.rbed.Sample;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +32,12 @@ public final class Bridge {
       new Manufacturing(),
       new BuildingServices(),
       new Healthcare(),
-      new Automotive());
+      new Automotive(),
+      new Finance(),
+      new Logistics(),
+      new Environment(),
+      new Sports(),
+      new ItOperations());
 
   private Bridge() {}
 
@@ -96,7 +102,9 @@ public final class Bridge {
    *
    * @param parameters JSON object of parameter values by id; missing ones take their default,
    *     null stands for NaN
-   * @param drawnChannels JSON object reserved for Channel values the reader drew; ignored for now
+   * @param drawnChannels JSON object of Channel values the reader drew, by Channel name, one
+   *     number per Sample of the Scenario (null: absent in that Sample); they replace that
+   *     Channel's own values
    * @return JSON object with the Samples, the Events, the Discarded Pending Events (with the
    *     timestamp they were Discarded), the timestamps time was advanced to without a Sample,
    *     the timestamp of the restart if the Detector was restarted, and, for a Scenario that
@@ -109,7 +117,7 @@ public final class Bridge {
     try {
       Scenario scenario = scenario(scenarioId);
       Map<String, Double> values = values(scenario, parameters);
-      List<Sample> samples = scenario.samples(values);
+      List<Sample> samples = drawn(scenario, scenario.samples(values), drawnChannels);
       Lifecycle lifecycle = new Lifecycle();
       scenario.detect(scenario.rules(values), samples, values, lifecycle);
       return result(scenario, values, samples, lifecycle);
@@ -124,6 +132,47 @@ public final class Bridge {
       if (s.id.equals(id)) return s;
     }
     throw new IllegalArgumentException("Unknown Scenario " + id);
+  }
+
+  /** The Scenario's Samples, with each drawn Channel's values in place of its own. */
+  private static List<Sample> drawn(Scenario scenario, List<Sample> samples, String drawnChannels) {
+    if (!(Json.parse(drawnChannels) instanceof Map<?, ?> drawn)) {
+      throw new IllegalArgumentException("Drawn Channels are not a JSON object");
+    }
+    if (drawn.isEmpty()) return samples;
+    List<Map<Channel, Double>> values = new ArrayList<>();
+    for (Sample sample : samples) values.add(new HashMap<>(sample.values()));
+    for (Map.Entry<?, ?> entry : drawn.entrySet()) {
+      Channel channel = channel(scenario, (String) entry.getKey());
+      List<?> drawnValues = entry.getValue() instanceof List<?> l ? l : List.of();
+      if (drawnValues.size() != samples.size()) {
+        throw new IllegalArgumentException("Drawn Channel " + channel.name() + " has "
+            + drawnValues.size() + " values for " + samples.size() + " Samples");
+      }
+      for (int i = 0; i < samples.size(); i++) {
+        Object value = drawnValues.get(i);
+        if (value == null) {
+          values.get(i).remove(channel);
+        } else if (value instanceof Double d) {
+          values.get(i).put(channel, d);
+        } else {
+          throw new IllegalArgumentException(
+              "Drawn Channel " + channel.name() + " has a value that is not a number");
+        }
+      }
+    }
+    List<Sample> result = new ArrayList<>();
+    for (int i = 0; i < samples.size(); i++) {
+      result.add(new Sample(samples.get(i).timestamp(), values.get(i)));
+    }
+    return result;
+  }
+
+  private static Channel channel(Scenario scenario, String name) {
+    for (Channel c : scenario.channels) {
+      if (c.name().equals(name)) return c;
+    }
+    throw new IllegalArgumentException("No Channel " + name + " in Scenario " + scenario.id);
   }
 
   private static Map<String, Double> values(Scenario scenario, String parameters) {

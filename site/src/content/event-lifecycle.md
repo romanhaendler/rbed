@@ -13,9 +13,9 @@ The Detector tells its `EventListener` about each stage. All four methods are op
 
 ## Pending, then Confirmed or Discarded
 
-`Overheat` requires `temp` to stay above 80 for a duration, two seconds by default. On the Rule's lane, the band is pale while the Event is Pending and solid once it is Confirmed. The dots mark the moments it went Pending, was Confirmed, Ended or was Discarded. Hover over the chart to read the state at each Sample, and change the duration to see what `forDuration` does.
+`Overheat` requires `temp` to stay above 80 for a duration, two seconds by default. On the Rule's lane, the band is pale while the Event is Pending and solid once it is Confirmed. The dots mark the moments it went Pending, was Confirmed, Ended or was Discarded. Hover over the chart to read the state at each Sample, and change the duration to see what `forDuration` does. Set Draw to `temp` and draw a spike of your own: shorter than the duration, it is Discarded.
 
-<!-- scenario event-lifecycle -->
+<!-- scenario event-lifecycle draw -->
 
 At the default duration of two seconds:
 

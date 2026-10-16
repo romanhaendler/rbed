@@ -4,10 +4,20 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Drawing with a mouse and with touch changes the Channel's values and the Events update while drawing
-- [ ] Reset restores the Scenario's own values
-- [ ] `run` uses drawn values in place of generated ones for those Channels only
-- [ ] Drawing does not scroll the page on a phone
-- [ ] JUnit and the Node parity test cover one Scenario with a drawn Channel
+- [x] Drawing with a mouse and with touch changes the Channel's values and the Events update while drawing
+- [x] Reset restores the Scenario's own values
+- [x] `run` uses drawn values in place of generated ones for those Channels only
+- [x] Drawing does not scroll the page on a phone
+- [x] JUnit and the Node parity test cover one Scenario with a drawn Channel
+
+## Comments
+
+**Done.** Checked in headless Chromium (Playwright from a scratch directory) at 1280 and 375 px, light and dark, in draw mode on `/`, `/event-lifecycle/`, `/aggregates/`, `/pulse-channels/`, `/conditions-and-expressions/` and `/end-conditions/`: no horizontal scroll, no page errors. Scripted: a mouse stroke on the front page turns `HighTemperature 2..3` into `1..3` (start Truncated) while the button is still down, the address stays `/rbed/`, Reset brings back `2..3` and disables itself; a finger stroke (CDP touch events) on the lifecycle page at 375 px changes the Events and scrolls the page by 0 px, while the same swipe without draw mode scrolls it by 120 px; Tab moves from the chart on to Reset, the sliders and the rest of the page; drawing `ambient` (absent before 5 s) on the Expressions page and `weight` on the End Conditions page works without an error. The Playwright smoke test passes.
+
+- **Bridge:** `drawnChannels` is a JSON object of Channel name to an array with one number per Sample of the Scenario, in Sample order (null: the Channel is absent in that Sample); those values replace the Channel's own in each Sample, other Channels stay. `run` applies them to the list from `samples(values)` (06), and that one list goes to `detect`, to the plotted Expression (07) and into the result, so all three agree. `detect` takes the Samples as an argument (06 had the same idea; merged); `Healthcare.detect` makes its own values, so drawn values would not reach it (its page does not offer drawing). Errors (in place of a result, like rbed's): `No Channel <name> in Scenario <id>`, `Drawn Channel <name> has <n> values for <m> Samples`, `Drawn Channel <name> has a value that is not a number`. Drawing cannot add or move Samples; a Scenario keeps its timestamps. `BridgeTest.run(id, parameters, drawn)` is the three-argument helper (the two-argument one passes `{}`), so its calls are in the parity test.
+- **Opt-in per page marker:** `<!-- scenario <id> draw -->` (`Block.draw` in `markdown.ts`, `ScenarioView`'s `draw` prop). Enabled on the front page, Event lifecycle, Aggregates, Pulse Channels, Conditions and Expressions, and End Conditions. Not on Data gaps: its Samples change with its `gap` parameter, and drawn values are by Sample index, so a parameter change would leave them the wrong length (the bridge then returns an error); a Scenario whose Sample count depends on its parameters should not be drawable. Pulse Channels are never drawable. Later concept pages (08, 10) can add ` draw` to their marker; domain example pages should not. The prerender, twin and search ignore the flag.
+- **UI (ScenarioView):** a "Draw" `SegmentedControl` (Off plus each drawable Channel; umriss allows two to four options, so at most three drawable Channels) with a hint, in the panel above "Show". While a Channel is chosen, `DrawLayer` (absolute over `.drawStage`, the wrapper around `EventChart`, `touch-action: none`) takes the pointer; it is not focusable, so it traps nothing, and it hides the hover readout until Draw is Off again. A stroke sets the Sample nearest in time and interpolates the Samples passed since its previous point (`src/draw.ts`, tested in `test/draw.test.mjs`); values are clamped to the Channels' part of the plot (above the lanes) and rounded to a tenth of a tick step. The Channels' axis is frozen during a stroke (`EventChart` now takes the `course` axis as a prop, computed in `ScenarioView` by `courseOf(shown)`, which includes 07's Expression and threshold) and rescales after it, so drawing near the top widens the axis stroke by stroke. Drawn values are React state only: not in the address, gone on reload. The panel's Reset restores both the default parameters and the Scenario's own values.
+- **Not done:** the Java source under the chart still shows the Scenario's own values (on the lifecycle page, the `values` array) after drawing; the text alternative lists the Events of the drawn values but does not say values were drawn.
+- **umriss-ui gaps:** `@umriss-ui/charts` 0.40.0 has no public pixel-to-value mapping and no plot rectangle. `src/plotArea.ts` (`valueAt`) is the only place that reads the internal `.uc-axis-x.uc-axis-bottom` and `.uc-axis-y.uc-axis-left` boxes and maps linearly onto the fixed axis domains; replace it when the package offers a mapping (for example an `invert(px)` on the hook, or a pointer callback with domain values). There is also no drawing or pointer-capture layer of its own, so the overlay blocks the chart's tooltip while drawing.

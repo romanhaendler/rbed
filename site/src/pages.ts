@@ -120,6 +120,41 @@ export const PAGES: Page[] = [
       "Trips, harsh braking and idling from a vehicle's speed and engine rpm: deceleration via rate, a Trip's distance via integral.",
     rubric: 'Examples',
   },
+  {
+    path: '/finance/',
+    title: 'Finance',
+    description:
+      'Golden and death crosses of two moving averages of daily closing prices, and a start Truncated by the warm-up of the averages.',
+    rubric: 'Examples',
+  },
+  {
+    path: '/logistics/',
+    title: 'Logistics',
+    description:
+      'Temperature excursions of a refrigerated truck: attributing one to an open door with after, and a total time limit with totalDuration.',
+    rubric: 'Examples',
+  },
+  {
+    path: '/environment/',
+    title: 'Environment',
+    description:
+      'A flood warning from a river gauge: the smoothed rate of a moving average, hysteresis on the way down and a missing report.',
+    rubric: 'Examples',
+  },
+  {
+    path: '/sports/',
+    title: 'Sports',
+    description:
+      "Sprints and recoveries of an interval session from a runner's speed and heart rate: after, a rep count via count, and a listener timing each recovery.",
+    rubric: 'Examples',
+  },
+  {
+    path: '/it-operations/',
+    title: 'IT operations',
+    description:
+      'Error spikes of a web service attributed to a deployment reported on a Pulse Channel, and high CPU.',
+    rubric: 'Examples',
+  },
 ];
 
 /** The page path an address names when the site is served below `base`, or undefined outside it. */
