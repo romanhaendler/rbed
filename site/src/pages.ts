@@ -23,6 +23,20 @@ export const PAGES: Page[] = [
       'Rule-based event detection in time series: a small Java library that finds Events in multi-channel data by evaluating declarative Rules.',
   },
   {
+    path: '/aggregates/',
+    title: 'Aggregates',
+    description:
+      "Every Event carries each Channel's minimum, maximum, mean, count, time-weighted mean and integral over its Samples.",
+    rubric: 'Guide',
+  },
+  {
+    path: '/pulse-channels/',
+    title: 'Pulse Channels',
+    description:
+      'Pulse Channels report one-off occurrences such as deployments: their value exists only in the Sample that carries it.',
+    rubric: 'Guide',
+  },
+  {
     path: '/cranes/',
     title: 'Cranes',
     description:

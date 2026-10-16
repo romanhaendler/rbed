@@ -3,7 +3,7 @@
 import { expect, test } from '@playwright/test';
 
 for (const { path, control } of [
-  { path: './', control: 'Threshold' },
+  { path: 'aggregates/', control: 'Driving above' },
   { path: 'cranes/', control: 'Lifted above' },
 ]) {
   test(`moving "${control}" on ${path} changes the Event table`, async ({ page }) => {

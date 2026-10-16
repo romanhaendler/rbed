@@ -9,6 +9,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { aggregatesLine } from './src/aggregates.ts';
 import { escape, parse, SCENARIO_MARKER } from './src/markdown.ts';
 import { markdownFile, PAGES, titleOf } from './src/pages.ts';
 
@@ -43,7 +44,7 @@ function eventRows({ unit, millis, result }) {
   // A Note column only for a Scenario whose listener notes something, as in the live table.
   const notes = result.events.some((e) => e.note !== undefined);
   return [
-    ['Name', `Start (${unit})`, `Confirmed (${unit})`, `End (${unit})`, 'Truncated', ...(notes ? ['Note'] : [])],
+    ['Name', `Start (${unit})`, `Confirmed (${unit})`, `End (${unit})`, 'Truncated', ...(notes ? ['Note'] : []), 'Aggregates'],
     ...result.events.map((e) => [
       e.name,
       String(e.start / millis),
@@ -51,6 +52,7 @@ function eventRows({ unit, millis, result }) {
       String(e.end / millis),
       [e.truncatedStart && 'start', e.truncatedEnd && 'end'].filter(Boolean).join(', '),
       ...(notes ? [e.note ?? ''] : []),
+      Object.entries(e.aggregates).map(([channel, a]) => aggregatesLine(channel, a)).join('; '),
     ]),
   ];
 }

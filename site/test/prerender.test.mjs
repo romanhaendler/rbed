@@ -18,7 +18,20 @@ const facts = new Map([
       millis: 1000,
       result: {
         samples: [],
-        events: [{ name: 'Run', start: 2000, confirmed: 2000, end: 7500, truncatedStart: false, truncatedEnd: true }],
+        events: [
+          {
+            name: 'Run',
+            start: 2000,
+            confirmed: 2000,
+            end: 7500,
+            truncatedStart: false,
+            truncatedEnd: true,
+            aggregates: {
+              speed: { min: 5.5, max: 9, mean: 7.123456, count: 3, timeWeightedMean: 7, integral: 38.5 },
+              load: { min: null, max: null, mean: null, count: 0, timeWeightedMean: null, integral: null },
+            },
+          },
+        ],
       },
     },
   ],
@@ -32,8 +45,8 @@ test('the twin is the Markdown with each Scenario as its Java source and its def
     '# Data gaps\n\nA gap <ends> an Event.\n\n' +
       '```java\nRule.named("Run").when(speed.above(5)).maxGap(Duration.ofSeconds(10));\n```\n\n' +
       'Events at the default parameters:\n\n' +
-      '| Name | Start (s) | Confirmed (s) | End (s) | Truncated |\n| --- | --- | --- | --- | --- |\n' +
-      '| Run | 2 | 2 | 7.5 | end |\n\n' +
+      '| Name | Start (s) | Confirmed (s) | End (s) | Truncated | Aggregates |\n| --- | --- | --- | --- | --- | --- |\n' +
+      '| Run | 2 | 2 | 7.5 | end | speed: min 5.5, max 9, mean 7.12; load: no value |\n\n' +
       'That is all.\n',
   );
 });
@@ -55,16 +68,16 @@ test('the table has a Note column when the Scenario notes an Event, such as the 
         result: {
           samples: [],
           events: [
-            { name: 'Run', start: 2000, confirmed: 2000, end: 7500, truncatedStart: false, truncatedEnd: false, note: 'pallet' },
-            { name: 'Stop', start: 8000, confirmed: 8000, end: 9000, truncatedStart: false, truncatedEnd: false },
+            { name: 'Run', start: 2000, confirmed: 2000, end: 7500, truncatedStart: false, truncatedEnd: false, aggregates: {}, note: 'pallet' },
+            { name: 'Stop', start: 8000, confirmed: 8000, end: 9000, truncatedStart: false, truncatedEnd: false, aggregates: {} },
           ],
         },
       },
     ],
   ]);
   const text = twin(markdown, noted);
-  assert.ok(text.includes('| Name | Start (s) | Confirmed (s) | End (s) | Truncated | Note |\n'), text);
-  assert.ok(text.includes('| Run | 2 | 2 | 7.5 |  | pallet |\n| Stop | 8 | 8 | 9 |  |  |'), text);
+  assert.ok(text.includes('| Name | Start (s) | Confirmed (s) | End (s) | Truncated | Note | Aggregates |\n'), text);
+  assert.ok(text.includes('| Run | 2 | 2 | 7.5 |  | pallet |  |\n| Stop | 8 | 8 | 9 |  |  |  |'), text);
 });
 
 test("a page's HTML holds its head, its text, its Java source and its default Events before any script", () => {
@@ -78,7 +91,7 @@ test("a page's HTML holds its head, its text, its Java source and its default Ev
     '<div id="root"><div class="prerendered">',
     '<p>A gap &lt;ends&gt; an Event.</p>',
     'Rule.named(&quot;Run&quot;).when(speed.above(5))',
-    '<td>Run</td><td>2</td><td>2</td><td>7.5</td><td>end</td>',
+    '<td>Run</td><td>2</td><td>2</td><td>7.5</td><td>end</td><td>speed: min 5.5, max 9, mean 7.12; load: no value</td>',
     '.js .prerendered{visibility:hidden}',
   ]) {
     assert.ok(html.includes(part), part);
