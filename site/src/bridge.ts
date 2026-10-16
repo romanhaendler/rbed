@@ -51,7 +51,14 @@ export type Discard = { name: string; start: number; discarded: number };
 /** For a Scenario that plots one: an Expression's value per Sample, null where it is undefined,
  *  and the threshold its Rule's Condition compares it to. One with a `unit` of its own (a count of
  *  Events, a duration) is not on the Channels' scale. */
-export type PlottedExpression = { name: string; unit?: string; threshold: number; values: (number | null)[] };
+export type PlottedExpression = {
+  name: string;
+  unit?: string;
+  threshold: number;
+  values: (number | null)[];
+  /** Its value at each time advance (Result.advances), where time was advanced. */
+  atAdvances?: (number | null)[];
+};
 
 export type Result =
   | {

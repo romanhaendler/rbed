@@ -8,7 +8,7 @@
 import { Alert } from '@umriss-ui/core';
 import { useMemo, useRef, useState } from 'react';
 import { run, type Scenario, source } from './bridge';
-import { type ChannelAxis, type ChartModel, channelAxisOf, EXPRESSION, type Row } from './chartModel.ts';
+import { type ChannelAxis, type ChartModel, channelAxisOf, EXPRESSION, expressionRows, type Row } from './chartModel.ts';
 import { CodeBlock } from './CodeBlock';
 import { drawTo } from './draw.ts';
 import { DrawLayer } from './DrawLayer';
@@ -53,6 +53,7 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
       </Alert>
     );
   } else {
+    const plotted = expressionRows(rows, result.expression, result.advances, scenario.timeUnit.millis);
     const model: ChartModel = {
       scenario,
       rows,
@@ -61,6 +62,7 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
       rules: scenario.rules.filter((r) => !hidden.includes(r)),
       hoverLatest,
       expression: result.expression,
+      expressionRows: plotted,
       advances: result.advances,
       restart: result.restart,
     };
@@ -96,7 +98,7 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
         <EventSummary
           scenario={scenario}
           lifecycle={result}
-          also={expressionSummary(result.expression, rows, scenario.timeUnit.name) + timeSummary(result, scenario)}
+          also={expressionSummary(result.expression, plotted, scenario.timeUnit.name) + timeSummary(result, scenario)}
         />
         {event && <AggregatesPanel scenario={scenario} event={event} />}
       </>

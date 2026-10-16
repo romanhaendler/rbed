@@ -49,7 +49,17 @@ export const EXPRESSION = 'expression';
 export const expressionColor = (scenario: Scenario) => CHANNEL_COLORS[scenario.channels.length % CHANNEL_COLORS.length];
 export const expressionValue = (v: number | null | undefined) => (v == null ? 'undefined' : String(Number(v.toPrecision(6))));
 
-/** Where the plotted Expression is undefined, in the Scenario's unit: from each undefined Sample to the next one. */
+/** The plotted Expression's rows: its value at every moment of the run, at each Sample and each
+    time advance, in time order. */
+export function expressionRows(rows: Row[], expression: PlottedExpression | undefined, advances: number[], millis: number): Row[] {
+  if (!expression) return [];
+  return [
+    ...rows.map((r) => ({ t: r.t, [EXPRESSION]: r[EXPRESSION] })),
+    ...(expression.atAdvances ?? []).map((v, k) => ({ t: advances[k] / millis, [EXPRESSION]: v })),
+  ].sort((a, b) => a.t - b.t) as Row[];
+}
+
+/** Where the plotted Expression is undefined, in the Scenario's unit: from each undefined moment to the next one. */
 export function undefinedStretches(rows: Row[]): [number, number][] {
   const stretches: [number, number][] = [];
   rows.forEach((r, i) => {
@@ -133,6 +143,8 @@ export type ChartModel = {
       none. A state setter, so it stays the same function across renders. */
   hoverLatest: (key: string | undefined) => void;
   expression?: PlottedExpression;
+  /** The plotted Expression's rows (expressionRows); none without one. */
+  expressionRows: Row[];
   /** Timestamps time was advanced to without a Sample, and the restart, if any (ms). */
   advances: number[];
   restart?: number;
@@ -140,9 +152,9 @@ export type ChartModel = {
 
 /** The Channels' axis of what is shown (with the plotted Expression and its threshold); it keeps
     its scale while Channels are hidden. */
-export const channelAxisOf = ({ scenario, rows, rules, expression }: ChartModel): ChannelAxis => {
+export const channelAxisOf = ({ scenario, rows, rules, expression, expressionRows }: ChartModel): ChannelAxis => {
   const below = rules.length + (expression?.unit !== undefined ? SEPARATE_UNITS : 0);
   return expression && expression.unit === undefined
-    ? bandAxis(rows, [...scenario.channels, EXPRESSION], [expression.threshold], below, CHANNEL_UNITS, CHANNEL_UNITS + below)
+    ? bandAxis([...rows, ...expressionRows], [...scenario.channels, EXPRESSION], [expression.threshold], below, CHANNEL_UNITS, CHANNEL_UNITS + below)
     : bandAxis(rows, scenario.channels, [], below, CHANNEL_UNITS, CHANNEL_UNITS + below);
 };

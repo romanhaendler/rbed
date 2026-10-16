@@ -14,7 +14,7 @@ import java.util.Map;
  * Event carries its start (where it went Pending), Confirmed and end timestamps; a Discarded
  * Pending Event is kept with the moment it was Discarded, which the Event itself does not carry.
  */
-final class Lifecycle implements EventListener {
+class Lifecycle implements EventListener {
   record Discard(Event event, long at) {}
 
   final List<Event> ended = new ArrayList<>();

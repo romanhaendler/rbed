@@ -5,12 +5,15 @@ import type { PlottedExpression, Scenario } from './bridge';
 import { type Row, undefinedStretches } from './chartModel.ts';
 import { type Lifecycle, timeIn } from './events.ts';
 
-/** The plotted Expression in words: what it is compared to and where it is undefined. */
+/** The plotted Expression in words: what it is compared to and where it is undefined; `rows` are
+    its expressionRows. */
 export function expressionSummary(expression: PlottedExpression | undefined, rows: Row[], unit: string): string {
   if (!expression) return '';
   const stretches = undefinedStretches(rows).map(([from, to]) => `from ${from} to ${to} ${unit}`);
+  const advances = (expression.atAdvances ?? []).length;
   return (
-    ` The dashed line is ${expression.name}, compared with the threshold ${expression.threshold}` +
+    ` The dashed line is ${expression.name}, compared with the threshold ${expression.threshold}${expression.unit ? ` ${expression.unit}` : ''}` +
+    (advances === 0 ? '' : `, read at every Sample and every time advance`) +
     (stretches.length === 0 ? '.' : `; it is undefined ${stretches.join(' and ')}.`)
   );
 }

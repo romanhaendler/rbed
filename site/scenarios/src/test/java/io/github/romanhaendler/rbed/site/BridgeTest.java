@@ -645,6 +645,30 @@ class BridgeTest {
   }
 
   @Test
+  @SuppressWarnings("unchecked")
+  void silentSensorsPlotsTheAgeOfTheHeartRateAtEverySampleAndEveryAdvance() {
+    Map<String, Object> plot = (Map<String, Object>) run("silent-sensors", "{}").get("expression");
+    assertEquals("hr.age()", plot.get("name"));
+    assertEquals("s", plot.get("unit"));
+    assertEquals(5.0, plot.get("threshold"));
+    List<Double> values = (List<Double>) plot.get("values");
+    assertEquals(41, values.size());
+    assertTrue(values.stream().allMatch(v -> v == 0.0), "every Sample reports hr: " + values);
+    List<Double> atAdvances = new ArrayList<>();
+    for (int s = 1; s <= 20; s++) atAdvances.add((double) s);   // the last Sample was at 24 s
+    assertEquals(atAdvances, plot.get("atAdvances"));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void withoutTheTimerTheAgeIsOnlyReadAtSamples() {
+    Map<String, Object> plot =
+        (Map<String, Object>) run("silent-sensors", "{\"timer\": 1}").get("expression");
+    assertTrue(((List<Double>) plot.get("values")).stream().allMatch(v -> v == 0.0));
+    assertFalse(plot.containsKey("atAdvances"));
+  }
+
+  @Test
   void withoutAdvancesTheSilenceGoesUnnoticed() {
     Map<String, Object> result = run("silent-sensors", "{\"timer\": 1}");
     assertEquals(List.of("HighHeartRate 12000..45000"), events(result));
@@ -748,6 +772,18 @@ class BridgeTest {
   void movingAverageOverADurationIsUndefinedUntilItsValuesSpanTheWindow() {
     assertEquals(10, warmUp(run("expressions", "{\"expression\": 2}")));
     assertEquals(5, warmUp(run("expressions", "{\"expression\": 2, \"window\": 5}")));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void thePlottedDifferenceIsExactlyTheDoubleSubtractionGives() {
+    Map<String, Object> result = run("expressions", "{\"expression\": 3}");
+    List<Double> values = expressionValues(result);
+    List<Map<String, Object>> samples = (List<Map<String, Object>>) result.get("samples");
+    for (int i = 5; i < samples.size(); i++) {
+      Map<String, Double> sample = (Map<String, Double>) samples.get(i).get("values");
+      assertEquals(sample.get("temp") - sample.get("ambient"), values.get(i), 0.0, "at " + i);
+    }
   }
 
   @Test

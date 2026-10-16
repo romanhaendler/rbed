@@ -93,7 +93,7 @@ export function EventChart({
   latest?: Event;
   select: (key: string | undefined) => void;
 }) {
-  const { scenario, rows, lifecycle, channels, rules, expression } = model;
+  const { scenario, rows, lifecycle, channels, rules, expression, expressionRows } = model;
   const { name: unit, millis } = scenario.timeUnit;
   // An Expression with a unit of its own (a count of Events, a duration) is not on the Channels'
   // scale: it gets a band of the plot and an axis of its own, between the Channels and the lanes.
@@ -111,7 +111,7 @@ export function EventChart({
   live.current = model;
   const lanes = rules.length;
   const total = CHANNEL_UNITS + lanes + (separate ? SEPARATE_UNITS : 0);
-  const separateAxis = separate && bandAxis(rows, [EXPRESSION], [separate.threshold], lanes, SEPARATE_UNITS, total);
+  const separateAxis = separate && bandAxis(expressionRows, [EXPRESSION], [separate.threshold], lanes, SEPARATE_UNITS, total);
   return (
     <Chart
       height={separate ? 380 : 300}
@@ -131,7 +131,7 @@ export function EventChart({
         tickFormat={(v) => rules[Math.round(lanes - 0.5 - v)] ?? ''}
       />
       {expression &&
-        undefinedStretches(rows).map(([from, to]) => (
+        undefinedStretches(expressionRows).map(([from, to]) => (
           <LimitBand key={from} orientation="x" from={from} to={to} color="var(--u-color-text-muted)" label="undefined" />
         ))}
       {onChannels && <LimitLine value={onChannels.threshold} label={`threshold ${onChannels.threshold}`} />}
@@ -193,9 +193,9 @@ export function EventChart({
         ),
       )}
       {onChannels && (
-        <Line value={EXPRESSION} name={onChannels.name} color={expressionColor(scenario)} dash={[6, 4]} markers="always" />
+        <Line data={expressionRows} value={EXPRESSION} name={onChannels.name} color={expressionColor(scenario)} dash={[6, 4]} markers="always" />
       )}
-      {separate && <Line value={EXPRESSION} name={separate.name} color={expressionColor(scenario)} dash={[6, 4]} yAxisId="separate" />}
+      {separate && <Line data={expressionRows} value={EXPRESSION} name={separate.name} color={expressionColor(scenario)} dash={[6, 4]} yAxisId="separate" />}
       <Tooltip mode="x" render={(hit: TooltipHit<Row>) => <Readout model={live.current} t={hit.xValue} />} />
     </Chart>
   );
