@@ -561,6 +561,15 @@ pre {
   border-radius: 50%;
 }
 
+/* The restart is a dashed vertical line. */
+.swatch.line {
+  width: 0;
+  height: 12px;
+  border-left: 2px dashed;
+  border-radius: 0;
+  vertical-align: middle;
+}
+
 /* A Truncated edge is a large halo behind its mark. */
 .swatch.halo {
   width: 14px;

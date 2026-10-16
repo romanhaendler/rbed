@@ -94,7 +94,7 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
             <DrawLayer x={[times[0], times[times.length - 1]]} channelAxis={channelAxis} draw={drawPoint} end={() => setFrozen(undefined)} />
           )}
         </div>
-        <LifecycleKey advances={result.advances.length > 0} />
+        <LifecycleKey advances={result.advances.length > 0} restart={result.restart !== undefined} />
         <EventSummary
           scenario={scenario}
           lifecycle={result}

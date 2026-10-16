@@ -141,7 +141,8 @@ export function EventChart({
       )}
       {latest && <LimitBand orientation="x" from={latest.start / millis} to={latest.end / millis} color={LATEST_COLOR} />}
       {model.restart !== undefined && (
-        <LimitLine orientation="x" value={model.restart / millis} label="Restart" color={RESTART_COLOR} />
+        // No label: on the x axis it would cover a tick on a phone; the key under the chart names it.
+        <LimitLine orientation="x" value={model.restart / millis} color={RESTART_COLOR} />
       )}
       {rules.map((rule, i) => (
         <StateBand<BandRow>
@@ -202,7 +203,7 @@ export function EventChart({
 }
 
 /** What the bands' colors and the marks mean; the text alternative says it in words. */
-export function LifecycleKey({ advances }: { advances: boolean }) {
+export function LifecycleKey({ advances, restart }: { advances: boolean; restart: boolean }) {
   const item = (label: string, color: string, mark: boolean) => (
     <span key={label}>
       <span className={mark ? 'swatch mark' : 'swatch'} style={{ background: color }} />
@@ -220,6 +221,12 @@ export function LifecycleKey({ advances }: { advances: boolean }) {
         Truncated start or end
       </span>
       {advances && item('Time advance', ADVANCE_COLOR, true)}
+      {restart && (
+        <span>
+          <span className="swatch line" style={{ borderColor: RESTART_COLOR }} />
+          Restart
+        </span>
+      )}
     </div>
   );
 }
