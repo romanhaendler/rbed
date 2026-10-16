@@ -23,6 +23,12 @@ final class AfterScenario extends Scenario {
     super("after", "after", "min", MINUTE, List.of(TEMP, DOOR),
         List.of(new Parameter("window", "Window after DoorOpen", 30, 0, 60, 5, "min")),
         """
+        import static io.github.romanhaendler.rbed.Conditions.*;
+
+        import io.github.romanhaendler.rbed.*;
+        import java.time.Duration;
+        import java.util.Map;
+
         Channel door = Channel.named("door");
         Channel temp = Channel.named("temp");
 
@@ -33,8 +39,12 @@ final class AfterScenario extends Scenario {
             .rules(doorOpen, excursionAfterDoor)
             .build();
 
-        detector.push(0,      Map.of(door, 0.0, temp, 4.0));   // one Sample a minute
-        detector.push(60_000, Map.of(door, 0.0, temp, 4.0));
+        for (int m = 0; m <= 150; m++) {   // one Sample a minute
+          detector.push(m * 60_000L, Map.of(
+              door, m >= 10 && m < 12 || m == 60 ? 1.0 : 0.0,
+              temp, m >= 15 && m < 25 || m >= 100 && m < 110 ? 10.0 : 4.0));
+        }
+        detector.close();
         """);
   }
 

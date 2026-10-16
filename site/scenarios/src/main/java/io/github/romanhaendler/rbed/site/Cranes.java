@@ -29,6 +29,13 @@ final class Cranes extends Scenario {
             new Parameter("overloadSamples", "Overload for", 2, 1, 6, 1, "Samples"),
             new Parameter("partial", "Partial set-down below", 0.5, 0.1, 0.9, 0.05, "× max")),
         """
+        import static io.github.romanhaendler.rbed.Conditions.*;
+
+        import io.github.romanhaendler.rbed.*;
+        import java.time.Duration;
+        import java.util.HashMap;
+        import java.util.Map;
+
         Channel ratedLoad = Channel.named("ratedLoad");
         Channel weight = Channel.named("weight");
 
@@ -46,11 +53,33 @@ final class Cranes extends Scenario {
             .forSamples(2);
         Detector crane = Detector.builder()
             .rules(loadLifted, overload, partialSetDown)
+            .listener(new EventListener() {
+              @Override public void onEnded(Event e) {
+                if (e.is(loadLifted)) System.out.println("lifted a " + load(e, weight));
+              }
+            })
             .build();
 
-        // The listener classifies a lifted load by its mean weight
-        String load(Event lift) {
+        for (long t = 0; t <= 14_000; t += 500) {   // the weight every 500 ms
+          Map<Channel, Double> values = new HashMap<>(Map.of(weight, weightAt(t)));
+          if (t == 0) values.put(ratedLoad, 5000.0);   // sent once, held from then on
+          crane.push(t, values);
+        }
+        crane.close();
+
+        // In the enclosing class:
+        // A plain method classifies a lifted load by its mean weight
+        static String load(Event lift, Channel weight) {
           return lift.aggregates(weight).mean() < 1500 ? "pallet" : "container";
+        }
+
+        static double weightAt(long t) {
+          if (t < 1_500) return 0;      // hook empty
+          if (t < 6_500) return 1200;   // pallet
+          if (t < 8_500) return 10;     // set down, empty hook swinging
+          if (t < 11_500) return 6000;  // container
+          if (t < 12_500) return 2500;  // part of it set down
+          return 0;
         }
         """);
   }

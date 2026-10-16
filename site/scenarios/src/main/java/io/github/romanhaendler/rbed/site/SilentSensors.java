@@ -23,23 +23,31 @@ final class SilentSensors extends Scenario {
         List.of(
             Parameter.choice("timer", "While silent", 0, List.of(
                 new Option("A timer advances time", """
-                    if (reading != null) detector.push(now, Map.of(hr, reading));
-                    else detector.advanceTo(now);  // the timer: time passes without a Sample"""),
+                    if (reports) detector.push(s * 1_000, Map.of(hr, reading));
+                      else detector.advanceTo(s * 1_000);  // the timer: time passes without a Sample"""),
                 new Option("Nothing happens", """
-                    if (reading != null) detector.push(now, Map.of(hr, reading));"""))),
+                    if (reports) detector.push(s * 1_000, Map.of(hr, reading));"""))),
             new Parameter("limit", "Silent after", 5, 1, 15, 1, "s")),
         """
+        import io.github.romanhaendler.rbed.*;
+        import java.time.Duration;
+        import java.util.Map;
+
         Channel hr = Channel.named("hr");
 
-        Condition silent = hr.age().above(${limit} * 1_000);
+        Condition silent = hr.age().above(Duration.ofSeconds(${limit}).toMillis());
         Rule highHeartRate = Rule.named("HighHeartRate").when(hr.above(120).and(silent.not()));
         Rule sensorLost = Rule.named("SensorLost").when(silent);
         Detector detector = Detector.builder()
             .rules(highHeartRate, sensorLost)
             .build();
 
-        // every second; the sensor is silent from 25 to 44 s, so reading is null then
-        ${timer}
+        for (long s = 0; s <= 60; s++) {   // every second
+          boolean reports = s < 25 || s >= 45;   // the sensor is silent from 25 to 44 s
+          double reading = s < 12 ? 78 + s % 3 : s < 25 ? 128 + s % 4 : 92 - s % 3;
+          ${timer}
+        }
+        detector.close();
         """);
   }
 

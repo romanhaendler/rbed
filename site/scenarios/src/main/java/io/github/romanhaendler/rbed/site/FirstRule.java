@@ -14,6 +14,9 @@ final class FirstRule extends Scenario {
     super("first-rule", "A first Rule", "s", 1_000, List.of(TEMP),
         List.of(new Parameter("threshold", "Threshold", 80, 60, 90, 1, "°C")),
         """
+        import io.github.romanhaendler.rbed.*;
+        import java.util.Map;
+
         Channel temp = Channel.named("temp");
 
         Rule highTemperature = Rule.named("HighTemperature").when(temp.above(${threshold}));

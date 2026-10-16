@@ -6,6 +6,8 @@ A small Java 17 library that finds **Events** in multi-channel time series by ev
 
 You describe *what* an Event is ("the weight is above 500 kg for 2 seconds"), and rbed tells you *when* it happened: when it started, when it was confirmed, when it ended, and what the data looked like in between. Every chart on this site is the real rbed, compiled to JavaScript and running in your browser.
 
+The terms (Sample, Channel, Condition, Rule, Event, Detector, Pending, Confirmed, Truncated, ...) are defined in the [glossary](https://github.com/romanhaendler/rbed/blob/main/CONTEXT.md).
+
 ## Install
 
 rbed {{version}} is on Maven Central and needs Java 17 or later.
@@ -37,21 +39,39 @@ Three steps are always the same:
 2. **Feed it Samples** with `push(timestamp, values)`, in time order.
 3. **Close it** with `close()` when the data ends, so that an Event still in progress is reported, too.
 
-Methods used: [`Rule.named`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#named%28java.lang.String%29), [`when`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#when%28io.github.romanhaendler.rbed.Condition%29), [`above`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Expression.html#above%28double%29), [`Detector.builder`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#builder%28%29), [`rules`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.Builder.html#rules%28io.github.romanhaendler.rbed.Rule...%29), [`listener`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.Builder.html#listener%28io.github.romanhaendler.rbed.EventListener%29), [`build`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.Builder.html#build%28%29), [`name`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Event.html#name%28%29), [`start`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Event.html#start%28%29), [`end`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Event.html#end%28%29), [`push`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#push%28long,java.util.Map%29), [`close`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#close%28%29).
+The Java on every page can be copied and run: it starts with its imports, and its statements are the body of a method, such as `main`. Where it calls a method of its own, that method follows under `// In the enclosing class:`. Time values are written as `java.time.Duration`; every method that takes one also takes a `long` in milliseconds. Short snippets in the text assume the Channels and Rules they name, and these imports:
+
+```java
+import static io.github.romanhaendler.rbed.Conditions.*;   // during, after, count, totalDuration, latest
+
+import io.github.romanhaendler.rbed.*;
+import java.time.Duration;
+import java.util.Map;
+```
+
+Import rbed's types with `io.github.romanhaendler.rbed.*` or one by one, not together with `import java.util.*;`: `EventListener` shares its simple name with `java.util.EventListener`.
+
+## Good to know
+
+- A Detector is single-use and not thread-safe. Use one per data stream, and feed it from one thread at a time.
+- Rules and the listener are fixed when the Detector is built. To change Rules, build a new Detector and pass it the Events so far as [History](history/).
+- A pushed Sample costs one hash lookup per value, and in steady state (no Event starting or ending) a Detector allocates nothing: from about 1.2 million Samples per second for 50 Rules over 20 Channels to over 40 million for a single threshold Rule. See the README's [Performance](https://github.com/romanhaendler/rbed#performance), and [Memory and the Retention Limit](memory/) for what a Detector keeps.
+
+Methods used: [`Channel.named`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Channel.html#named%28java.lang.String%29), [`Rule.named`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#named%28java.lang.String%29), [`Rule.when`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#when%28io.github.romanhaendler.rbed.Condition%29), [`Expression.above`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Expression.html#above%28double%29), [`Detector.builder`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#builder%28%29), [`Detector.Builder.rules`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.Builder.html#rules%28io.github.romanhaendler.rbed.Rule...%29), [`Detector.Builder.listener`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.Builder.html#listener%28io.github.romanhaendler.rbed.EventListener%29), [`EventListener.onEnded`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/EventListener.html#onEnded%28io.github.romanhaendler.rbed.Event%29), [`Event.name`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Event.html#name%28%29), [`Event.start`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Event.html#start%28%29), [`Event.end`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Event.html#end%28%29), [`Detector.Builder.build`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.Builder.html#build%28%29), [`Detector.push`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#push%28long,java.util.Map%29), [`Detector.close`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#close%28%29).
 
 ## Domain examples
 
 Runnable end-to-end examples from different domains, each a test with its expected Events and a page of its own where it runs live.
 
-- [**Cranes** `CraneScenarioTest` hysteresis, during, classifying a load, partial set-down via latest](cranes/)
-- [**Manufacturing** `MachineToolOverheatExample` sampling-rate mode, rate, combined durings](manufacturing/)
-- [**Building services** `HvacShortCyclingExample` after().within(), count().within()](building-services/)
-- [**Healthcare** `VitalSignsExample` advanceTo and age() for a silent sensor, maxGap](healthcare/)
-- [**Automotive** `FleetTelematicsExample` deceleration via rate, distance via integral](automotive/)
-- [**Finance** `TradingSignalsExample` moving-average crosses, truncated start after warm-up](finance/)
-- [**Logistics** `ColdChainExample` attributing a cause with after, totalDuration limit](logistics/)
-- [**Environment** `FloodWarningExample` smoothed rate of a moving average, hysteresis](environment/)
-- [**Sports** `IntervalTrainingExample` after, rep count via count, listener-side timing](sports/)
-- [**IT operations** `DeploymentRegressionExample` a Pulse Channel reporting deployments](it-operations/)
+- [**Cranes** `CraneScenarioTest`: hysteresis, during, classifying a load, partial set-down via latest](cranes/)
+- [**Manufacturing** `MachineToolOverheatExample`: sampling-rate mode, rate, combined durings](manufacturing/)
+- [**Building services** `HvacShortCyclingExample`: after().within(), count().within()](building-services/)
+- [**Healthcare** `VitalSignsExample`: advanceTo and age() for a silent sensor, maxGap](healthcare/)
+- [**Automotive** `FleetTelematicsExample`: deceleration via rate, distance via integral](automotive/)
+- [**Finance** `TradingSignalsExample`: moving-average crosses, Truncated start after warm-up](finance/)
+- [**Logistics** `ColdChainExample`: attributing a cause with after, totalDuration limit](logistics/)
+- [**Environment** `FloodWarningExample`: smoothed rate of a moving average, hysteresis](environment/)
+- [**Sports** `IntervalTrainingExample`: after, rep count via count, listener-side timing](sports/)
+- [**IT operations** `DeploymentRegressionExample`: a Pulse Channel reporting deployments](it-operations/)
 
 [Source on GitHub](https://github.com/romanhaendler/rbed) · [Maven Central](https://central.sonatype.com/artifact/io.github.romanhaendler/rbed) · [MIT licence](https://github.com/romanhaendler/rbed/blob/main/LICENSE)

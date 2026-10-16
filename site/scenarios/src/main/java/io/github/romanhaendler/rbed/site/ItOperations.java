@@ -29,22 +29,37 @@ final class ItOperations extends Scenario {
             new Parameter("cpu", "High CPU above", 90, 50, 100, 5, "%"),
             new Parameter("cpuMinutes", "High CPU for", 5, 1, 15, 1, "min")),
         """
+        import static io.github.romanhaendler.rbed.Conditions.*;
+
+        import io.github.romanhaendler.rbed.*;
+        import java.time.Duration;
+        import java.util.HashMap;
+        import java.util.Map;
+
         Channel cpu = Channel.named("cpu");
         Channel deploy = Channel.pulse("deploy");
         Channel errors = Channel.named("errors");
-        long MINUTE = 60_000;
 
         Rule deployment = Rule.named("Deployment").when(deploy.above(0.5));
         Rule errorSpike = Rule.named("ErrorSpike")
-            .when(errors.above(${errors})).forDuration(${spikeMinutes} * MINUTE);
+            .when(errors.above(${errors})).forDuration(Duration.ofMinutes(${spikeMinutes}));
         Rule regression = Rule.named("Regression")
-            .when(after(deployment).within(${window} * MINUTE).and(errors.above(${errors})))
-            .forDuration(${spikeMinutes} * MINUTE);
+            .when(after(deployment).within(Duration.ofMinutes(${window})).and(errors.above(${errors})))
+            .forDuration(Duration.ofMinutes(${spikeMinutes}));
         Rule highCpu = Rule.named("HighCpu")
-            .when(cpu.above(${cpu})).forDuration(${cpuMinutes} * MINUTE);
+            .when(cpu.above(${cpu})).forDuration(Duration.ofMinutes(${cpuMinutes}));
         Detector detector = Detector.builder()
             .rules(deployment, errorSpike, regression, highCpu)
             .build();
+
+        for (int m = 0; m < 120; m++) {   // every minute
+          Map<Channel, Double> values = new HashMap<>();
+          values.put(errors, m >= 25 && m < 35 ? 12.0 : m >= 80 && m < 85 ? 9.0 : 1.0);
+          values.put(cpu, m >= 90 && m < 100 ? 95.0 : 50.0);
+          if (m == 10) values.put(deploy, 1.0);   // a deployment, in this Sample only
+          detector.push(m * 60_000L, values);
+        }
+        detector.close();
         """);
   }
 

@@ -4,10 +4,11 @@ A Detector evaluates its Rules only when something happens. If Samples stop arri
 
 ## Time without Samples
 
-`x.age()` is the number of milliseconds since `x` last had a value, measured at the current Sample or advance; before the first value it is undefined. At a Sample that carries `x` it is 0, so `age()` only grows at advances:
+`x.age()` is the number of milliseconds since `x` last had a value, measured at the current Sample or advance; before the first value it is undefined. At a Sample that carries `x` it is 0. It grows at Samples that do not carry `x` and at advances, so when no Samples arrive at all, only advances make it grow:
 
 ```java
-Rule sensorLost = Rule.named("SensorLost").when(hr.age().above(10_000));
+Rule sensorLost = Rule.named("SensorLost")
+    .when(hr.age().above(Duration.ofSeconds(10).toMillis()));
 Detector detector = Detector.builder()
     .rules(sensorLost)
     .build();
@@ -24,9 +25,12 @@ A heart rate is reported every second. From 12 s it is high, and from 25 to 44 s
 
 <!-- scenario silent-sensors draw -->
 
-With the timer, the last reading at 24 s grows older with every advance: the dashed line climbs a second per second. At 30 s it is 6 s old, more than the limit of 5 s: `HighHeartRate` Ends there and `SensorLost` is Confirmed, both without a Sample. `SensorLost` Ends at 45 s, when the sensor reports again. Raise *Silent after*, and both move later.
+At the defaults, with the timer, the last reading at 24 s grows older with every advance: the dashed line climbs a second per second. At 30 s it is 6 s old, more than the limit of 5 s: `HighHeartRate` Ends there and `SensorLost` is Confirmed, both without a Sample. `SensorLost` Ends at 45 s, when the sensor reports again.
 
-Choose "Nothing happens" instead of the timer, and the Detector learns of the silence only when the next Sample arrives at 45 s. That Sample carries `hr`, so its age is 0 again, and the dashed line, read only at Samples, stays at 0 throughout: `SensorLost` never happens, and `HighHeartRate` runs through the whole silence on a reading that is 21 seconds old by the time the next one arrives.
+### Things to try
+
+- Raise *Silent after* to 10 s: both move later, to 35 s.
+- Choose "Nothing happens" instead of the timer: the Detector learns of the silence only when the next Sample arrives at 45 s. That Sample carries `hr`, so its age is 0 again, and the dashed line, read only at Samples, stays at 0 throughout: there is no `SensorLost` Event, and `HighHeartRate` runs through the whole silence on a reading that is 21 seconds old by the time the next one arrives.
 
 ## What an advance does
 
@@ -40,4 +44,4 @@ An advance must lie after the previous Sample or advance, and a Detector with a 
 - [Detector](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html) in the Javadoc: `advanceTo`
 - The [Healthcare](../healthcare/) example: a sensor dropout during which the monitor advances its Detector every second
 
-Methods used: [`when`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#when%28io.github.romanhaendler.rbed.Condition%29), [`age`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/ChannelExpression.html#age%28%29), [`above`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Expression.html#above%28double%29), [`push`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#push%28long,java.util.Map%29), [`advanceTo`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#advanceTo%28long%29), [`and`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Condition.html#and%28io.github.romanhaendler.rbed.Condition%29), [`not`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Condition.html#not%28%29).
+Methods used: [`Channel.named`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Channel.html#named%28java.lang.String%29), [`ChannelExpression.age`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/ChannelExpression.html#age%28%29), [`Expression.above`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Expression.html#above%28double%29), [`Rule.named`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#named%28java.lang.String%29), [`Rule.when`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#when%28io.github.romanhaendler.rbed.Condition%29), [`Condition.and`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Condition.html#and%28io.github.romanhaendler.rbed.Condition%29), [`Condition.not`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Condition.html#not%28%29), [`Detector.builder`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#builder%28%29), [`Detector.Builder.rules`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.Builder.html#rules%28io.github.romanhaendler.rbed.Rule...%29), [`Detector.Builder.build`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.Builder.html#build%28%29), [`Detector.push`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#push%28long,java.util.Map%29), [`Detector.advanceTo`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#advanceTo%28long%29), [`Detector.close`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#close%28%29).

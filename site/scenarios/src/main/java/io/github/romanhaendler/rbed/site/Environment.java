@@ -25,20 +25,31 @@ final class Environment extends Scenario {
             new Parameter("liftHours", "Lifted after", 2, 0, 6, 1, "h"),
             new Parameter("gapMinutes", "Interrupted by a gap over", 120, 15, 240, 15, "min")),
         """
+        import io.github.romanhaendler.rbed.*;
+        import java.time.Duration;
+        import java.util.Map;
+
         Channel level = Channel.named("level");
-        long MINUTE = 60_000, HOUR = 60 * MINUTE;
 
         Rule floodWarning = Rule.named("FloodWarning")
             .when(level.above(${warning})
-                .and(level.averageOverSamples(4).rate().above(${rising} / (HOUR / 1000.0))))
-            .forDuration(HOUR / 2)
-            .endWhen(level.below(${lift})).forDuration(${liftHours} * HOUR)
-            .maxGap(${gapMinutes} * MINUTE);
+                .and(level.averageOverSamples(4).rate().above(${rising} / 3600.0)))  // cm/h in cm/s
+            .forDuration(Duration.ofMinutes(30))
+            .endWhen(level.below(${lift})).forDuration(Duration.ofHours(${liftHours}))
+            .maxGap(Duration.ofMinutes(${gapMinutes}));
         Rule receding = Rule.named("Receding")
             .when(level.falling().and(level.above(${warning})));
         Detector detector = Detector.builder()
             .rules(floodWarning, receding)
             .build();
+
+        for (int quarter = 0; quarter < 72 * 4; quarter++) {   // every 15 minutes for 72 h
+          if (quarter == 20 * 4) continue;                       // the report at 20 h is missing
+          double h = quarter / 4.0;
+          double cm = h <= 12 ? 200 + 20 * h : Math.max(200, 440 - 10 * (h - 12));
+          detector.push(quarter * 900_000L, Map.of(level, cm));
+        }
+        detector.close();
         """);
   }
 
