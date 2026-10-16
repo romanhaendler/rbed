@@ -8,6 +8,7 @@ Needs Java 17+, Maven and Node 22+. From a clean checkout, in this directory:
 npm ci
 npm run build     # installs rbed from the repository root, compiles the Scenarios with TeaVM, builds dist/
 npm test          # installs rbed, runs the JUnit tests and TeaVM, then the Node parity tests
+npm run build:web # builds dist/ from the module npm test compiled, as the Pages workflow does
 npm run preview   # serves dist/ at http://localhost:4173/rbed/
 npm run test:browser  # after build: the Playwright smoke test against dist/ (once: npx playwright install chromium)
 ```

@@ -35,7 +35,8 @@ jobs:
           cache-dependency-path: site/package-lock.json
       - run: npm ci
       - run: npm test
-      - run: npm run build
+      # npm test has already installed rbed and compiled the Scenarios with TeaVM
+      - run: npm run build:web
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
       - uses: actions/upload-pages-artifact@v5
