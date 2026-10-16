@@ -4,8 +4,8 @@
 // Aggregates, whose rows and the chart's bands select each other; a selected Event's Aggregates
 // are shown in full under the chart. Non-default values live in the address. The Detector runs
 // again on every change. A Scenario that plots an Expression adds it as a dashed line, with the
-// threshold its Rule compares it to and the stretches where it is undefined; on a chart of its
-// own under the Events if it has a unit of its own (a count of Events, a duration). On a Scenario
+// threshold its Rule compares it to and the stretches where it is undefined; on an axis and a
+// band of the plot of its own if it has a unit of its own (a count of Events, a duration). On a Scenario
 // whose Rules read latest(...), hovering highlights the Event latest(...) reads at that time.
 import { LimitBand, LimitLine, Tooltip, type TooltipHit, useChart } from '@umriss-ui/charts';
 import { Alert, Button, Checkbox, FormField, RadioGroup, Slider, VisuallyHidden } from '@umriss-ui/core';
@@ -22,8 +22,10 @@ type BandRow = { t: number; s: number | null; key?: string };
 /** A lifecycle mark, on its Rule's lane. */
 type MarkRow = { t: number; y: number };
 
-/** The Event lanes take the bottom of the plot, one unit each; the Channels the top three units. */
+/** The Event lanes take the bottom of the plot, one unit each; the Channels the top three units.
+    An Expression with a unit of its own takes two units between them. */
 const COURSE_UNITS = 3;
+const OWN_UNITS = 2;
 const EVENT_COLOUR = 'var(--uc-series-2)';
 const EVENT_STATES = [
   { label: 'Pending', color: `color-mix(in srgb, ${EVENT_COLOUR} 35%, transparent)` },
@@ -74,8 +76,9 @@ function niceStep(rough: number): number {
   return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * power;
 }
 
-/** The Channels' axis: ticks over the values only, and a domain stretched below them for the lanes. */
-function courseAxis(rows: Row[], channels: string[], lanes: number, also: number[] = []) {
+/** An axis with ticks over the values only, and a domain that puts them into the band from `below`
+    to `below + units` of the plot's `total` units, counted from its bottom. */
+function bandAxis(rows: Row[], channels: string[], also: number[], below: number, units: number, total: number) {
   const values = [...rows.flatMap((r) => channels.map((c) => r[c])), ...also].filter(Number.isFinite) as number[];
   const lo = Math.min(...values);
   const hi = Math.max(...values);
@@ -86,7 +89,9 @@ function courseAxis(rows: Row[], channels: string[], lanes: number, also: number
   for (let k = first; k <= last; k++) ticks.push(Number((k * step).toPrecision(12)));
   const top = last * step + step / 2;
   const bottom = first * step - step / 2;
-  const domain: [number, number] = [top - ((top - bottom) * (COURSE_UNITS + lanes)) / COURSE_UNITS, top];
+  const span = ((top - bottom) * total) / units;
+  const from = bottom - (span * below) / total;
+  const domain: [number, number] = [from, from + span];
   return { ticks, domain };
 }
 
@@ -194,10 +199,12 @@ function EventChart({
   latest?: Event;
   select: (key: string | undefined) => void;
 }) {
-  const { scenario, rows, lifecycle, channels, rules } = shown;
+  const { scenario, rows, lifecycle, channels, rules, expression } = shown;
   const { name: unit, millis } = scenario.timeUnit;
-  // An Expression with a unit of its own has its own chart (ExpressionChart).
-  const expression = shown.expression?.unit === undefined ? shown.expression : undefined;
+  // An Expression with a unit of its own (a count of Events, a duration) is not on the Channels'
+  // scale: it gets a band of the plot and an axis of its own, between the Channels and the lanes.
+  const own = expression?.unit !== undefined ? expression : undefined;
+  const onCourse = own ? undefined : expression;
   // A click (or Enter) on the chart selects the Event under it, if any.
   const { Chart, XAxis, YAxis, Line, Scatter, StateBand } = useChart(rows, {
     onSelect: (hit) => {
@@ -209,25 +216,28 @@ function EventChart({
   const live = useRef(shown);
   live.current = shown;
   const lanes = rules.length;
+  const below = lanes + (own ? OWN_UNITS : 0);
+  const total = COURSE_UNITS + below;
   // The axis keeps its scale while Channels are hidden.
-  const course = expression
-    ? courseAxis(rows, [...scenario.channels, EXPRESSION], lanes, [expression.threshold])
-    : courseAxis(rows, scenario.channels, lanes);
+  const course = onCourse
+    ? bandAxis(rows, [...scenario.channels, EXPRESSION], [onCourse.threshold], below, COURSE_UNITS, total)
+    : bandAxis(rows, scenario.channels, [], below, COURSE_UNITS, total);
+  const ownAxis = own && bandAxis(rows, [EXPRESSION], [own.threshold], lanes, OWN_UNITS, total);
   return (
     <Chart
-      height={300}
-      syncId={scenario.id}
+      height={own ? 380 : 300}
       ariaLabel={`${scenario.channels.join(', ')} over time in ${unit}, with the Events of ${scenario.rules.join(', ')} as bands, Pending then Confirmed, and their lifecycle marked`}
     >
       <XAxis value="t" domain={[rows[0].t, rows[rows.length - 1].t]} label={`Time (${unit})`} />
       <YAxis domain={course.domain} ticks={course.ticks} label={channels.join(', ')} />
+      {own && ownAxis && <YAxis id="own" grid={false} domain={ownAxis.domain} ticks={ownAxis.ticks} />}
       {/* Lane i (first Rule on top) spans lanes - i - 1 .. lanes - i. The lane names change with
           the shown Rules; the chart's key remounts it then, since tickFormat is compared by text. */}
       <YAxis
         id="lanes"
         position="right"
         grid={false}
-        domain={[0, COURSE_UNITS + lanes]}
+        domain={[0, total]}
         ticks={rules.map((_, i) => lanes - i - 0.5)}
         tickFormat={(v) => rules[Math.round(lanes - 0.5 - v)] ?? ''}
       />
@@ -235,7 +245,8 @@ function EventChart({
         undefinedStretches(rows).map(([from, to]) => (
           <LimitBand key={from} orientation="x" from={from} to={to} color="var(--u-color-text-muted)" label="undefined" />
         ))}
-      {expression && <LimitLine value={expression.threshold} label={`threshold ${expression.threshold}`} />}
+      {onCourse && <LimitLine value={onCourse.threshold} label={`threshold ${onCourse.threshold}`} />}
+      {own && <LimitLine axisId="own" value={own.threshold} label={`threshold ${own.threshold} ${own.unit}`} />}
       {selected && (
         <LimitBand orientation="x" from={selected.start / millis} to={selected.end / millis} color="var(--u-color-accent)" />
       )}
@@ -279,30 +290,11 @@ function EventChart({
           <Line key={c} value={c} name={c} color={channelColour(scenario, c)} markers="always" />
         ),
       )}
-      {expression && (
-        <Line value={EXPRESSION} name={expression.name} color={expressionColour(scenario)} dash={[6, 4]} markers="always" />
+      {onCourse && (
+        <Line value={EXPRESSION} name={onCourse.name} color={expressionColour(scenario)} dash={[6, 4]} markers="always" />
       )}
+      {own && <Line value={EXPRESSION} name={own.name} color={expressionColour(scenario)} dash={[6, 4]} yAxisId="own" />}
       <Tooltip mode="x" render={(hit: TooltipHit<Row>) => <Readout shown={live.current} t={hit.xValue} />} />
-    </Chart>
-  );
-}
-
-/** An Expression with a unit of its own, such as a running count of Events, with its threshold,
-    under the Events on the same time axis. */
-function ExpressionChart({ scenario, rows, expression }: { scenario: Scenario; rows: Row[]; expression: PlottedExpression }) {
-  const { Chart, XAxis, YAxis, Line } = useChart(rows);
-  const { name: unit } = scenario.timeUnit;
-  return (
-    <Chart
-      height={160}
-      syncId={scenario.id}
-      ariaLabel={`${expression.name} in ${expression.unit} at every Sample, over time in ${unit}, against the threshold ${expression.threshold}`}
-    >
-      <XAxis value="t" domain={[rows[0].t, rows[rows.length - 1].t]} label={`Time (${unit})`} />
-      <YAxis label={expression.unit} />
-      <LimitLine value={expression.threshold} label={`threshold ${expression.threshold}`} />
-      <Line value={EXPRESSION} name={expression.name} color={expressionColour(scenario)} dash={[6, 4]} />
-      <Tooltip mode="x" />
     </Chart>
   );
 }
@@ -596,9 +588,6 @@ export function ScenarioView({ scenario }: { scenario: Scenario }) {
           latest={result.events.find((e) => eventKey(e) === hoveredLatest)}
           select={select}
         />
-        {result.expression?.unit !== undefined && (
-          <ExpressionChart key={scenario.id} scenario={scenario} rows={rows} expression={result.expression} />
-        )}
         <LifecycleKey />
         <EventSummary
           scenario={scenario}

@@ -396,6 +396,14 @@ class BridgeTest {
   }
 
   @Test
+  void withoutADesaturationDurationTheCombinationStartsWithTheDip() {
+    assertEquals(List.of("Desaturation 20000..25000", "Desaturation 100000..160000",
+            "HypoxicTachycardia 100000..160000", "Tachycardia 40000..200000",
+            "Desaturation 230000..260000"),
+        events(run("during", "{\"desaturation\": 0}")));
+  }
+
+  @Test
   void afterAtDefaultsAttributesOnlyTheExcursionSoonAfterTheDoor() {
     assertEquals(List.of("DoorOpen 600000..720000", "ExcursionAfterDoor 900000..1500000",
             "DoorOpen 3600000..3660000"),
@@ -418,10 +426,13 @@ class BridgeTest {
 
   @Test
   void countAtDefaultsFindsTheFourthStartWithinAnHour() {
+    Map<String, Object> result = run("count", "{}");
     assertEquals(List.of("Run 600000..900000", "Run 1800000..2100000", "Run 2700000..3000000",
             "Run 3600000..3900000", "FrequentStarts 3660000..4320000", "Run 9000000..9300000",
             "Run 12000000..12300000"),
-        events(run("count", "{}")));
+        events(result));
+    assertEquals(List.of("660000", "1860000", "2760000", "3660000", "3660000", "9060000",
+        "12060000"), confirmed(result));
   }
 
   @Test
@@ -438,6 +449,8 @@ class BridgeTest {
     assertEquals(3.0, plot.get("threshold"));
     List<Double> values = (List<Double>) plot.get("values");   // one per minute
     assertEquals(List.of(0.0, 1.0), values.subList(10, 12));      // Run Confirmed at 11
+    assertEquals(List.of(1.0, 2.0), values.subList(30, 32));
+    assertEquals(List.of(2.0, 3.0), values.subList(45, 47));
     assertEquals(List.of(3.0, 4.0), values.subList(60, 62));      // the fourth Confirmed at 61
     assertEquals(List.of(4.0, 3.0), values.subList(71, 73));      // the first leaves at 72
   }
