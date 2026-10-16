@@ -645,6 +645,50 @@ pre {
   overflow-x: auto;
 }
 
+/* On a phone, an Event's cells flow under its name as labelled pieces ("Start (s) 12"), so the
+   live tables need no sideways scrolling; the column heads stay for screen readers. */
+@media (max-width: 600px) {
+  .stacked thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .stacked tr {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: var(--u-space-3);
+    padding: var(--u-space-2) 0;
+    border-bottom: 1px solid var(--u-edge-color);
+  }
+  .stacked tr:has(+ .aggregateRow) {
+    padding-bottom: var(--u-space-1);
+    border-bottom: none;
+  }
+  .stacked .aggregateRow {
+    padding-top: 0;
+  }
+  .eventTable.stacked td {
+    padding: 0;
+    border-bottom: none;
+  }
+  .stacked td:first-child {
+    flex-basis: 100%;
+  }
+  .stacked td:empty {
+    display: none;
+  }
+  .stacked td[data-label]::before {
+    content: attr(data-label) ' ';
+    color: var(--u-color-text-muted);
+  }
+  .stacked tr[data-selected] {
+    background: color-mix(in srgb, var(--u-color-accent) 12%, transparent);
+  }
+}
+
 /* ---------------- Tiles ---------------- */
 
 .tiles {

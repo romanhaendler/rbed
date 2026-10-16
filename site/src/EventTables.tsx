@@ -1,9 +1,9 @@
 // The tables under a Scenario's chart: its Events with their Aggregates (a row selects its
 // Event), the Discarded Pending Events, and every Aggregate of the selected Event. Their columns
 // are those of the prerendered tables (src/events.ts).
-import { type Aggregates, formatNumber } from './aggregates.ts';
+import { type Aggregates, aggregatesLine, formatNumber } from './aggregates.ts';
 import type { Discard, Event, Scenario } from './bridge';
-import { aggregatesText, discardedCells, discardedHead, eventCells, eventHead, eventKey, hasNotes } from './events.ts';
+import { discardedCells, discardedHead, eventCells, eventHead, eventKey, hasNotes } from './events.ts';
 
 /** The Pending Events that were Discarded; no table while there is none. */
 export function DiscardedTable({ scenario, discarded }: { scenario: Scenario; discarded: Discard[] }) {
@@ -11,7 +11,7 @@ export function DiscardedTable({ scenario, discarded }: { scenario: Scenario; di
   if (discarded.length === 0) return null;
   return (
     <div className="tableScroll">
-      <table className="eventTable" id="discarded">
+      <table className="eventTable stacked" id="discarded">
         <caption>Discarded Pending Events</caption>
         <thead>
           <tr>
@@ -26,7 +26,9 @@ export function DiscardedTable({ scenario, discarded }: { scenario: Scenario; di
           {discarded.map((d) => (
             <tr key={`${d.name} ${d.start}`}>
               {discardedCells(d, millis).map((c, i) => (
-                <td key={i}>{c}</td>
+                <td key={i} data-label={i > 0 ? discardedHead(unit)[i] : undefined}>
+                  {c}
+                </td>
               ))}
             </tr>
           ))}
@@ -101,7 +103,7 @@ export function EventTable({
   const head = eventHead(unit, notes);
   return (
     <div className="tableScroll">
-      <table className="eventTable" id="events">
+      <table className="eventTable stacked" id="events">
         <caption>Events</caption>
         <thead>
           <tr>
@@ -134,13 +136,19 @@ export function EventTable({
                   </button>
                 </td>
                 {cells.map((c, i) => (
-                  <td key={i}>{c}</td>
+                  <td key={i} data-label={head[i + 1]}>
+                    {c}
+                  </td>
                 ))}
               </tr>,
-              // The Aggregates under their Event, so the table stays five columns wide on a phone.
+              // The Aggregates under their Event, as a line of their own.
               <tr key={`${key} aggregates`} className="aggregateRow" data-selected={key === selected || undefined}>
                 <td colSpan={head.length}>
-                  <span className="aggregateLabel">Aggregates</span> {aggregatesText(e)}
+                  <span className="aggregateLabel">Aggregates</span>{' '}
+                  {Object.entries(e.aggregates).map(([channel, a], i) => [
+                    i > 0 && '; ',
+                    <span key={channel}>{aggregatesLine(channel, a)}</span>,
+                  ])}
                 </td>
               </tr>,
             ];
