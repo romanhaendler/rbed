@@ -10,6 +10,7 @@ Create the Channel with `Channel.pulse(name)` instead of `Channel.named(name)`. 
 
 A service reports its errors once a minute, and the Pulse Channel `deploy` reports its deployments, at minutes 10 and 60. `Deployment` is an Event while a deployment is reported, which is exactly one Sample: at the next Sample `deploy` is absent, and the Event Ends. `Regression` is an error spike within a window after a Deployment, written with `after(deployment).within(...)`.
 
+<!-- live -->
 The `deploy` values are drawn as marks at their Samples, not as a line, because there is no value between them.
 
 <!-- scenario pulse-channels draw -->

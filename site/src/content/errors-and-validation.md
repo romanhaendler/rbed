@@ -1,6 +1,9 @@
 # Errors and validation
 
-rbed reports a mistake as early as it can, most of them when the Detector is built, and always with an exception whose message names what is wrong. On this page, some controls lead into such mistakes on purpose: rbed then rejects the Rules, and the page shows its message in place of the chart.
+rbed reports a mistake as early as it can, most of them when the Detector is built, and always with an exception whose message names what is wrong.
+
+<!-- live -->
+On this page, some controls lead into such mistakes on purpose: rbed then rejects the Rules, and the page shows its message in place of the chart.
 
 ## A warm room
 
@@ -12,7 +15,7 @@ At the defaults, the average over 5 Samples rises above 25 °C at 12 s, the thir
 
 ### Things to try
 
-- Raise *Average over* above the *Retention Limit*, the most entries one window may keep (1,000,000 by default, 10 here). A window over Samples keeps that many values, which the Retention Limit caps, so `build()` rejects the Rule and says how to fix it: raise the limit with `Detector.builder().retentionLimit(...)`.
+- Raise *Average over* above the *Retention Limit*, the most entries one window may keep (1,000,000 by default, 10 here). An average over n Samples must keep n values, so `build()` rejects an n above the Retention Limit and says how to fix it: raise the limit with `Detector.builder().retentionLimit(...)`.
 - Set the *Retention Limit* to 0: `retentionLimit` itself rejects a limit below one.
 - Set *Warm for* to −1 s: `forDuration` rejects a negative duration as soon as the Rule is written, before any Detector exists.
 - Add `Hot` before `Warm`. A Rule may only refer to Rules added before it, since Rules are evaluated in the order they are added, so `build()` rejects `Hot`.
@@ -23,6 +26,7 @@ At the defaults, the average over 5 Samples rises above 25 °C at 12 s, the thir
 - `forDuration` or `forSamples` before any `when` or `endWhen`; negative durations, `forSamples(0)`, `between` with its low above its high.
 - A sampling rate outside (0, 1000] Hz; a History Event that has not Ended, or whose name matches no Rule; one Channel name used both as a Pulse Channel and as an ordinary one.
 - While running: a timestamp not after the previous Sample or advance (or, with History, not after its latest end); a NaN, infinite or null value (the Sample is then ignored); pushing after `close()`; the wrong `push` for the sampling mode.
+- A Rule referring to itself, to a Rule added after it, or to one not added at all (`build()`).
 - Reading the Aggregates of a Channel the Rule does not aggregate.
 
 The [Restarts: History](../history/) and [Silent sensors](../silent-sensors/) pages show restarts and time advances that stay within these rules. What the Retention Limit is, and what happens when a window reaches it, is on [Memory and the Retention Limit](../memory/).

@@ -11,7 +11,9 @@ A machine tool's spindle temperature and load are sampled at 1 Hz without timest
 - **OverheatUnderLoad**: both at once, `during` combined with `and`.
 - **FastHeating**: heating faster than 0.5 °C/s for 5 consecutive Samples.
 
-`during(overheat)` stays true until Overheat's End Condition has held for its minute (391 s), although its end timestamp is where the End Condition began (331 s). A streaming Detector cannot know earlier that the Event is over.
+At the defaults, the load is 90 % from 100 s to 400 s, so `HighLoad` runs from 100 s to 400 s, Confirmed at 110 s. The temperature rises from 101 s, and `FastHeating` runs from there, Confirmed at the fifth Sample at 105 s, to 141 s, the first Sample without a rise. It passes 80 °C at 121 s: `Overheat` is Confirmed 30 s later, at 151 s, and `OverheatUnderLoad` starts with it. The temperature falls below 70 °C at 331 s, where `Overheat` Ends.
+
+`OverheatUnderLoad` Ends only at 391 s: `during(overheat)` stays true until Overheat's End Condition has held for its minute (391 s), although its end timestamp is where the End Condition began (331 s). A streaming Detector cannot know earlier that the Event is over.
 
 ### Things to try
 

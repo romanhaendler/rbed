@@ -7,8 +7,10 @@ A runner's speed and heart rate are recorded at 1 Hz during an interval session:
 ## The Rules
 
 - **Sprint**: faster than 6 m/s for 5 s, over below 4 m/s.
-- **Recovered**: the heart rate below 120 within 2 minutes after a Sprint. A listener computes the recovery time, from the end of a Sprint to Recovered, shown as a note in the table: 51 s after each rep. The last one still holds when the data ends, so its end is Truncated.
-- **SessionDone**: more than 2 Sprints, that is, the third Sprint was Confirmed, at 305 s.
+- **Recovered**: the heart rate below 120 within 2 minutes after a Sprint. A listener computes the recovery time, from the end of a Sprint to Recovered, shown as a note in the table.
+- **SessionDone**: more than 2 Sprints, that is, the third Sprint was Confirmed.
+
+At the defaults, the three Sprints run from 60 s, 180 s and 300 s for 30 s each, Confirmed 5 s after their start. Each time, 51 s after the Sprint's end, the heart rate is below 120: `Recovered` runs from 141 s, 261 s and 381 s until the next Sprint, and the last one still holds when the data ends at 419 s, so its end is Truncated. The third Sprint is Confirmed at 305 s, where `SessionDone` starts.
 
 ### Things to try
 

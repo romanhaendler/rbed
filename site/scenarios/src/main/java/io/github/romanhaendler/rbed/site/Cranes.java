@@ -128,6 +128,14 @@ final class Cranes extends Scenario {
     return event.aggregates(WEIGHT).mean() < 1500 ? "pallet" : "container";
   }
 
+  /** The limit {@code PartialSetDown} compares the weight with; it has no threshold of its own. */
+  @Override
+  List<Plot> plots(Map<String, Double> values) {
+    double partial = values.get("partial");
+    return List.of(new Plot("latest(loadLifted).max(weight).times(" + partial + ")",
+        latest(rules(values)[0]).max(WEIGHT).times(partial)));
+  }
+
   @Override
   List<Threshold> thresholds(Map<String, Double> values) {
     return List.of(new Threshold(WEIGHT, "LoadLifted", "when >", values.get("lift")),

@@ -6,8 +6,10 @@ A river gauge reports the water level every 15 minutes; the report at 20 h is mi
 
 ## The Rules
 
-- **FloodWarning**: above 300 cm and still rising faster than 10 cm/h, for 30 minutes; lifted only once below 250 cm for 2 hours. Reports more than 2 hours apart interrupt it. It starts at 5.25 h (305 cm) and ends at 31.25 h (247.5 cm).
-- **Receding**: falling while still above 300 cm, from 12.25 h (437.5 cm) to 26 h, where the level is exactly 300 cm.
+- **FloodWarning**: above 300 cm and still rising faster than 10 cm/h, for 30 minutes; lifted only once below 250 cm for 2 hours. Reports more than 2 hours apart interrupt it.
+- **Receding**: falling while still above 300 cm.
+
+At the defaults, `FloodWarning` starts at 5.25 h (305 cm), is Confirmed at 5.75 h and Ends at 31.25 h (247.5 cm), the missing report at 20 h being well within 2 hours. `Receding` runs from 12.25 h (437.5 cm) to 26 h, where the level is exactly 300 cm.
 
 ### Things to try
 

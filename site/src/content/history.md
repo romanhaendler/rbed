@@ -21,7 +21,10 @@ Detector detector = Detector.builder()
 
 ## A service that is due every 90 days
 
-A machine reports whether it is in service mode once a day, for 200 days; it is serviced on days 10 and 140. `OverdueService` holds while there was no `Maintenance` in the last 90 days. The vertical line marks the restart: the Detector is closed and a new one takes over from that day.
+A machine reports whether it is in service mode once a day, for 200 days; it is serviced on days 10 and 140. `OverdueService` holds while there was no `Maintenance` in the last 90 days. At the restart, the Detector is closed and a new one takes over from that day.
+
+<!-- live -->
+The vertical line marks the restart.
 
 <!-- scenario history draw -->
 
