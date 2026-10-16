@@ -60,8 +60,9 @@ abstract class Window {
   /** The values from the last {@code millis}, counted back from the latest value. */
   static final class OverDuration extends Window {
     private final long millis;
-    private long[] times = new long[16];
-    private double[] values = new double[16];
+    private final String rule;
+    private long[] times;
+    private double[] values;
     private int head;
     private int size;
     private int evictedSinceExactSum;
@@ -72,6 +73,10 @@ abstract class Window {
     OverDuration(Detector detector, long millis) {
       super(detector);
       this.millis = millis;
+      rule = detector.bindingRule;
+      int initial = Math.min(16, detector.retentionLimit());
+      times = new long[initial];
+      values = new double[initial];
     }
 
     @Override
@@ -79,6 +84,14 @@ abstract class Window {
       if (!started) {
         started = true;
         first = time;
+      }
+      if (size == detector.retentionLimit()) { // full: drop the oldest like one leaving by time
+        sum.add(-values[head]);
+        head = (head + 1) % times.length;
+        size--;
+        detector.retained--;
+        evictedSinceExactSum++;
+        detector.dropped(rule);
       }
       if (size == times.length) grow();
       int tail = (head + size) % times.length;
@@ -112,8 +125,8 @@ abstract class Window {
     }
 
     private void grow() {
-      long[] newTimes = new long[times.length * 2];
-      double[] newValues = new double[values.length * 2];
+      long[] newTimes = new long[Math.min(times.length * 2, detector.retentionLimit())];
+      double[] newValues = new double[Math.min(values.length * 2, detector.retentionLimit())];
       for (int i = 0; i < size; i++) {
         newTimes[i] = times[(head + i) % times.length];
         newValues[i] = values[(head + i) % values.length];

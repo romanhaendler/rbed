@@ -62,9 +62,9 @@
             <configuration>
               <compilerArgs>
                 <arg>--add-modules</arg>
-                <arg>jdk.management</arg>
+                <arg>jdk.management,java.logging</arg>
                 <arg>--add-reads</arg>
-                <arg>io.github.romanhaendler.rbed=jdk.management,java.management</arg>
+                <arg>io.github.romanhaendler.rbed=jdk.management,java.management,java.logging</arg>
               </compilerArgs>
             </configuration>
           </execution>
@@ -82,7 +82,7 @@
           <groups>${surefire.groups}</groups>
           <excludedGroups>${surefire.excludedGroups}</excludedGroups>
           <!-- lets the performance tests measure allocations via the platform MXBean -->
-          <argLine>--add-modules jdk.management --add-reads io.github.romanhaendler.rbed=jdk.management,java.management</argLine>
+          <argLine>--add-modules jdk.management,java.logging --add-reads io.github.romanhaendler.rbed=jdk.management,java.management,java.logging</argLine>
         </configuration>
       </plugin>
     </plugins>

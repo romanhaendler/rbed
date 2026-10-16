@@ -136,6 +136,25 @@ class PerformanceTest {
         "allocated " + perSample + " bytes per Sample");
   }
 
+  /** A duration window held at the Retention Limit drops an entry every Sample, still for free. */
+  @Test
+  void droppingAtTheRetentionLimitDoesNotAllocate() {
+    Detector detector = Detector.builder().retentionLimit(1_000)
+        .rules(Rule.named("AvgTime").when(X.averageOverDuration(60_000).above(0)))
+        .build();
+    Feed feed = new Feed(8, X, i -> 1.0 + (i % 7));
+
+    feed.push(detector, 120_000); // far beyond the limit: the window is full and dropping
+    long dropsBefore = detector.droppedValues();
+    long bytes = allocatedBytes(() -> feed.push(detector, MEASURED_SAMPLES));
+
+    assertTrue(detector.droppedValues() - dropsBefore >= MEASURED_SAMPLES, "no drops measured");
+    double perSample = (double) bytes / MEASURED_SAMPLES;
+    report("dropping allocation", perSample, "bytes/Sample");
+    assertTrue(perSample <= ACCEPTED_BYTES_PER_SAMPLE,
+        "allocated " + perSample + " bytes per Sample");
+  }
+
   /** The realistic Rule set, too, allocates nothing per Sample while no Event changes state. */
   @Test
   void realisticRuleSetDoesNotAllocateInSteadyState() {

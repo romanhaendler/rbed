@@ -65,3 +65,7 @@ _Avoid_: Closed, finished, completed
 **Discarded**:
 A Pending Event whose Conditions stopped holding before it was Confirmed.
 _Avoid_: Cancelled, aborted, rejected
+
+**Retention Limit**:
+The maximum number of entries a single window of a Detector keeps; beyond it, the oldest entries are dropped.
+_Avoid_: Cap, max size, buffer limit

@@ -38,6 +38,8 @@ public final class Detector implements AutoCloseable {
   private boolean closed;
   /** Entries held by moving-average windows and count timestamps; see {@link #retainedValues}. */
   long retained;
+  private final int retentionLimit;
+  private long dropped;
   private List<Event> collected;
   /** Timestamp of the Sample being applied by {@link #applyValue}. */
   private long sampleTimestamp;
@@ -56,7 +58,7 @@ public final class Detector implements AutoCloseable {
    * While binding Rules: the Rule being bound, the names of all Rules and of those bound before
    * it, and the Channels its Conditions refer to.
    */
-  private String bindingRule;
+  String bindingRule;
   private Set<String> added;
   private Set<String> addedBefore;
   private Set<ChannelState> channelLookups;
@@ -64,6 +66,7 @@ public final class Detector implements AutoCloseable {
   private Detector(Builder b) {
     listener = b.listener;
     samplingRate = b.samplingRate;
+    retentionLimit = b.retentionLimit;
     added = b.rules.keySet();
     addedBefore = new HashSet<>();
     rules = new RuleState[b.rules.size()];
@@ -106,6 +109,29 @@ public final class Detector implements AutoCloseable {
    */
   public long retainedValues() {
     return channels.size() + retained;
+  }
+
+  /**
+   * The number of entries dropped because a window was full (see
+   * {@link Builder#retentionLimit}) since this Detector was built. Entries that left a window by
+   * time are not counted.
+   */
+  public long droppedValues() {
+    return dropped;
+  }
+
+  int retentionLimit() {
+    return retentionLimit;
+  }
+
+  /** Counts an entry dropped from the full window of {@code rule}; warns on the first one. */
+  void dropped(String rule) {
+    if (dropped++ == 0) {
+      System.getLogger("io.github.romanhaendler.rbed").log(System.Logger.Level.WARNING,
+          "Rule " + rule + ": a window reached the Retention Limit of " + retentionLimit
+              + " entries; its oldest entries are dropped, so results deviate from the Rule."
+              + " Raise the limit with Detector.builder().retentionLimit(...).");
+    }
   }
 
   public static Builder builder() {
@@ -315,6 +341,7 @@ public final class Detector implements AutoCloseable {
     private final List<Event> history = new ArrayList<>();
     private EventListener listener = new EventListener() {};
     private double samplingRate;
+    private int retentionLimit = 1_000_000;
 
     private Builder() {}
 
@@ -350,6 +377,20 @@ public final class Detector implements AutoCloseable {
         throw new IllegalArgumentException("Sampling rate must be in (0, 1000] Hz: " + hz);
       }
       samplingRate = hz;
+      return this;
+    }
+
+    /**
+     * Sets the Retention Limit: the maximum number of entries a single {@code averageOverDuration}
+     * window keeps (default 1,000,000). When a full window gets a new value, its oldest entry is
+     * dropped, and the Detector logs one warning through {@link System.Logger}. See
+     * {@link Detector#droppedValues}.
+     *
+     * @throws IllegalArgumentException if {@code n} is below 1
+     */
+    public Builder retentionLimit(int n) {
+      if (n < 1) throw new IllegalArgumentException("Retention Limit must be >= 1: " + n);
+      retentionLimit = n;
       return this;
     }
 
