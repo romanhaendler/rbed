@@ -62,8 +62,13 @@ export function scenarios(): Scenario[] {
   return JSON.parse(compiled.scenarios());
 }
 
-export function run(scenarioId: string, parameters: Record<string, number>): Result {
-  return JSON.parse(compiled.run(scenarioId, JSON.stringify(parameters), '{}'));
+/** `drawn`: Channel values the reader drew, by Channel name, one per Sample (null: absent), in place of the Scenario's own. */
+export function run(
+  scenarioId: string,
+  parameters: Record<string, number>,
+  drawn: Record<string, (number | null)[]> = {},
+): Result {
+  return JSON.parse(compiled.run(scenarioId, JSON.stringify(parameters), JSON.stringify(drawn)));
 }
 
 /** The source with each placeholder replaced by its parameter's value. */

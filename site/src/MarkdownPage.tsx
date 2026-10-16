@@ -28,7 +28,7 @@ export function MarkdownPage({ page }: { page: Page }) {
             <CodeBlock language={block.label} source={block.source} />
           </div>
         ) : (
-          <ScenarioView key={block.id} scenario={CATALOGUE.find((s) => s.id === block.id)!} />
+          <ScenarioView key={block.id} scenario={CATALOGUE.find((s) => s.id === block.id)!} draw={block.draw} />
         ),
       )}
     </article>

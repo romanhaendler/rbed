@@ -15,7 +15,7 @@ One Rule, `AboveLimit`, compares an Expression of a noisy temperature with a fix
 
 The temperature starts warm, has a single outlier at 15 s and ramps up from 30 s. The Channel `ambient` reports only from 5 s on.
 
-<!-- scenario expressions -->
+<!-- scenario expressions draw -->
 
 Things to try:
 

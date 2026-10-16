@@ -12,7 +12,7 @@ A service reports its errors once a minute, and the Pulse Channel `deploy` repor
 
 The `deploy` values are drawn as marks at their Samples, not as a line, because there is no value between them. Widen the window to 45 minutes, and the second spike, 40 minutes after the second Deployment, is a Regression too.
 
-<!-- scenario pulse-channels -->
+<!-- scenario pulse-channels draw -->
 
 ## Absent is not undefined
 

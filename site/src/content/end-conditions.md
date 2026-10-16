@@ -18,7 +18,7 @@ The gap between the two thresholds is the hysteresis: noise that stays inside it
 
 A crane's load cell reports the `weight` once a second. At 3 s it lifts a load that reads around 500 kg as it swings, at 14 s a deep swing reads 440 kg, and at 22 s the load is set down. `LoadLifted` starts above 500 kg; the End threshold starts out equal to it, which is no hysteresis at all.
 
-<!-- scenario end-conditions -->
+<!-- scenario end-conditions draw -->
 
 At an End threshold of 500 kg the Rule flaps: four Events, the first only one second long. Move the End threshold down to 450 kg and the noise around 500 no longer Ends anything: one Event from 4 s until the swing at 14 s, and a second one until the load is set down. At 440 kg or lower even the swing stays inside the hysteresis, and a single Event runs from 4 s to 22 s. The README's 50 kg Ends it at 23 s, the first Sample below 50.
 

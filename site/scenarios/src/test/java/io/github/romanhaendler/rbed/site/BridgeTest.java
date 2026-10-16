@@ -41,8 +41,14 @@ class BridgeTest {
 
   @SuppressWarnings("unchecked")
   static Map<String, Object> run(String scenarioId, String parameters) {
-    String result = Bridge.run(scenarioId, parameters, "{}");
-    return (Map<String, Object>) Json.parse(call("run", result, scenarioId, parameters, "{}"));
+    return run(scenarioId, parameters, "{}");
+  }
+
+  @SuppressWarnings("unchecked")
+  static Map<String, Object> run(String scenarioId, String parameters, String drawnChannels) {
+    String result = Bridge.run(scenarioId, parameters, drawnChannels);
+    return (Map<String, Object>) Json.parse(
+        call("run", result, scenarioId, parameters, drawnChannels));
   }
 
   @SuppressWarnings("unchecked")
@@ -529,5 +535,45 @@ class BridgeTest {
   @Test
   void aScenarioWithoutAnExpressionHasNoneInItsResult() {
     assertFalse(run("first-rule", "{}").containsKey("expression"));
+  }
+
+  @Test
+  void aDrawnChannelReplacesTheScenariosValues() {
+    Map<String, Object> result = run("first-rule", "{}", "{\"temp\": [85, 70, 75]}");
+    assertEquals(List.of("HighTemperature 1000..2000 truncatedStart"), events(result));
+    assertEquals(List.of(
+            Map.of("timestamp", 1000.0, "values", Map.of("temp", 85.0)),
+            Map.of("timestamp", 2000.0, "values", Map.of("temp", 70.0)),
+            Map.of("timestamp", 3000.0, "values", Map.of("temp", 75.0))),
+        result.get("samples"));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void onlyTheDrawnChannelsChange() {
+    String stopped = "{\"speed\": [" + "0,".repeat(28) + "0]}";
+    Map<String, Object> result = run("aggregates", "{}", stopped);
+    assertEquals(List.of(), events(result));
+    Map<String, Object> last = ((List<Map<String, Object>>) result.get("samples")).get(28);
+    assertEquals(Map.of("speed", 0.0, "temp", 73.0), last.get("values"));
+  }
+
+  @Test
+  void aNullDrawnValueLeavesTheChannelAbsentInThatSample() {
+    Map<String, Object> result = run("first-rule", "{}", "{\"temp\": [null, 90, 70]}");
+    assertEquals(Map.of("timestamp", 1000.0, "values", Map.of()),
+        ((List<?>) result.get("samples")).get(0));
+    // temp is unknown before 2000, so rbed cannot tell whether the Event began earlier.
+    assertEquals(List.of("HighTemperature 2000..3000 truncatedStart"), events(result));
+  }
+
+  @Test
+  void drawnValuesMustMatchTheScenariosChannelsAndSamples() {
+    assertEquals(Map.of("error", "No Channel pressure in Scenario first-rule"),
+        run("first-rule", "{}", "{\"pressure\": [1, 2, 3]}"));
+    assertEquals(Map.of("error", "Drawn Channel temp has 2 values for 3 Samples"),
+        run("first-rule", "{}", "{\"temp\": [1, 2]}"));
+    assertEquals(Map.of("error", "Drawn Channel temp has a value that is not a number"),
+        run("first-rule", "{}", "{\"temp\": [1, \"x\", 3]}"));
   }
 }
