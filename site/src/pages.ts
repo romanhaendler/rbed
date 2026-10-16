@@ -4,6 +4,9 @@
 // A page's text is the Markdown file src/content/<markdownFile(page)>; see site/README.md, "Adding
 // a page". A page that is not in this list is not linked, built or searched anywhere.
 
+/** The repository on GitHub, where the README, the glossary and the example tests are. */
+export const REPOSITORY = 'https://github.com/romanhaendler/rbed';
+
 export type Page = {
   /** Address below the site's base, starting and ending with a slash. */
   path: string;
@@ -207,6 +210,10 @@ export function pageAt(pathname: string, base: string): Page | undefined {
 export function markdownFile(page: Pick<Page, 'path'>): string {
   return page.path === '/' ? 'index.md' : page.path.slice(1, -1) + '.md';
 }
+
+/** The navigation's headings in order; the front page stands under Overview. */
+export const RUBRICS = ['Overview', 'Guide', 'Examples'] as const;
+export const rubricOf = (page: Pick<Page, 'rubric'>) => page.rubric ?? 'Overview';
 
 export function titleOf(page: Pick<Page, 'path' | 'title'>): string {
   return page.path === '/' ? 'rbed: rule-based event detection' : `${page.title} · rbed`;

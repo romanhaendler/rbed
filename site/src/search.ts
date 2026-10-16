@@ -2,7 +2,7 @@
 // keywords from its Markdown: the methods its Java source calls (fenced code and the source of
 // each Scenario it shows), the names in its inline code, and its headings.
 import { parse } from './markdown.ts';
-import type { Page } from './pages.ts';
+import { type Page, rubricOf } from './pages.ts';
 
 export type SearchItem = { id: string; label: string; group: string; keywords: string[] };
 
@@ -23,6 +23,6 @@ export function searchItems(
       for (const name of m[1].match(/[A-Za-z_]\w+/g) ?? []) words.add(name);
     }
     for (const m of prose.matchAll(/^#{2,3} +(.*)$/gm)) words.add(m[1].replace(/[`*]/g, ''));
-    return { id: page.path, label: page.title, group: page.rubric ?? 'Overview', keywords: [...words] };
+    return { id: page.path, label: page.title, group: rubricOf(page), keywords: [...words] };
   });
 }

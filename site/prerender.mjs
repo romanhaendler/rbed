@@ -9,17 +9,14 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { aggregatesLine } from './src/aggregates.ts';
+import { aggregatesText, discardedCells, discardedHead, eventCells, eventHead, hasNotes } from './src/events.ts';
 import { escape, parse, SCENARIO_MARKER } from './src/markdown.ts';
-import { markdownFile, PAGES, titleOf } from './src/pages.ts';
-import { fillSource } from './src/parameters.ts';
+import { markdownFile, PAGES, REPOSITORY, RUBRICS, rubricOf, titleOf } from './src/pages.ts';
+import { defaultsOf, fillSource } from './src/parameters.ts';
 
 export const SITE = 'https://romanhaendler.github.io/rbed/';
-const REPOSITORY = 'https://github.com/romanhaendler/rbed';
-const RUBRICS = ['Overview', 'Guide', 'Examples'];
 
 const site = (path) => new URL(path, import.meta.url);
-const rubricOf = (page) => page.rubric ?? 'Overview';
 
 /** The rbed version of this commit, as the root pom states it. */
 export function rbedVersion() {
@@ -42,29 +39,18 @@ function factOf(facts, id) {
 function eventRows({ unit, millis, result }) {
   if ('error' in result) return `rbed rejects the default parameters: ${result.error}`;
   if (result.events.length === 0) return 'No Event at the default parameters.';
-  // A Note column only for a Scenario whose listener notes something, as in the live table.
-  const notes = result.events.some((e) => e.note !== undefined);
+  // The live table's columns (src/events.ts), with the Aggregates as a column of their own.
+  const notes = hasNotes(result.events);
   return [
-    ['Name', `Start (${unit})`, `Confirmed (${unit})`, `End (${unit})`, 'Truncated', ...(notes ? ['Note'] : []), 'Aggregates'],
-    ...result.events.map((e) => [
-      e.name,
-      String(e.start / millis),
-      String(e.confirmed / millis),
-      String(e.end / millis),
-      [e.truncatedStart && 'start', e.truncatedEnd && 'end'].filter(Boolean).join(', '),
-      ...(notes ? [e.note ?? ''] : []),
-      Object.entries(e.aggregates).map(([channel, a]) => aggregatesLine(channel, a)).join('; '),
-    ]),
+    [...eventHead(unit, notes), 'Aggregates'],
+    ...result.events.map((e) => [...eventCells(e, millis, notes), aggregatesText(e)]),
   ];
 }
 
 /** The Discarded Pending Events at the default parameters, like eventRows; none, no rows. */
 function discardedRows({ unit, millis, result }) {
   if ('error' in result || result.discarded.length === 0) return [];
-  return [
-    ['Name', `Start (${unit})`, `Discarded (${unit})`],
-    ...result.discarded.map((d) => [d.name, String(d.start / millis), String(d.discarded / millis)]),
-  ];
+  return [discardedHead(unit), ...result.discarded.map((d) => discardedCells(d, millis))];
 }
 
 /** The tables of a Scenario at its defaults: a caption with its rows, or a sentence. */
@@ -197,7 +183,7 @@ export async function prerender(dist, version) {
     JSON.parse(bridge.scenarios()).map((s) => [
       s.id,
       {
-        source: fillSource(s.source, s.parameters, Object.fromEntries(s.parameters.map((p) => [p.id, p.default]))).trimEnd(),
+        source: fillSource(s.source, s.parameters, defaultsOf(s.parameters)).trimEnd(),
         unit: s.timeUnit.name,
         millis: s.timeUnit.millis,
         result: JSON.parse(bridge.run(s.id, '{}', '{}')),

@@ -1,8 +1,9 @@
 // The tables under a Scenario's chart: its Events with their Aggregates (a row selects its
-// Event), the Discarded Pending Events, and every Aggregate of the selected Event.
-import { type Aggregates, aggregatesLine, formatNumber } from './aggregates.ts';
+// Event), the Discarded Pending Events, and every Aggregate of the selected Event. Their columns
+// are those of the prerendered tables (src/events.ts).
+import { type Aggregates, formatNumber } from './aggregates.ts';
 import type { Discard, Event, Scenario } from './bridge';
-import { eventKey } from './events.ts';
+import { aggregatesText, discardedCells, discardedHead, eventCells, eventHead, eventKey, hasNotes } from './events.ts';
 
 /** The Pending Events that were Discarded; no table while there is none. */
 export function DiscardedTable({ scenario, discarded }: { scenario: Scenario; discarded: Discard[] }) {
@@ -14,17 +15,19 @@ export function DiscardedTable({ scenario, discarded }: { scenario: Scenario; di
         <caption>Discarded Pending Events</caption>
         <thead>
           <tr>
-            <th scope="col">Name</th>
-            <th scope="col">Start ({unit})</th>
-            <th scope="col">Discarded ({unit})</th>
+            {discardedHead(unit).map((h) => (
+              <th scope="col" key={h}>
+                {h}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
           {discarded.map((d) => (
             <tr key={`${d.name} ${d.start}`}>
-              <td>{d.name}</td>
-              <td>{d.start / millis}</td>
-              <td>{d.discarded / millis}</td>
+              {discardedCells(d, millis).map((c, i) => (
+                <td key={i}>{c}</td>
+              ))}
             </tr>
           ))}
         </tbody>
@@ -94,29 +97,30 @@ export function EventTable({
   select: (key: string | undefined) => void;
 }) {
   const { name: unit, millis } = scenario.timeUnit;
-  const notes = events.some((e) => e.note !== undefined);
+  const notes = hasNotes(events);
+  const head = eventHead(unit, notes);
   return (
     <div className="tableScroll">
       <table className="eventTable" id="events">
         <caption>Events</caption>
         <thead>
           <tr>
-            <th scope="col">Name</th>
-            <th scope="col">Start ({unit})</th>
-            <th scope="col">Confirmed ({unit})</th>
-            <th scope="col">End ({unit})</th>
-            <th scope="col">Truncated</th>
-            {notes && <th scope="col">Note</th>}
+            {head.map((h) => (
+              <th scope="col" key={h}>
+                {h}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
           {events.length === 0 && (
             <tr>
-              <td colSpan={5}>No Event</td>
+              <td colSpan={head.length}>No Event</td>
             </tr>
           )}
           {events.map((e) => {
             const key = eventKey(e);
+            const [name, ...cells] = eventCells(e, millis, notes);
             return [
               <tr key={key} data-selected={key === selected || undefined}>
                 <td>
@@ -126,23 +130,17 @@ export function EventTable({
                     aria-pressed={key === selected}
                     onClick={() => select(key === selected ? undefined : key)}
                   >
-                    {e.name}
+                    {name}
                   </button>
                 </td>
-                <td>{e.start / millis}</td>
-                <td>{e.confirmed / millis}</td>
-                <td>{e.end / millis}</td>
-                <td>{[e.truncatedStart && 'start', e.truncatedEnd && 'end'].filter(Boolean).join(', ')}</td>
-                {notes && <td>{e.note}</td>}
+                {cells.map((c, i) => (
+                  <td key={i}>{c}</td>
+                ))}
               </tr>,
               // The Aggregates under their Event, so the table stays five columns wide on a phone.
               <tr key={`${key} aggregates`} className="aggregateRow" data-selected={key === selected || undefined}>
-                <td colSpan={notes ? 6 : 5}>
-                  <span className="aggregateLabel">Aggregates</span>{' '}
-                  {Object.entries(e.aggregates).map(([channel, a], i) => [
-                    i > 0 && '; ',
-                    <span key={channel}>{aggregatesLine(channel, a)}</span>,
-                  ])}
+                <td colSpan={head.length}>
+                  <span className="aggregateLabel">Aggregates</span> {aggregatesText(e)}
                 </td>
               </tr>,
             ];
