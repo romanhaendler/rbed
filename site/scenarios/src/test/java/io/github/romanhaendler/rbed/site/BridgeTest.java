@@ -19,6 +19,10 @@ import org.junit.jupiter.api.Test;
  * Tests the bridge on the JVM. Every call is also written with its JVM result to
  * target/parity.json, where site/test/parity.test.mjs repeats it against the compiled
  * JavaScript and compares.
+ *
+ * <p>The domain tests repeat the expected Event lists of rbed's example tests as literals: this
+ * module cannot depend on rbed's test code, which is not in its jar. Each names the example test
+ * it mirrors, so a change to an example is made in both places.
  */
 class BridgeTest {
   static final List<String> calls = new ArrayList<>();
@@ -114,6 +118,8 @@ class BridgeTest {
   }
 
   /** CraneScenarioTest's form: "Name start..end" in ms, then the load of a LoadLifted. */
+  // Mirrors the expected list of rbed's own test
+  // CraneScenarioTest#liftsOverloadAndSetDownsWithClassifiedLoads; change both together.
   @Test
   void cranesAtDefaultsYieldTheCraneScenarioTestsEvents() {
     Map<String, Object> result = run("cranes", "{}");
@@ -131,6 +137,8 @@ class BridgeTest {
         described);
   }
 
+  // Mirrors the expected list of rbed's own test
+  // examples.MachineToolOverheatExample#detectsOverheatingUnderLoad; change both together.
   @Test
   void manufacturingAtDefaultsYieldsTheMachineToolOverheatExamplesEvents() {
     assertEquals(List.of(
@@ -141,6 +149,8 @@ class BridgeTest {
         describe(run("manufacturing", "{}"), 1000));
   }
 
+  // Mirrors the expected list of rbed's own test
+  // examples.HvacShortCyclingExample#detectsShortCyclesAndQuickRestarts; change both together.
   @Test
   void buildingServicesAtDefaultsYieldTheHvacShortCyclingExamplesEvents() {
     Map<String, Object> result = run("building-services", "{}");
@@ -155,6 +165,8 @@ class BridgeTest {
     assertEquals(Arrays.asList(null, null, "short cycle", null, null), notes(result));
   }
 
+  // Mirrors the expected list of rbed's own test
+  // examples.VitalSignsExample#detectsCombinedAlarmsAndHandlesSensorDropout; change both together.
   @Test
   void healthcareAtDefaultsYieldsTheVitalSignsExamplesEvents() {
     assertEquals(List.of(
@@ -166,6 +178,8 @@ class BridgeTest {
         describe(run("healthcare", "{}"), 1000));
   }
 
+  // Mirrors the expected list of rbed's own test
+  // examples.FleetTelematicsExample#detectsTripsHarshBrakingAndIdling; change both together.
   @Test
   void automotiveAtDefaultsYieldsTheFleetTelematicsExamplesEvents() {
     Map<String, Object> result = run("automotive", "{}");
@@ -179,6 +193,8 @@ class BridgeTest {
     assertEquals(Arrays.asList(null, null, "11.94 km", null), notes(result));
   }
 
+  // Mirrors the expected list of rbed's own test
+  // examples.TradingSignalsExample#detectsMovingAverageCrosses; change both together.
   @Test
   void financeAtDefaultsYieldsTheTradingSignalsExamplesEvents() {
     // the example finds the golden cross by brute force over the two averages: day 366
@@ -198,6 +214,8 @@ class BridgeTest {
         describe(run("environment", "{\"gapMinutes\": 15}"), 3_600_000));
   }
 
+  // Mirrors the expected list of rbed's own test
+  // examples.ColdChainExample#detectsExcursionsAndTheirCause; change both together.
   @Test
   void logisticsAtDefaultsYieldsTheColdChainExamplesEvents() {
     assertEquals(List.of(
@@ -209,6 +227,8 @@ class BridgeTest {
         describe(run("logistics", "{}"), 60_000));
   }
 
+  // Mirrors the expected list of rbed's own test
+  // examples.FloodWarningExample#warnsWhileRisingAndLiftsWithHysteresis; change both together.
   @Test
   void environmentAtDefaultsYieldsTheFloodWarningExamplesEvents() {
     assertEquals(List.of("Receding 12.25..26", "FloodWarning 5.25..31.25"),
@@ -216,6 +236,8 @@ class BridgeTest {
   }
 
   /** IntervalTrainingExample's Events, and its listener's recovery times as notes. */
+  // Mirrors the expected list of rbed's own test
+  // examples.IntervalTrainingExample#detectsRepsAndRecoveryTimes; change both together.
   @Test
   void sportsAtDefaultsYieldsTheIntervalTrainingExamplesEvents() {
     Map<String, Object> result = run("sports", "{}");
@@ -228,6 +250,8 @@ class BridgeTest {
     assertEquals(Arrays.asList(null, "51 s", null, "51 s", null, "51 s", null), notes(result));
   }
 
+  // Mirrors the expected list of rbed's own test
+  // examples.DeploymentRegressionExample#attributesErrorSpikesToDeployments; change both together.
   @Test
   void itOperationsAtDefaultsYieldsTheDeploymentRegressionExamplesEvents() {
     assertEquals(List.of(
