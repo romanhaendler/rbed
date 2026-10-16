@@ -19,6 +19,7 @@ public final class Bridge {
   private static final List<Scenario> SCENARIOS = List.of(
       new FirstRule(),
       new EventLifecycle(),
+      new Expressions(),
       new AggregatesScenario(),
       new PulseChannels(),
       new Cranes(),
@@ -68,7 +69,17 @@ public final class Bridge {
         Json.number(out.append(",\"min\":"), p.min());
         Json.number(out.append(",\"max\":"), p.max());
         Json.number(out.append(",\"step\":"), p.step());
-        Json.string(out.append(",\"unit\":"), p.unit()).append('}');
+        Json.string(out.append(",\"unit\":"), p.unit());
+        if (!p.options().isEmpty()) {
+          out.append(",\"options\":[");
+          for (int j = 0; j < p.options().size(); j++) {
+            if (j > 0) out.append(',');
+            Json.string(out.append("{\"label\":"), p.options().get(j).label());
+            Json.string(out.append(",\"source\":"), p.options().get(j).source()).append('}');
+          }
+          out.append(']');
+        }
+        out.append('}');
       }
       Json.string(out.append("],\"source\":"), s.source).append('}');
     }
@@ -81,9 +92,10 @@ public final class Bridge {
    * @param parameters JSON object of parameter values by id; missing ones take their default,
    *     null stands for NaN
    * @param drawnChannels JSON object reserved for Channel values the reader drew; ignored for now
-   * @return JSON object with the Samples, the Events and the Discarded Pending Events (with the
-   *     timestamp they were Discarded), or {@code {"error": message}} if rbed
-   *     rejected the Rules or the input was invalid
+   * @return JSON object with the Samples, the Events, the Discarded Pending Events (with the
+   *     timestamp they were Discarded) and, for a Scenario that plots an Expression, its name,
+   *     threshold and value per Sample (null where undefined); or {@code {"error": message}} if
+   *     rbed rejected the Rules or the input was invalid
    */
   @JSExport
   public static String run(String scenarioId, String parameters, String drawnChannels) {
@@ -118,6 +130,9 @@ public final class Bridge {
       if (value == null) value = Double.NaN;
       if (!(value instanceof Double d)) {
         throw new IllegalArgumentException("Parameter " + p.id() + " is not a number");
+      }
+      if (!p.options().isEmpty() && !(d >= 0 && d < p.options().size() && d == Math.rint(d))) {
+        throw new IllegalArgumentException("Parameter " + p.id() + " has no option " + d);
       }
       values.put(p.id(), d);
     }
@@ -166,7 +181,19 @@ public final class Bridge {
           .append(",\"discarded\":").append(d.at())
           .append('}');
     }
-    return out.append("]}").toString();
+    out.append(']');
+    Scenario.Plot plot = scenario.plot(values);
+    if (plot != null) {
+      Json.string(out.append(",\"expression\":{\"name\":"), plot.name());
+      Json.number(out.append(",\"threshold\":"), plot.threshold()).append(",\"values\":[");
+      double[] plotted = ExpressionValues.of(plot.expression(), samples);
+      for (int i = 0; i < plotted.length; i++) {
+        if (i > 0) out.append(',');
+        Json.number(out, plotted[i]);
+      }
+      out.append("]}");
+    }
+    return out.append('}').toString();
   }
 
   /** The Event's Aggregates by Channel name, in the Scenario's Channel order; NaN becomes null. */

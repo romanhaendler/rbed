@@ -3,6 +3,7 @@ package io.github.romanhaendler.rbed.site;
 import io.github.romanhaendler.rbed.Channel;
 import io.github.romanhaendler.rbed.Detector;
 import io.github.romanhaendler.rbed.Event;
+import io.github.romanhaendler.rbed.Expression;
 import io.github.romanhaendler.rbed.Rule;
 import io.github.romanhaendler.rbed.Sample;
 import java.util.List;
@@ -67,7 +68,31 @@ abstract class Scenario {
     return null;
   }
 
-  /** A number the reader can change, with its default and the limits of its control. */
+  /** The Expression to plot for the given parameter values, or null for none. */
+  Plot plot(Map<String, Double> values) {
+    return null;
+  }
+
+  /** An Expression plotted next to the Channels, with the threshold its Condition compares to. */
+  record Plot(String name, Expression expression, double threshold) {}
+
+  /**
+   * A number the reader can change, with its default and the limits of its control. A choice has
+   * options: its value is the index of the chosen one, and {@code ${id}} in the source stands for
+   * that option's source, which may hold placeholders of its own.
+   */
   record Parameter(String id, String label, double defaultValue, double min, double max,
-      double step, String unit) {}
+      double step, String unit, List<Option> options) {
+    Parameter(String id, String label, double defaultValue, double min, double max, double step,
+        String unit) {
+      this(id, label, defaultValue, min, max, step, unit, List.of());
+    }
+
+    static Parameter choice(String id, String label, int defaultIndex, List<Option> options) {
+      return new Parameter(id, label, defaultIndex, 0, options.size() - 1, 1, "", options);
+    }
+  }
+
+  /** One option of a choice: its label and the Java source it stands for. */
+  record Option(String label, String source) {}
 }

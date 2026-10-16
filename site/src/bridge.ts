@@ -1,6 +1,7 @@
 // The two functions of the Scenario module (site/scenarios, Bridge.java), typed.
 import * as compiled from 'rbed-scenarios';
 import type { Aggregates } from './aggregates.ts';
+import { fillSource } from './parameters.ts';
 
 export type Parameter = {
   id: string;
@@ -10,6 +11,8 @@ export type Parameter = {
   max: number;
   step: number;
   unit: string;
+  /** Present on a choice, whose value is the index of an option. */
+  options?: { label: string; source: string }[];
 };
 
 export type Scenario = {
@@ -42,11 +45,16 @@ export type Event = {
 /** A Pending Event that stopped holding before it was Confirmed, and when that was noticed. */
 export type Discard = { name: string; start: number; discarded: number };
 
+/** For a Scenario that plots one: an Expression's value per Sample, null where it is undefined,
+ *  and the threshold its Rule's Condition compares it to. */
+export type PlottedExpression = { name: string; threshold: number; values: (number | null)[] };
+
 export type Result =
   | {
       samples: { timestamp: number; values: Record<string, number | null> }[];
       events: Event[];
       discarded: Discard[];
+      expression?: PlottedExpression;
     }
   | { error: string };
 
@@ -60,7 +68,5 @@ export function run(scenarioId: string, parameters: Record<string, number>): Res
 
 /** The source with each placeholder replaced by its parameter's value. */
 export function source(scenario: Scenario, parameters: Record<string, number>): string {
-  return scenario.source.replace(/\$\{(\w+)\}/g, (_, id: string) =>
-    Number.isNaN(parameters[id]) ? 'Double.NaN' : String(parameters[id]),
-  );
+  return fillSource(scenario.source, scenario.parameters, parameters);
 }

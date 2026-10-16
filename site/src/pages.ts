@@ -30,6 +30,13 @@ export const PAGES: Page[] = [
     rubric: 'Guide',
   },
   {
+    path: '/conditions-and-expressions/',
+    title: 'Conditions and Expressions',
+    description:
+      'What a Rule compares: rates, moving averages and arithmetic between Channels, plotted per Sample, and why no Event starts where an Expression is undefined.',
+    rubric: 'Guide',
+  },
+  {
     path: '/aggregates/',
     title: 'Aggregates',
     description:
