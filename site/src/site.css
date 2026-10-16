@@ -522,6 +522,19 @@ pre {
   font-weight: var(--u-weight-medium);
 }
 
+/* While the reader draws a Channel, a layer covers the chart and takes the pointer; a finger
+   draws instead of scrolling the page. */
+.drawStage {
+  position: relative;
+}
+
+.drawLayer {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+  cursor: crosshair;
+}
+
 /* The chart's palette outside the chart, for the swatches: @umriss-ui/charts 0.40.0 defines it
    on its own root only. */
 .configuratorPanel,

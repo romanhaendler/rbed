@@ -19,7 +19,7 @@ A page is three things; the build does the rest.
 
 1. **A Scenario** (if the page shows one): a class in `scenarios/src/main/java/.../site/` extending `Scenario`, added to `Bridge.SCENARIOS`, with JUnit tests through the bridge in `BridgeTest` (the parity test repeats them against the compiled JavaScript).
 2. **A manifest entry** in `src/pages.ts` at its README position: `path` (`/event-lifecycle/`), `title`, a one-sentence `description`, and `rubric` (`Guide` for a README chapter, `Examples` for a domain example).
-3. **Its text** in `src/content/<name>.md`, named after the path (`/event-lifecycle/` reads `event-lifecycle.md`; the front page is `index.md`). It starts with `# Title`. The live Scenario stands where a line `<!-- scenario <id> -->` stands. `{{version}}` is the rbed version of the build.
+3. **Its text** in `src/content/<name>.md`, named after the path (`/event-lifecycle/` reads `event-lifecycle.md`; the front page is `index.md`). It starts with `# Title`. The live Scenario stands where a line `<!-- scenario <id> -->` stands; `<!-- scenario <id> draw -->` also lets the reader draw the values of its Channels (not its Pulse Channels), which suits concept pages. `{{version}}` is the rbed version of the build.
 
 The Markdown is a small subset (`src/markdown.ts`): `#` to `###` headings, paragraphs, `-` and `1.` lists (one level; a list of nothing but links is shown as tiles), fenced code with a language and an optional label (```` ```xml Maven ````), and inline `code`, `**strong**`, `*em*` and `[links](url)`. No raw HTML, no tables.
 
