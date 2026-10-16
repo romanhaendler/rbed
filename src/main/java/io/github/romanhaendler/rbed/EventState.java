@@ -18,13 +18,15 @@ final class EventState {
   private long lastDuration;
   private long runningStart;
   private long endedDuration;
-  /** Confirmation times within the largest window any count(...).within(...) needs. */
   private final Detector detector;
+  private final String name;
+  /** Confirmation times within the largest window any count(...).within(...) needs. */
   private Timestamps confirmations;
   private long countWindow;
 
-  EventState(Detector detector) {
+  EventState(Detector detector, String name) {
     this.detector = detector;
+    this.name = name;
   }
 
   void producedBy(RuleState rule) {
@@ -43,7 +45,7 @@ final class EventState {
 
   /** Keeps confirmation times for counting within {@code window}; call before any Event. */
   void countWithin(long window) {
-    if (confirmations == null) confirmations = new Timestamps(detector);
+    if (confirmations == null) confirmations = new Timestamps(detector, name);
     countWindow = Math.max(countWindow, window);
   }
 

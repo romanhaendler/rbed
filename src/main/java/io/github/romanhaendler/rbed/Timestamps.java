@@ -3,15 +3,15 @@ package io.github.romanhaendler.rbed;
 /** Ascending timestamps in a growable ring buffer; old ones are dropped from the front. */
 final class Timestamps {
   private final Detector detector;
-  /** The Rule that first uses the count, named in the Retention Limit warning. */
+  /** Names the buffer in the Retention Limit warning, e.g. "count of Run". */
   private final String rule;
   private long[] times;
   private int head;
   private int size;
 
-  Timestamps(Detector detector) {
+  Timestamps(Detector detector, String counted) {
     this.detector = detector;
-    rule = detector.bindingRule;
+    rule = "count of " + counted;
     times = new long[Math.min(16, detector.retentionLimit())];
   }
 
@@ -20,8 +20,8 @@ final class Timestamps {
     if (size == detector.retentionLimit()) {
       head = (head + 1) % times.length;
       size--;
-      detector.retained--;
-      detector.dropped(rule);
+      detector.release();
+      detector.recordDrop(rule);
     }
     if (size == times.length) {
       long[] grown = new long[Math.min(times.length * 2, detector.retentionLimit())];
@@ -31,7 +31,7 @@ final class Timestamps {
     }
     times[(head + size) % times.length] = t;
     size++;
-    detector.retained++;
+    detector.retain();
   }
 
   /** Drops timestamps more than {@code window} before {@code now}. */
@@ -39,7 +39,7 @@ final class Timestamps {
     while (size > 0 && now - times[head] > window) {
       head = (head + 1) % times.length;
       size--;
-      detector.retained--;
+      detector.release();
     }
   }
 

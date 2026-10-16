@@ -37,7 +37,7 @@ public final class Detector implements AutoCloseable {
   private long samples;
   private boolean closed;
   /** Entries held by moving-average windows and count timestamps; see {@link #retainedValues}. */
-  long retained;
+  private long retained;
   private final int retentionLimit;
   private long dropped;
   private List<Event> collected;
@@ -124,11 +124,19 @@ public final class Detector implements AutoCloseable {
     return retentionLimit;
   }
 
-  /** Counts an entry dropped from the full window of {@code rule}; warns on the first one. */
-  void dropped(String rule) {
+  void retain() {
+    retained++;
+  }
+
+  void release() {
+    retained--;
+  }
+
+  /** Counts an entry dropped from the full buffer named {@code what}; warns on the first one. */
+  void recordDrop(String what) {
     if (dropped++ == 0) {
       System.getLogger("io.github.romanhaendler.rbed").log(System.Logger.Level.WARNING,
-          "Rule " + rule + ": a window reached the Retention Limit of " + retentionLimit
+          what + ": a window reached the Retention Limit of " + retentionLimit
               + " entries; its oldest entries are dropped, so results deviate from the Rule."
               + " Raise the limit with Detector.builder().retentionLimit(...).");
     }
@@ -314,7 +322,7 @@ public final class Detector implements AutoCloseable {
   EventState event(String name) {
     EventState state = events.get(name);
     if (state == null) {
-      state = new EventState(this);
+      state = new EventState(this, name);
       events.put(name, state);
     }
     return state;
@@ -382,9 +390,11 @@ public final class Detector implements AutoCloseable {
 
     /**
      * Sets the Retention Limit: the maximum number of entries a single {@code averageOverDuration}
-     * window keeps (default 1,000,000). When a full window gets a new value, its oldest entry is
-     * dropped, and the Detector logs one warning through {@link System.Logger}. See
-     * {@link Detector#droppedValues}.
+     * window keeps (default 1,000,000), and the maximum number of timestamps kept per counted Rule for
+     * {@code count(...).within(...)}. When a full window or timestamp buffer gets a new entry, its
+     * oldest entry is dropped, and the Detector logs one warning through {@link System.Logger}. See
+     * {@link Detector#droppedValues}. {@code build()} rejects a Rule using
+     * {@code averageOverSamples(n)} with {@code n} above the limit.
      *
      * @throws IllegalArgumentException if {@code n} is below 1
      */

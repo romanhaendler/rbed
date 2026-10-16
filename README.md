@@ -706,6 +706,8 @@ Values of Channels that no Rule uses are ignored and leave no trace. What a Dete
 | `count(...).within(w)`          | one timestamp per Confirmed Event within `w`, at most the Retention Limit |
 | everything else                 | constant per Rule                             |
 
+Once the Retention Limit drops timestamps, `count(...).within(...)` yields min(true count, limit), so a Condition with a threshold at or above the limit (e.g. `.above(limit)`) can never hold; `droppedValues()` and the logged warning signal this. The timestamp buffer keeps its largest size after a burst (at most the limit).
+
 `detector.retainedValues()` returns the number of entries currently held (Channels, moving-average values and count timestamps). It is a plain counter read, so it is cheap to poll, for example as a metrics gauge.
 
 The **Retention Limit** (default 1,000,000 entries, about 16 MB per window) caps every `averageOverDuration` window and every `count(...).within(...)` list of confirmation timestamps (History included); set it with `Detector.builder().retentionLimit(n)`. When a full window gets a new value, its oldest entry is dropped as if it had left the window by time, so the average is the mean of the entries that remain, and detection continues. A count is then a lower bound of at most the limit. The first drop logs one `WARNING` through `System.Logger` naming the Rule and the limit. `detector.droppedValues()` returns how many entries were dropped because of the limit (not those leaving by time), for example to alert on.

@@ -39,7 +39,7 @@ abstract class Window {
         evictedSinceExactSum++;
       } else {
         size++;
-        detector.retained++;
+        detector.retain();
       }
       values[next] = value;
       sum.add(value);
@@ -73,7 +73,7 @@ abstract class Window {
     OverDuration(Detector detector, long millis) {
       super(detector);
       this.millis = millis;
-      rule = detector.bindingRule;
+      rule = "Rule " + detector.bindingRule;
       int initial = Math.min(16, detector.retentionLimit());
       times = new long[initial];
       values = new double[initial];
@@ -89,22 +89,22 @@ abstract class Window {
         sum.add(-values[head]);
         head = (head + 1) % times.length;
         size--;
-        detector.retained--;
+        detector.release();
         evictedSinceExactSum++;
-        detector.dropped(rule);
+        detector.recordDrop(rule);
       }
       if (size == times.length) grow();
       int tail = (head + size) % times.length;
       times[tail] = time;
       values[tail] = value;
       size++;
-      detector.retained++;
+      detector.retain();
       sum.add(value);
       while (time - times[head] > millis) {
         sum.add(-values[head]);
         head = (head + 1) % times.length;
         size--;
-        detector.retained--;
+        detector.release();
         evictedSinceExactSum++;
       }
       if (evictedSinceExactSum >= size) {

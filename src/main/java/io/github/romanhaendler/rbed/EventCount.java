@@ -16,7 +16,14 @@ public final class EventCount extends Expression {
     this.window = window;
   }
 
-  /** Counts only Events Confirmed at most {@code millis} before the current moment. */
+  /**
+   * Counts only Events Confirmed at most {@code millis} before the current moment. Once the
+   * Retention Limit (see {@link Detector.Builder#retentionLimit}) drops timestamps, the count is
+   * min(true count, limit): a Condition with a threshold at or above the limit (e.g.
+   * {@code .above(limit)}) can then never hold. {@link Detector#droppedValues} and the logged
+   * warning signal this. The timestamp buffer keeps its largest size after a burst (at most the
+   * limit).
+   */
   public Expression within(long millis) {
     if (millis < 0) throw new IllegalArgumentException("within must be >= 0: " + millis);
     return new EventCount(rule, millis);

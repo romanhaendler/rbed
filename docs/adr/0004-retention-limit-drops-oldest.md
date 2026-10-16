@@ -1,6 +1,6 @@
 # Growable windows have a Retention Limit; overflow drops the oldest entries
 
-`averageOverDuration` windows grow with time x sampling rate, so a long window on a fast stream can exhaust the heap. Every such window now has a Retention Limit (`Detector.builder().retentionLimit(n)`, default 1,000,000 entries). When a full window gets a new value, its oldest entry is dropped exactly as if it had left the window by time, so the average stays the mean of the entries that remain. The first drop in a Detector logs one `WARNING` through `System.Logger` naming the Rule and the limit; `Detector.droppedValues()` counts all drops.
+`averageOverDuration` windows grow with time x sampling rate, and the timestamps kept for `count(...).within(...)` grow with the Event rate, so either can exhaust the heap. Every such window and timestamp buffer now has a Retention Limit (`Detector.builder().retentionLimit(n)`, default 1,000,000 entries). `averageOverSamples(n)` has a fixed size, so `build()` rejects a Rule whose `n` exceeds the limit. When a full window or buffer gets a new entry, its oldest entry is dropped exactly as if it had left the window by time, so the average stays the mean of the entries that remain. The first drop in a Detector logs one `WARNING` through `System.Logger` naming the Rule (or, for a timestamp buffer, `count of <Rule>`) and the limit; `Detector.droppedValues()` counts all drops.
 
 ## Alternatives considered
 

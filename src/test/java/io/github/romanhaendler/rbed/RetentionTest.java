@@ -215,7 +215,7 @@ class RetentionTest {
       logger.removeHandler(handler);
     }
     assertEquals(1, records.size());
-    assertTrue(records.get(0).getMessage().contains("Many"), records.get(0).getMessage());
+    assertTrue(records.get(0).getMessage().contains("count of Run"), records.get(0).getMessage());
   }
 
   @Test
@@ -237,5 +237,42 @@ class RetentionTest {
   void averageOverSamplesAtOrBelowTheLimitBuilds() {
     Detector.builder().retentionLimit(10).rules(Rule.named("R").when(X.averageOverSamples(10).above(0))).build();
     Detector.builder().retentionLimit(11).rules(Rule.named("Big").when(X.averageOverSamples(11).above(0))).build();
+  }
+
+  @Test
+  void sameRuleBuildsAfterRaisingTheLimit() {
+    Rule rule = Rule.named("Big").when(X.averageOverSamples(11).above(0));
+    assertThrows(IllegalArgumentException.class,
+        () -> Detector.builder().retentionLimit(10).rules(rule).build());
+    Detector.builder().retentionLimit(11).rules(rule).build();
+  }
+
+  @Test
+  void twoWindowsDroppingLogExactlyOneWarning() {
+    java.util.logging.Logger logger = java.util.logging.Logger.getLogger("io.github.romanhaendler.rbed");
+    List<java.util.logging.LogRecord> records = new ArrayList<>();
+    java.util.logging.Handler handler = new java.util.logging.Handler() {
+      @Override public void publish(java.util.logging.LogRecord r) { records.add(r); }
+      @Override public void flush() {}
+      @Override public void close() {}
+    };
+    logger.addHandler(handler);
+    try {
+      denseStream(10, new Recorder()); // two windows both drop
+    } finally {
+      logger.removeHandler(handler);
+    }
+    assertEquals(1, records.size());
+  }
+
+  @Test
+  void retainedValuesAreCorrectAfterLimitDropThenTimeEviction() {
+    Detector d = Detector.builder().retentionLimit(3)
+        .rules(Rule.named("R").when(X.averageOverDuration(10).above(0))).build();
+    for (int i = 0; i < 6; i++) d.push(i, Map.of(X, 1.0));
+    assertEquals(1 + 3, d.retainedValues());
+    d.push(100, Map.of(X, 1.0)); // the older entries leave by time
+    assertEquals(1 + 1, d.retainedValues());
+    assertEquals(4, d.droppedValues()); // 3 while filling, 1 when the full window got the new value
   }
 }
