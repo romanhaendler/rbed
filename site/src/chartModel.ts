@@ -36,8 +36,10 @@ export const RESTART_COLOR = 'var(--u-color-text-secondary)';
 export const TRUNCATED = { name: 'Truncated', color: 'color-mix(in srgb, var(--u-color-text) 30%, transparent)' };
 export const truncatedEdges = (l: Lifecycle) =>
   l.events.flatMap((e) => [...(e.truncatedStart ? [e.start] : []), ...(e.truncatedEnd ? [e.end] : [])]);
-/** The chart palette without the Events' color, so a Channel never looks like a band. */
-const CHANNEL_COLORS = [1, 3, 4, 5, 6].map((n) => `var(--uc-series-${n})`);
+/** The chart palette without the Events' color, so a Channel never looks like a band; blue,
+    violet and cyan first, since green and amber are close to the Confirmed and Pending start
+    marks (every Scenario has at most three Channels and an Expression). */
+const CHANNEL_COLORS = [1, 5, 6, 3, 4].map((n) => `var(--uc-series-${n})`);
 export const channelColor = (scenario: Scenario, channel: string) =>
   CHANNEL_COLORS[scenario.channels.indexOf(channel) % CHANNEL_COLORS.length];
 
