@@ -38,6 +38,9 @@ const MARKS = [
   { name: 'Discarded', colour: 'var(--u-color-danger)', moments: (l: Lifecycle) => l.discarded.map((d) => d.discarded) },
   { name: 'Confirmed', colour: 'var(--u-color-success)', moments: (l: Lifecycle) => l.events.map((e) => e.confirmed) },
 ] as const;
+/** Time advanced without a Sample (advanceTo), marked just above the lanes; a restart is a line. */
+const ADVANCE_COLOUR = 'var(--u-color-text-muted)';
+const RESTART_COLOUR = 'var(--u-color-text-secondary)';
 /** A Truncated start or end: a halo behind the edge's mark, so it reads as more than a colour. */
 const TRUNCATED = { name: 'Truncated', colour: 'color-mix(in srgb, var(--u-color-text) 30%, transparent)' };
 const truncatedEdges = (l: Lifecycle) =>
@@ -131,6 +134,9 @@ type Shown = {
   channels: string[];
   rules: string[];
   expression?: PlottedExpression;
+  /** Timestamps time was advanced to without a Sample, and the restart, if any (ms). */
+  advances: number[];
+  restart?: number;
 };
 
 /** The Channels' axis of what is shown (with the plotted Expression and its threshold); it keeps
@@ -215,6 +221,9 @@ function EventChart({
       {selected && (
         <LimitBand orientation="x" from={selected.start / millis} to={selected.end / millis} color="var(--u-color-accent)" />
       )}
+      {shown.restart !== undefined && (
+        <LimitLine orientation="x" value={shown.restart / millis} label="Restart" color={RESTART_COLOUR} />
+      )}
       {rules.map((rule, i) => (
         <StateBand<BandRow>
           key={rule}
@@ -246,6 +255,16 @@ function EventChart({
           radius={4}
         />
       ))}
+      {shown.advances.length > 0 && (
+        <Scatter<MarkRow>
+          data={shown.advances.map((t) => ({ t: t / millis, y: lanes + 0.15 }))}
+          value="y"
+          yAxisId="lanes"
+          name="Time advance"
+          color={ADVANCE_COLOUR}
+          radius={3}
+        />
+      )}
       {/* A Pulse Channel has no value between its Samples, so it is drawn as marks, not a line. */}
       {channels.map((c) =>
         scenario.pulse.includes(c) ? (
@@ -315,8 +334,20 @@ function expressionSummary(expression: PlottedExpression | undefined, rows: Row[
   );
 }
 
+/** The time advances and the restart in words, for the text alternative. */
+function timeSummary({ advances, restart }: { advances: number[]; restart?: number }, scenario: Scenario): string {
+  const { name: unit, millis } = scenario.timeUnit;
+  const at = (ms: number) => `${ms / millis} ${unit}`;
+  return (
+    (advances.length === 0
+      ? ''
+      : ` Time is advanced without a Sample ${advances.length === 1 ? 'once' : `${advances.length} times`}, from ${at(advances[0])} to ${at(advances[advances.length - 1])}.`) +
+    (restart === undefined ? '' : ` The Detector is restarted at ${at(restart)}.`)
+  );
+}
+
 /** What the bands' colours and the marks mean; the text alternative says it in words. */
-function LifecycleKey() {
+function LifecycleKey({ advances }: { advances: boolean }) {
   const item = (label: string, colour: string, mark: boolean) => (
     <span key={label}>
       <span className={mark ? 'swatch mark' : 'swatch'} style={{ background: colour }} />
@@ -333,6 +364,7 @@ function LifecycleKey() {
         <span className="swatch mark halo" style={{ background: TRUNCATED.colour }} />
         Truncated start or end
       </span>
+      {advances && item('Time advance', ADVANCE_COLOUR, true)}
     </div>
   );
 }
@@ -590,6 +622,8 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
       channels: scenario.channels.filter((c) => !hidden.includes(c)),
       rules: scenario.rules.filter((r) => !hidden.includes(r)),
       expression: result.expression,
+      advances: result.advances,
+      restart: result.restart,
     };
     const event = result.events.find((e) => eventKey(e) === selected);
     const course = frozen ?? courseOf(shown);
@@ -618,11 +652,11 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
             <DrawLayer x={[times[0], times[times.length - 1]]} course={course} draw={drawPoint} end={() => setFrozen(undefined)} />
           )}
         </div>
-        <LifecycleKey />
+        <LifecycleKey advances={result.advances.length > 0} />
         <EventSummary
           scenario={scenario}
           lifecycle={result}
-          also={expressionSummary(result.expression, rows, scenario.timeUnit.name)}
+          also={expressionSummary(result.expression, rows, scenario.timeUnit.name) + timeSummary(result, scenario)}
         />
         {event && <AggregatesPanel scenario={scenario} event={event} />}
       </>

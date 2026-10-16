@@ -55,6 +55,10 @@ export type Result =
       events: Event[];
       discarded: Discard[];
       expression?: PlottedExpression;
+      /** Timestamps the Detector was advanced to without a Sample. */
+      advances: number[];
+      /** Timestamp of the first Sample after the Detector was restarted, if it was. */
+      restart?: number;
     }
   | { error: string };
 

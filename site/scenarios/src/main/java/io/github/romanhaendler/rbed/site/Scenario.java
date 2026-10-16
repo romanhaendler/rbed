@@ -66,6 +66,16 @@ abstract class Scenario {
   }
 
   /**
+   * Like {@link #detect(Rule[], List, Lifecycle)}, for a Scenario whose feeding depends on its
+   * parameters (a sampling rate, a timer advancing time, a restart with or without History).
+   * The bridge calls this one.
+   */
+  void detect(Rule[] rules, List<Sample> samples, Map<String, Double> values,
+      Lifecycle lifecycle) {
+    detect(rules, samples, lifecycle);
+  }
+
+  /**
    * What the Scenario's listener makes of an Event at the given parameter values, such as the
    * class of a lifted load; or null.
    */

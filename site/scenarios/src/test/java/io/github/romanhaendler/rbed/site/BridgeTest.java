@@ -443,6 +443,89 @@ class BridgeTest {
   }
 
   @Test
+  void pushedWithTimestampsTheVibrationAcrossTheLostSamplesIsConfirmed() {
+    Map<String, Object> result = run("sampling-rate", "{}");
+    assertEquals(List.of("Vibration 1500..3500", "Vibration 5000..7000"), events(result));
+    assertEquals(List.of("3000", "6500"), confirmed(result));
+    assertEquals(List.of(), discarded(result));
+  }
+
+  @Test
+  void withASamplingRateTheLostSamplesShortenTimeAndTheVibrationIsDiscarded() {
+    Map<String, Object> result = run("sampling-rate", "{\"mode\": 1}");
+    assertEquals(List.of("Vibration 4100..6100"), events(result));
+    assertEquals(List.of("5600"), confirmed(result));
+    assertEquals(List.of("Vibration 1500..2600"), discarded(result));
+    assertEquals(List.of(2000.0, 2100.0), timestamps(result).subList(20, 22));
+  }
+
+  @Test
+  void aSlowerDeclaredRateStretchesEveryDuration() {
+    Map<String, Object> result = run("sampling-rate", "{\"mode\": 1, \"rate\": 5}");
+    assertEquals(List.of("Vibration 3000..5200", "Vibration 8200..12200"), events(result));
+    assertEquals(List.of("4600", "9800"), confirmed(result));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void advancingTimeThroughTheSilenceEndsTheHighHeartRateAndConfirmsSensorLost() {
+    Map<String, Object> result = run("silent-sensors", "{}");
+    assertEquals(List.of("HighHeartRate 12000..30000", "SensorLost 30000..45000"),
+        events(result));
+    List<Double> advances = (List<Double>) result.get("advances");
+    assertEquals(20, advances.size());
+    assertEquals(List.of(25000.0, 44000.0), List.of(advances.get(0), advances.get(19)));
+    assertEquals(List.of(24000.0, 45000.0), timestamps(result).subList(24, 26));
+  }
+
+  @Test
+  void withoutAdvancesTheSilenceGoesUnnoticed() {
+    Map<String, Object> result = run("silent-sensors", "{\"timer\": 1}");
+    assertEquals(List.of("HighHeartRate 12000..45000"), events(result));
+    assertEquals(List.of(), result.get("advances"));
+  }
+
+  @Test
+  void aLongerSilenceLimitNoticesTheSilenceLater() {
+    assertEquals(List.of("HighHeartRate 12000..35000", "SensorLost 35000..45000"),
+        events(run("silent-sensors", "{\"limit\": 10}")));
+  }
+
+  static final long DAY = 86_400_000;
+
+  @Test
+  void withHistoryTheRestartedDetectorKnowsTheLastMaintenance() {
+    Map<String, Object> result = run("history", "{}");
+    assertEquals(List.of("Maintenance 10..11", "OverdueService 0..11 truncatedStart",
+            "Maintenance 140..141", "OverdueService 102..141"),
+        describe(result, DAY));
+    assertEquals(60.0 * DAY, result.get("restart"));
+  }
+
+  @Test
+  void withoutHistoryTheRestartedDetectorFindsTheServiceOverdueAtOnce() {
+    assertEquals(List.of("Maintenance 10..11", "OverdueService 0..11 truncatedStart",
+            "Maintenance 140..141", "OverdueService 60..141 truncatedStart"),
+        describe(run("history", "{\"history\": 1}"), DAY));
+  }
+
+  @Test
+  void aRestartMoreThanNinetyDaysAfterTheMaintenanceNeedsNoHistory() {
+    List<String> expected = List.of("Maintenance 10..11", "OverdueService 0..11 truncatedStart",
+        "OverdueService 102..119 truncatedEnd", "Maintenance 140..141",
+        "OverdueService 120..141 truncatedStart");
+    assertEquals(expected, describe(run("history", "{\"restart\": 120}"), DAY));
+    assertEquals(expected, describe(run("history", "{\"restart\": 120, \"history\": 1}"), DAY));
+  }
+
+  @SuppressWarnings("unchecked")
+  static List<Double> timestamps(Map<String, Object> result) {
+    return ((List<Map<String, Object>>) result.get("samples")).stream()
+        .map(s -> (Double) s.get("timestamp"))
+        .toList();
+  }
+
+  @Test
   void catalogueHasTheFirstRuleWithItsThresholdAndSource() {
     Map<String, Object> first = scenarios().get(0);
     assertEquals("first-rule", first.get("id"));

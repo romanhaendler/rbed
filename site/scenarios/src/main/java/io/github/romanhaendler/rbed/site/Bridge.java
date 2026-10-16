@@ -24,7 +24,10 @@ public final class Bridge {
       new DataGaps(),
       new Expressions(),
       new AggregatesScenario(),
+      new SamplingRate(),
+      new SilentSensors(),
       new PulseChannels(),
+      new History(),
       new Cranes(),
       new Manufacturing(),
       new BuildingServices(),
@@ -103,7 +106,9 @@ public final class Bridge {
    *     number per Sample of the Scenario (null: absent in that Sample); they replace that
    *     Channel's own values
    * @return JSON object with the Samples, the Events, the Discarded Pending Events (with the
-   *     timestamp they were Discarded) and, for a Scenario that plots an Expression, its name,
+   *     timestamp they were Discarded), the timestamps time was advanced to without a Sample,
+   *     the timestamp of the restart if the Detector was restarted, and, for a Scenario that
+   *     plots an Expression, its name,
    *     threshold and value per Sample (null where undefined); or {@code {"error": message}} if
    *     rbed rejected the Rules or the input was invalid
    */
@@ -114,7 +119,7 @@ public final class Bridge {
       Map<String, Double> values = values(scenario, parameters);
       List<Sample> samples = drawn(scenario, scenario.samples(values), drawnChannels);
       Lifecycle lifecycle = new Lifecycle();
-      scenario.detect(scenario.rules(values), samples, lifecycle);
+      scenario.detect(scenario.rules(values), samples, values, lifecycle);
       return result(scenario, values, samples, lifecycle);
     } catch (RuntimeException e) {
       return Json.string(new StringBuilder("{\"error\":"), String.valueOf(e.getMessage()))
@@ -232,7 +237,13 @@ public final class Bridge {
           .append(",\"discarded\":").append(d.at())
           .append('}');
     }
+    out.append("],\"advances\":[");
+    for (int i = 0; i < lifecycle.advances.size(); i++) {
+      if (i > 0) out.append(',');
+      out.append(lifecycle.advances.get(i));
+    }
     out.append(']');
+    if (lifecycle.restart != null) out.append(",\"restart\":").append(lifecycle.restart);
     Scenario.Plot plot = scenario.plot(values);
     if (plot != null) {
       Json.string(out.append(",\"expression\":{\"name\":"), plot.name());
