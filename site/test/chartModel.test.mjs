@@ -6,10 +6,17 @@ import {
   expressionKey,
   expressionRows,
   hasGaps,
+  heldChannels,
   heldRows,
+  keyOf,
+  lineRows,
+  readoutValue,
+  thresholdLines,
+  thresholdText,
+  tickText,
   timeTicks,
   undefinedStretches,
-  windowStretches,
+  windowRows,
 } from '../src/chartModel.ts';
 
 const scenario = (channels, pulse = []) => ({ id: 's', channels, pulse, rules: ['R'], timeUnit: { name: 's', millis: 1000 } });
@@ -85,10 +92,120 @@ test('few Samples at whole units are the time ticks; many are left to the chart'
   assert.equal(timeTicks(rows({ temp: Array(20).fill(70) })), undefined);
 });
 
-test('a within(...) window runs from the end of each Event of its Rule', () => {
+test('the time a within(...) counts lies in the lane of the Rule that counts it, overlapping windows merged', () => {
   const lifecycle = {
-    events: [{ name: 'DoorOpen', start: 0, end: 60_000 }, { name: 'Other', start: 0, end: 1000 }],
+    events: [
+      { name: 'Sprint', start: 0, end: 60_000 },
+      { name: 'Sprint', start: 90_000, end: 120_000 },
+      { name: 'Other', start: 0, end: 1000 },
+    ],
     discarded: [],
   };
-  assert.deepEqual(windowStretches([{ after: 'DoorOpen', millis: 30 * 60_000 }], lifecycle, 60_000), [[1, 31]]);
+  assert.deepEqual(
+    windowRows([{ rule: 'Recovered', after: 'Sprint', millis: 120_000 }], lifecycle, 60_000),
+    new Map([
+      [
+        'Recovered',
+        [
+          { t: 1, s: 0 },
+          { t: 4, s: null },
+        ],
+      ],
+    ]),
+  );
+});
+
+test('a Pulse Channel reads "–" where a Sample does not carry it; another Channel keeps its last value', () => {
+  const s = scenario(['errors', 'deploy'], ['deploy']);
+  const r = rows({ errors: [3, null, 5], deploy: [1, null, null] });
+  assert.equal(readoutValue(s, r, 'deploy', 0), '1');
+  assert.equal(readoutValue(s, r, 'deploy', 1), '–');
+  assert.equal(readoutValue(s, r, 'errors', 1), '3 (kept)');
+  assert.equal(readoutValue(s, r, 'errors', 2), '5');
+  // At a time advance, between Samples, every Channel holds its value, but a Pulse Channel.
+  assert.equal(readoutValue(s, r, 'errors', 2.5), '5 (kept)');
+  assert.equal(readoutValue(s, r, 'deploy', 0.5), '–');
+  assert.equal(readoutValue(s, rows({ errors: [null, 2] }), 'errors', 0), '–');
+});
+
+test('held lines are drawn for Channels some Samples lack, and for all where time was advanced; never for a Pulse Channel', () => {
+  const s = scenario(['errors', 'deploy', 'cpu'], ['deploy']);
+  const r = rows({ errors: [3, null], deploy: [1, null], cpu: [50, 60] });
+  assert.deepEqual(heldChannels(s, r, []), ['errors']);
+  assert.deepEqual(heldChannels(s, r, [5]), ['errors', 'cpu']);
+});
+
+test('across a silence the line breaks, and the held line runs from the Sample before it through the advances', () => {
+  const r = [
+    { t: 0, hr: 80 },
+    { t: 1, hr: 128 },
+    { t: 4, hr: 92 },
+  ];
+  assert.deepEqual(
+    lineRows(r, [2, 3]).map((x) => x.hr),
+    [80, 128, undefined, undefined, 92],
+  );
+  assert.deepEqual(
+    heldRows(r, 'hr', [2, 3]).map((x) => [x.t, x.hr]),
+    [
+      [0, null],
+      [1, 128],
+      [2, 128],
+      [3, 128],
+      [4, null],
+    ],
+  );
+});
+
+test('a threshold names its Rule, Channel and value in words', () => {
+  assert.equal(thresholdText({ channel: 'hr', rule: 'Tachycardia', condition: 'when >', value: 100 }), 'Tachycardia when hr > 100');
+  assert.equal(thresholdText({ channel: 'spo2', rule: 'Desaturation', condition: 'endWhen ≥', value: 92 }), 'Desaturation endWhen spo2 ≥ 92');
+  assert.equal(thresholdText({ channel: 'speed', rule: 'Trip, Idling', condition: 'when <', value: 0.5 }), 'Trip, Idling when speed < 0.5');
+});
+
+test('thresholds at one value share a line; a line close to a labelled one is left unlabelled; the Channel is named where an axis has several', () => {
+  const axis = (id, channels, ticks) => ({ id, channels, ticks, domain: [0, 1], middle: '50%' });
+  const axes = [axis('band0', ['hr', 'spo2'], [80, 90, 100, 110, 120]), axis('band1', ['load'], [0, 50, 100])];
+  const t = (channel, condition, value) => ({ channel, rule: 'R', condition, value });
+  const lines = thresholdLines(
+    [t('hr', 'when >', 100), t('hr', 'endWhen <', 95), t('spo2', 'when <', 90), t('spo2', 'endWhen ≥', 91), t('load', 'when >', 80), t('load', 'endWhen <', 80)],
+    axes,
+    ['hr', 'spo2', 'load'],
+  );
+  assert.deepEqual(
+    lines.map((l) => [l.axis, l.value, l.label, l.thresholds.length]),
+    [
+      ['band0', 100, 'hr > 100', 1],
+      ['band0', 95, 'hr < 95', 1],
+      ['band0', 90, '', 1],
+      ['band0', 91, 'spo2 ≥ 91', 1],
+      ['band1', 80, '> 80, < 80', 2],
+    ],
+  );
+  // A hidden Channel's thresholds are not drawn, and the other is then alone on its axis.
+  assert.deepEqual(
+    thresholdLines([t('hr', 'when >', 100), t('spo2', 'when <', 90)], axes, ['hr']).map((l) => l.label),
+    ['> 100'],
+  );
+});
+
+test('the key lists the lifecycle in order, and Pending only where something was Pending for a while', () => {
+  const at = (start, confirmed, end) => ({ name: 'R', start, confirmed, end });
+  const names = (l) => {
+    const key = keyOf(l);
+    return [...key.states.map((s) => s.label), ...key.marks.map((m) => m.name)];
+  };
+  assert.deepEqual(names({ events: [at(1, 1, 3)], discarded: [] }), ['Confirmed', 'Confirmed at', 'Ended at']);
+  assert.deepEqual(names({ events: [at(1, 2, 3)], discarded: [{ name: 'R', start: 5, discarded: 6 }] }), [
+    'Pending',
+    'Confirmed',
+    'Went Pending',
+    'Confirmed at',
+    'Ended at',
+    'Discarded at',
+  ]);
+});
+
+test("an axis' ticks keep their decimals", () => {
+  assert.deepEqual([0, 0.5, 1, 1500].map(tickText), ['0', '0.5', '1', '1,500']);
 });

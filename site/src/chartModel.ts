@@ -18,9 +18,11 @@ export type MarkRow = { t: number; y: number };
     between the Channels and the lanes. */
 export const CHANNEL_UNITS = 3;
 export const SEPARATE_UNITS = 2;
-export const EVENT_COLOR = 'var(--uc-series-2)';
+/** The Events' colors (site.css): Pending a lighter tone of Confirmed in light, a darker one in
+    dark, each at least 3:1 against the surface. */
+export const EVENT_COLOR = 'var(--event-confirmed)';
 export const EVENT_STATES = [
-  { label: 'Pending', color: `color-mix(in srgb, ${EVENT_COLOR} 35%, transparent)` },
+  { label: 'Pending', color: 'var(--event-pending)' },
   { label: 'Confirmed', color: EVENT_COLOR },
 ] as const;
 /** The four lifecycle moments, marked on each Rule's lane; Confirmed last, on top of a Pending
@@ -31,6 +33,26 @@ export const MARKS = [
   { name: 'Discarded at', color: 'var(--u-color-danger)', moments: (l: Lifecycle) => l.discarded.map((d) => d.discarded) },
   { name: 'Confirmed at', color: 'var(--u-color-success)', moments: (l: Lifecycle) => l.events.map((e) => e.confirmed) },
 ] as const;
+
+/** Whether some Event, or Discarded Pending Event, was Pending for a while: only then does the
+    chart show a Pending stretch and a Went Pending mark apart from the Confirmed one. */
+export const somePending = (l: Lifecycle) =>
+  l.events.some((e) => e.confirmed > e.start) || l.discarded.some((d) => d.discarded > d.start);
+
+/** The key's bands and marks, in lifecycle order, of those the chart shows. */
+export function keyOf(l: Lifecycle) {
+  const pending = somePending(l);
+  const mark = (name: (typeof MARKS)[number]['name']) => MARKS.find((m) => m.name === name)!;
+  return {
+    states: EVENT_STATES.filter((s) => s.label !== 'Pending' || pending),
+    marks: [
+      ...(pending ? [mark('Went Pending')] : []),
+      mark('Confirmed at'),
+      mark('Ended at'),
+      ...(l.discarded.length > 0 ? [mark('Discarded at')] : []),
+    ],
+  };
+}
 /** Every lifecycle moment, for the ring in the surface's color that sets each mark off its band. */
 export const allMoments = (l: Lifecycle) => MARKS.flatMap((m) => m.moments(l));
 export const RING_COLOR = 'var(--u-color-surface)';
@@ -146,14 +168,45 @@ export function channelBands(scenario: Scenario, rows: Row[]): string[][] {
 /** Whether some Sample lacks a value of the Channel. */
 export const hasGaps = (rows: Row[], channel: string) => rows.some((r) => r[channel] == null);
 
-/** The Channel's value as rbed sees it at each Sample: a Sample without one keeps the last;
-    none before the first. */
-export function heldRows(rows: Row[], channel: string): Row[] {
+/** The Channels' lines' rows: the Samples, and a row without values at each time advance (in
+    the Scenario's unit), so a line breaks where time moved on without a Sample instead of
+    running straight across. */
+export const lineRows = (rows: Row[], advances: number[]): Row[] =>
+  advances.length === 0 ? rows : [...rows, ...advances.map((t) => ({ t }) as Row)].sort((a, b) => a.t - b.t);
+
+/** The Channel's value where rbed holds it (in rbed, a Channel keeps its last value): in a
+    Sample that lacks it, and at a time advance (in the Scenario's unit), from the Sample
+    before. For a Channel some Samples lack, at every Sample and advance (none before the
+    first); otherwise only from the Sample before an advance through the advances, so only the
+    held stretches are drawn. */
+export function heldRows(rows: Row[], channel: string, advances: number[] = []): Row[] {
+  const gaps = hasGaps(rows, channel);
+  const moments = [...rows.map((r) => ({ t: r.t, value: r[channel] ?? null, sample: true })), ...advances.map((t) => ({ t, value: null, sample: false }))].sort(
+    (a, b) => a.t - b.t,
+  );
   let held: number | null = null;
-  return rows.map((r) => {
-    held = r[channel] ?? held;
-    return { t: r.t, [channel]: held } as Row;
+  return moments.map((m, i) => {
+    held = m.value ?? held;
+    const silent = !m.sample || moments[i + 1]?.sample === false;
+    return { t: m.t, [channel]: gaps || silent ? held : null } as Row;
   });
+}
+
+/** The Channels whose held values the chart draws as a thin step line: those some Samples
+    lack, and every one where time was advanced without a Sample; never a Pulse Channel, which
+    holds nothing. */
+export const heldChannels = (scenario: Scenario, rows: Row[], advances: number[]) =>
+  scenario.channels.filter((c) => !scenario.pulse.includes(c) && (advances.length > 0 || hasGaps(rows, c)));
+
+/** What the readout says of a Channel at time t (in the Scenario's unit): the value of the
+    Sample at t; where there is none (an advance) or the Sample lacks the Channel, the value rbed
+    holds, "(kept)", or "–" before the first; a Pulse Channel holds nothing, so "–". */
+export function readoutValue(scenario: Scenario, rows: Row[], channel: string, t: number): string {
+  const value = rows.find((r) => r.t === t)?.[channel];
+  if (value != null) return String(value);
+  if (scenario.pulse.includes(channel)) return '–';
+  const kept = rows.findLast((r) => r.t <= t && r[channel] != null)?.[channel];
+  return kept != null ? `${kept} (kept)` : '–';
 }
 
 /** The plot's units: the lanes, the band of the Expressions with a unit, each band of Channels. */
@@ -224,10 +277,13 @@ export function bandRows(lifecycle: Lifecycle, millis: number): BandRow[] {
 
 /** Lane i of `lanes` (the first Rule's on top), on the lanes axis: where its band lies. On a
     narrow chart the band takes the lane's lower half, and the Rule's name hangs from the
-    lane's top, `name`, over its upper half. */
+    lane's top, `name`, over its upper half. A thin strip just above the band, `strip`, shows
+    the time a within(...) of the Rule counts. */
 export function lane(i: number, lanes: number, narrow: boolean) {
   const bottom = lanes - i - 1;
-  return narrow ? { from: bottom + 0.05, to: bottom + 0.5, name: bottom + 1 } : { from: bottom + 0.1, to: bottom + 0.9, name: bottom + 0.9 };
+  return narrow
+    ? { from: bottom + 0.05, to: bottom + 0.5, name: bottom + 1, strip: [bottom + 0.53, bottom + 0.62] }
+    : { from: bottom + 0.1, to: bottom + 0.9, name: bottom + 0.9, strip: [bottom + 0.92, bottom + 1.04] };
 }
 
 /** Marks at the moments `moments` picks from each Rule's lifecycle, in the middle of that Rule's band. */
@@ -256,13 +312,75 @@ export function ruleState(lifecycle: Lifecycle, t: number, millis: number): stri
 /** The Event latest(...) reads at time t: the most recently Confirmed one, running or Ended. */
 export const latestEvent = (events: Event[], t: number, millis: number) => events.findLast((e) => e.confirmed / millis <= t);
 
-/** A threshold's label on the chart: with its Rule where the Scenario has more than one. */
-export const thresholdLabel = (t: Threshold, scenario: Scenario) =>
-  `${scenario.rules.length > 1 ? `${t.rule} ` : ''}${t.condition} ${t.value}`;
+/** The comparison in a threshold's condition: "when >" gives ">". */
+const COMPARISON = /[<>≤≥]=?/;
 
-/** The stretches a within(...) counts: from the end of each Event of its Rule, in the Scenario's unit. */
-export const windowStretches = (windows: Window[], lifecycle: Lifecycle, millis: number): [number, number][] =>
-  windows.flatMap((w) => ofRule(lifecycle, w.after).events.map((e): [number, number] => [e.end / millis, (e.end + w.millis) / millis]));
+/** A threshold in words, naming its Rule, Channel and value: "Tachycardia when hr > 100". */
+export const thresholdText = (t: Threshold) =>
+  `${t.rule} ${COMPARISON.test(t.condition) ? t.condition.replace(COMPARISON, `${t.channel} $&`) : `${t.condition} ${t.channel}`} ${t.value}`;
+
+/** A line the chart draws at a threshold: its axis, its value, its label (empty where the line
+    lies too close to a labelled one to tell them apart; the key names it) and the thresholds
+    it stands for. */
+export type ThresholdLine = { axis: string; value: number; label: string; thresholds: Threshold[] };
+
+/** Labels of lines closer than this share of their axis' span are left out. */
+const LABEL_SPACING = 0.04;
+
+/** The lines of the thresholds of the shown Channels: one per axis and value, labelled with
+    the comparison alone ("> 100"; the key says the rest), or with the Channel too where the
+    axis has several shown Channels ("temp > 26"); from the top, a line too close to a
+    labelled one has no label. */
+export function thresholdLines(thresholds: Threshold[], axes: ChannelAxis[], channels: string[]): ThresholdLine[] {
+  const lines: ThresholdLine[] = [];
+  for (const t of thresholds) {
+    if (!channels.includes(t.channel)) continue;
+    const axis = axes.find((a) => a.channels.includes(t.channel)) ?? axes[0];
+    const line = lines.find((l) => l.axis === axis.id && l.value === t.value);
+    if (line) line.thresholds.push(t);
+    else lines.push({ axis: axis.id, value: t.value, label: '', thresholds: [t] });
+  }
+  const labelled: ThresholdLine[] = [];
+  for (const line of [...lines].sort((a, b) => b.value - a.value)) {
+    const axis = axes.find((a) => a.id === line.axis)!;
+    const span = axis.ticks[axis.ticks.length - 1] - axis.ticks[0] || 1;
+    if (labelled.some((l) => l.axis === line.axis && Math.abs(l.value - line.value) <= span * LABEL_SPACING)) continue;
+    const several = axis.channels.filter((c) => channels.includes(c)).length > 1;
+    const parts = line.thresholds.map((t) => `${several ? `${t.channel} ` : ''}${t.condition.match(COMPARISON)?.[0] ?? t.condition} ${t.value}`);
+    line.label = [...new Set(parts)].join(', ');
+    labelled.push(line);
+  }
+  return lines;
+}
+
+/** An axis' tick, written with as many decimals as it has: 0.5 stays 0.5, 1500 is 1,500. */
+export const tickText = (v: number) => v.toLocaleString('en-US', { maximumFractionDigits: 6 });
+
+/** Each Rule's within(...) windows as StateBand rows of one state, over the time it counts after
+    each Event of the Rule it follows (in the Scenario's unit); overlapping windows merge. */
+export function windowRows(windows: Window[], lifecycle: Lifecycle, millis: number): Map<string, BandRow[]> {
+  const byRule = new Map<string, BandRow[]>();
+  for (const rule of new Set(windows.map((w) => w.rule))) {
+    const stretches = windows
+      .filter((w) => w.rule === rule)
+      .flatMap((w) => ofRule(lifecycle, w.after).events.map((e) => [e.end / millis, (e.end + w.millis) / millis]))
+      .sort((a, b) => a[0] - b[0]);
+    const merged: number[][] = [];
+    for (const [from, to] of stretches) {
+      const last = merged.at(-1);
+      if (last && from <= last[1]) last[1] = Math.max(last[1], to);
+      else merged.push([from, to]);
+    }
+    byRule.set(
+      rule,
+      merged.flatMap(([from, to]) => [
+        { t: from, s: 0 },
+        { t: to, s: null },
+      ]),
+    );
+  }
+  return byRule;
+}
 
 /** What the chart shows: the shown Channels and Rules, and what the run returned. */
 export type ChartModel = {

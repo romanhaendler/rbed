@@ -65,8 +65,8 @@ export type PlottedExpression = {
  *  `rule` names the Rule, or the Rules, it belongs to. */
 export type Threshold = { channel: string; rule: string; condition: string; value: number };
 
-/** The time after each Event of the Rule `after` that a Rule's within(...) counts. */
-export type Window = { after: string; millis: number };
+/** The time after each Event of the Rule `after` that the within(...) of the Rule `rule` counts. */
+export type Window = { rule: string; after: string; millis: number };
 
 export type Result =
   | {
