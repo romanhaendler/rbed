@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -76,6 +77,99 @@ class BridgeTest {
 
   static String time(Object millis) {
     return millis == null ? "?" : Long.toString(((Double) millis).longValue());
+  }
+
+  /**
+   * The Events of a result as the domain examples' Samples.describe writes them: "Name
+   * start..end" with times in the given unit, plus Truncated flags.
+   */
+  @SuppressWarnings("unchecked")
+  static List<String> describe(Map<String, Object> result, long unit) {
+    return ((List<Map<String, Object>>) result.get("events")).stream()
+        .map(e -> e.get("name") + " " + time(e.get("start"), unit) + ".."
+            + time(e.get("end"), unit)
+            + (e.get("truncatedStart") == Boolean.TRUE ? " truncatedStart" : "")
+            + (e.get("truncatedEnd") == Boolean.TRUE ? " truncatedEnd" : ""))
+        .toList();
+  }
+
+  static String time(Object millis, long unit) {
+    if (millis == null) return "?";
+    double t = (Double) millis / unit;
+    return t == Math.rint(t) ? Long.toString((long) t) : Double.toString(t);
+  }
+
+  /** The note the Scenario gives each Event (its listener-side classification), or null. */
+  @SuppressWarnings("unchecked")
+  static List<Object> notes(Map<String, Object> result) {
+    return ((List<Map<String, Object>>) result.get("events")).stream()
+        .map(e -> e.get("note")).toList();
+  }
+
+  /** CraneScenarioTest's form: "Name start..end" in ms, then the load of a LoadLifted. */
+  @Test
+  void cranesAtDefaultsYieldTheCraneScenarioTestsEvents() {
+    Map<String, Object> result = run("cranes", "{}");
+    List<String> events = describe(result, 1);
+    List<Object> notes = notes(result);
+    List<String> described = new ArrayList<>();
+    for (int i = 0; i < events.size(); i++) {
+      described.add(events.get(i) + (notes.get(i) == null ? "" : " " + notes.get(i)));
+    }
+    assertEquals(List.of(
+            "LoadLifted 1500..6500 pallet",
+            "Overload 10500..11500",
+            "PartialSetDown 11500..12500",
+            "LoadLifted 8500..12500 container"),
+        described);
+  }
+
+  @Test
+  void manufacturingAtDefaultsYieldsTheMachineToolOverheatExamplesEvents() {
+    assertEquals(List.of(
+            "FastHeating 101..141",
+            "Overheat 121..331",
+            "OverheatUnderLoad 151..391",
+            "HighLoad 100..400"),
+        describe(run("manufacturing", "{}"), 1000));
+  }
+
+  @Test
+  void buildingServicesAtDefaultsYieldTheHvacShortCyclingExamplesEvents() {
+    Map<String, Object> result = run("building-services", "{}");
+    assertEquals(List.of(
+            "Run 100..700",
+            "QuickRestart 800..920",
+            "Run 800..920",
+            "Run 1600..2200",
+            "FrequentStarts 1630..2390 truncatedEnd"),
+        describe(result, 1000));
+    // the example's shortCycle: false, true, false for the three Runs
+    assertEquals(Arrays.asList(null, null, "short cycle", null, null), notes(result));
+  }
+
+  @Test
+  void healthcareAtDefaultsYieldsTheVitalSignsExamplesEvents() {
+    assertEquals(List.of(
+            "Tachycardia 60..159 truncatedEnd",
+            "HypoxicTachycardia 130..160",
+            "SensorLost 155..170",
+            "Desaturation 120..200",
+            "Tachycardia 170..300 truncatedStart"),
+        describe(run("healthcare", "{}"), 1000));
+  }
+
+  @Test
+  void automotiveAtDefaultsYieldsTheFleetTelematicsExamplesEvents() {
+    Map<String, Object> result = run("automotive", "{}");
+    assertEquals(List.of(
+            "Idling 60..301",
+            "HarshBraking 901..905",
+            "Trip 301..904",
+            "Idling 904..1499 truncatedEnd"),
+        describe(result, 1000));
+    // the example's km(trip): 11.94
+    assertEquals(Arrays.asList(null, null, "11.94 km", null), notes(result));
   }
 
   @Test

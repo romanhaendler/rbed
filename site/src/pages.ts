@@ -43,6 +43,41 @@ export const PAGES: Page[] = [
       'Pulse Channels report one-off occurrences such as deployments: their value exists only in the Sample that carries it.',
     rubric: 'Guide',
   },
+  {
+    path: '/cranes/',
+    title: 'Cranes',
+    description:
+      'Lifts, overloads and partial set-downs of a crane from the weight on its hook: hysteresis, during, latest and classifying a lifted load.',
+    rubric: 'Examples',
+  },
+  {
+    path: '/manufacturing/',
+    title: 'Manufacturing',
+    description:
+      "Overheating under load and fast heating of a machine tool's spindle, sampled without timestamps: sampling-rate mode, rate and combined durings.",
+    rubric: 'Examples',
+  },
+  {
+    path: '/building-services/',
+    title: 'Building services',
+    description:
+      "Short cycling of an air conditioner's compressor: Runs, quick restarts with after().within() and frequent starts with count().within().",
+    rubric: 'Examples',
+  },
+  {
+    path: '/healthcare/',
+    title: 'Healthcare',
+    description:
+      'Tachycardia, desaturation and a lost sensor on a bedside monitor: advanceTo and age() for a silent sensor, maxGap for a dropout.',
+    rubric: 'Examples',
+  },
+  {
+    path: '/automotive/',
+    title: 'Automotive',
+    description:
+      "Trips, harsh braking and idling from a vehicle's speed and engine rpm: deceleration via rate, a Trip's distance via integral.",
+    rubric: 'Examples',
+  },
 ];
 
 /** The page path an address names when the site is served below `base`, or undefined outside it. */

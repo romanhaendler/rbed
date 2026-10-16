@@ -341,6 +341,7 @@ function EventTable({
   select: (key: string | undefined) => void;
 }) {
   const { name: unit, millis } = scenario.timeUnit;
+  const notes = events.some((e) => e.note !== undefined);
   return (
     <div className="tableScroll">
       <table className="eventTable" id="events">
@@ -352,6 +353,7 @@ function EventTable({
             <th scope="col">Confirmed ({unit})</th>
             <th scope="col">End ({unit})</th>
             <th scope="col">Truncated</th>
+            {notes && <th scope="col">Note</th>}
           </tr>
         </thead>
         <tbody>
@@ -378,10 +380,11 @@ function EventTable({
                 <td>{e.confirmed / millis}</td>
                 <td>{e.end / millis}</td>
                 <td>{[e.truncatedStart && 'start', e.truncatedEnd && 'end'].filter(Boolean).join(', ')}</td>
+                {notes && <td>{e.note}</td>}
               </tr>,
               // The Aggregates under their Event, so the table stays five columns wide on a phone.
               <tr key={`${key} aggregates`} className="aggregateRow" data-selected={key === selected || undefined}>
-                <td colSpan={5}>
+                <td colSpan={notes ? 6 : 5}>
                   <span className="aggregateLabel">Aggregates</span>{' '}
                   {Object.entries(e.aggregates).map(([channel, a], i) => [
                     i > 0 && '; ',

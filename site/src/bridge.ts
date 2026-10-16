@@ -35,6 +35,8 @@ export type Event = {
   truncatedEnd: boolean;
   /** By Channel name, for each Channel the Rule aggregates. */
   aggregates: Record<string, Aggregates>;
+  /** What the Scenario's listener makes of the Event, such as the load a crane lifted. */
+  note?: string;
 };
 
 /** A Pending Event that stopped holding before it was Confirmed, and when that was noticed. */

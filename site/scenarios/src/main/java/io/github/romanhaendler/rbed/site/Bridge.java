@@ -2,7 +2,6 @@ package io.github.romanhaendler.rbed.site;
 
 import io.github.romanhaendler.rbed.Aggregates;
 import io.github.romanhaendler.rbed.Channel;
-import io.github.romanhaendler.rbed.Detector;
 import io.github.romanhaendler.rbed.Event;
 import io.github.romanhaendler.rbed.Rule;
 import io.github.romanhaendler.rbed.Sample;
@@ -21,7 +20,12 @@ public final class Bridge {
       new FirstRule(),
       new EventLifecycle(),
       new AggregatesScenario(),
-      new PulseChannels());
+      new PulseChannels(),
+      new Cranes(),
+      new Manufacturing(),
+      new BuildingServices(),
+      new Healthcare(),
+      new Automotive());
 
   private Bridge() {}
 
@@ -86,17 +90,10 @@ public final class Bridge {
     try {
       Scenario scenario = scenario(scenarioId);
       List<Sample> samples = scenario.samples();
+      Map<String, Double> values = values(scenario, parameters);
       Lifecycle lifecycle = new Lifecycle();
-      Detector detector = Detector.builder()
-          .rules(scenario.rules(values(scenario, parameters)))
-          .listener(lifecycle)
-          .build();
-      for (Sample sample : samples) {
-        lifecycle.now = sample.timestamp();
-        detector.push(sample.timestamp(), sample.values());
-      }
-      detector.close();
-      return result(scenario, samples, lifecycle);
+      scenario.detect(scenario.rules(values), lifecycle);
+      return result(scenario, values, samples, lifecycle);
     } catch (RuntimeException e) {
       return Json.string(new StringBuilder("{\"error\":"), String.valueOf(e.getMessage()))
           .append('}').toString();
@@ -127,7 +124,8 @@ public final class Bridge {
     return values;
   }
 
-  private static String result(Scenario scenario, List<Sample> samples, Lifecycle lifecycle) {
+  private static String result(Scenario scenario, Map<String, Double> values,
+      List<Sample> samples, Lifecycle lifecycle) {
     List<Event> events = lifecycle.ended;
     StringBuilder out = new StringBuilder("{\"samples\":[");
     for (int i = 0; i < samples.size(); i++) {
@@ -154,7 +152,10 @@ public final class Bridge {
           .append(",\"end\":").append(e.end().getAsLong())
           .append(",\"truncatedStart\":").append(e.truncatedStart())
           .append(",\"truncatedEnd\":").append(e.truncatedEnd());
-      aggregates(out.append(",\"aggregates\":"), scenario, e).append('}');
+      aggregates(out.append(",\"aggregates\":"), scenario, e);
+      String note = scenario.note(e, values);
+      if (note != null) Json.string(out.append(",\"note\":"), note);
+      out.append('}');
     }
     out.append("],\"discarded\":[");
     for (int i = 0; i < lifecycle.discarded.size(); i++) {
