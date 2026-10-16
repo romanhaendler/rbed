@@ -1,12 +1,14 @@
 package io.github.romanhaendler.rbed.site;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -78,6 +80,99 @@ class BridgeTest {
     return millis == null ? "?" : Long.toString(((Double) millis).longValue());
   }
 
+  /**
+   * The Events of a result as the domain examples' Samples.describe writes them: "Name
+   * start..end" with times in the given unit, plus Truncated flags.
+   */
+  @SuppressWarnings("unchecked")
+  static List<String> describe(Map<String, Object> result, long unit) {
+    return ((List<Map<String, Object>>) result.get("events")).stream()
+        .map(e -> e.get("name") + " " + time(e.get("start"), unit) + ".."
+            + time(e.get("end"), unit)
+            + (e.get("truncatedStart") == Boolean.TRUE ? " truncatedStart" : "")
+            + (e.get("truncatedEnd") == Boolean.TRUE ? " truncatedEnd" : ""))
+        .toList();
+  }
+
+  static String time(Object millis, long unit) {
+    if (millis == null) return "?";
+    double t = (Double) millis / unit;
+    return t == Math.rint(t) ? Long.toString((long) t) : Double.toString(t);
+  }
+
+  /** The note the Scenario gives each Event (its listener-side classification), or null. */
+  @SuppressWarnings("unchecked")
+  static List<Object> notes(Map<String, Object> result) {
+    return ((List<Map<String, Object>>) result.get("events")).stream()
+        .map(e -> e.get("note")).toList();
+  }
+
+  /** CraneScenarioTest's form: "Name start..end" in ms, then the load of a LoadLifted. */
+  @Test
+  void cranesAtDefaultsYieldTheCraneScenarioTestsEvents() {
+    Map<String, Object> result = run("cranes", "{}");
+    List<String> events = describe(result, 1);
+    List<Object> notes = notes(result);
+    List<String> described = new ArrayList<>();
+    for (int i = 0; i < events.size(); i++) {
+      described.add(events.get(i) + (notes.get(i) == null ? "" : " " + notes.get(i)));
+    }
+    assertEquals(List.of(
+            "LoadLifted 1500..6500 pallet",
+            "Overload 10500..11500",
+            "PartialSetDown 11500..12500",
+            "LoadLifted 8500..12500 container"),
+        described);
+  }
+
+  @Test
+  void manufacturingAtDefaultsYieldsTheMachineToolOverheatExamplesEvents() {
+    assertEquals(List.of(
+            "FastHeating 101..141",
+            "Overheat 121..331",
+            "OverheatUnderLoad 151..391",
+            "HighLoad 100..400"),
+        describe(run("manufacturing", "{}"), 1000));
+  }
+
+  @Test
+  void buildingServicesAtDefaultsYieldTheHvacShortCyclingExamplesEvents() {
+    Map<String, Object> result = run("building-services", "{}");
+    assertEquals(List.of(
+            "Run 100..700",
+            "QuickRestart 800..920",
+            "Run 800..920",
+            "Run 1600..2200",
+            "FrequentStarts 1630..2390 truncatedEnd"),
+        describe(result, 1000));
+    // the example's shortCycle: false, true, false for the three Runs
+    assertEquals(Arrays.asList(null, null, "short cycle", null, null), notes(result));
+  }
+
+  @Test
+  void healthcareAtDefaultsYieldsTheVitalSignsExamplesEvents() {
+    assertEquals(List.of(
+            "Tachycardia 60..159 truncatedEnd",
+            "HypoxicTachycardia 130..160",
+            "SensorLost 155..170",
+            "Desaturation 120..200",
+            "Tachycardia 170..300 truncatedStart"),
+        describe(run("healthcare", "{}"), 1000));
+  }
+
+  @Test
+  void automotiveAtDefaultsYieldsTheFleetTelematicsExamplesEvents() {
+    Map<String, Object> result = run("automotive", "{}");
+    assertEquals(List.of(
+            "Idling 60..301",
+            "HarshBraking 901..905",
+            "Trip 301..904",
+            "Idling 904..1499 truncatedEnd"),
+        describe(result, 1000));
+    // the example's km(trip): 11.94
+    assertEquals(Arrays.asList(null, null, "11.94 km", null), notes(result));
+  }
+
   @Test
   void firstRuleAtDefaultsYieldsTheReadmesEvent() {
     assertEquals(List.of("HighTemperature 2000..3000"), events(run("first-rule", "{}")));
@@ -142,6 +237,65 @@ class BridgeTest {
   void negativeLifecycleDurationReturnsRbedsMessage() {
     assertEquals(Map.of("error", "forDuration must be >= 0: -1000"),
         run("event-lifecycle", "{\"duration\": -1}"));
+  }
+
+  @Test
+  void anEndConditionAtTheStartThresholdLetsTheNoisyWeightFlap() {
+    // With an End Condition, `when` is not evaluated while the Event runs: a new Event starts
+    // only after the weight has been seen at or below 500 again, so 508 at 6 s starts none.
+    assertEquals(List.of("LoadLifted 4000..5000", "LoadLifted 10000..12000",
+            "LoadLifted 15000..17000", "LoadLifted 21000..22000"),
+        events(run("end-conditions", "{}")));
+  }
+
+  @Test
+  void movingTheEndThresholdApartLeavesOnlyTheSwingAsASecondEvent() {
+    assertEquals(List.of("LoadLifted 4000..14000", "LoadLifted 18000..22000"),
+        events(run("end-conditions", "{\"end\": 450}")));
+  }
+
+  @Test
+  void anEndThresholdBelowTheSwingKeepsOneEvent() {
+    assertEquals(List.of("LoadLifted 4000..22000"),
+        events(run("end-conditions", "{\"end\": 440}")));
+    assertEquals(List.of("LoadLifted 4000..23000"),
+        events(run("end-conditions", "{\"end\": 50}")));
+  }
+
+  @Test
+  void anEndDurationKeepsTheEventAcrossTheSwingAndEndsItWhereTheWeightDropped() {
+    assertEquals(List.of("LoadLifted 4000..22000"),
+        events(run("end-conditions", "{\"end\": 450, \"endDuration\": 1}")));
+  }
+
+  @Test
+  void anEndConditionThatNeverHoldsEndsTheEventTruncatedAtClose() {
+    assertEquals(List.of("LoadLifted 4000..29000 truncatedEnd"),
+        events(run("end-conditions", "{\"end\": 0}")));
+  }
+
+  @Test
+  void aGapLongerThanMaxGapEndsTheEventAtTheGapAndTruncatesBothSides() {
+    assertEquals(List.of("Running 6000..12000 truncatedEnd", "Running 18000..32000 truncatedStart"),
+        events(run("data-gaps", "{}")));
+  }
+
+  @Test
+  void aMaxGapAsLongAsTheGapKeepsTheEventAcrossIt() {
+    assertEquals(List.of("Running 6000..32000"),
+        events(run("data-gaps", "{\"maxGap\": 6}")));
+  }
+
+  @Test
+  void aGapOutsideTheEventLeavesItComplete() {
+    assertEquals(List.of("Running 6000..32000"),
+        events(run("data-gaps", "{\"gap\": 33}")));
+  }
+
+  @Test
+  void anEventRightAfterAGapHasATruncatedStart() {
+    assertEquals(List.of("Running 8000..32000 truncatedStart"),
+        events(run("data-gaps", "{\"gap\": 2}")));
   }
 
   @Test
@@ -279,10 +433,10 @@ class BridgeTest {
   @Test
   @SuppressWarnings("unchecked")
   void countPlotsTheRunsConfirmedWithinTheWindowAgainstItsLimit() {
-    Map<String, Object> running = (Map<String, Object>) run("count", "{}").get("running");
-    assertEquals("count(run).within(60 min)", running.get("label"));
-    assertEquals(3.0, running.get("limit"));
-    List<Double> values = (List<Double>) running.get("values");   // one per minute
+    Map<String, Object> plot = (Map<String, Object>) run("count", "{}").get("expression");
+    assertEquals("count(run).within(60 min)", plot.get("name"));
+    assertEquals(3.0, plot.get("threshold"));
+    List<Double> values = (List<Double>) plot.get("values");   // one per minute
     assertEquals(List.of(0.0, 1.0), values.subList(10, 12));      // Run Confirmed at 11
     assertEquals(List.of(3.0, 4.0), values.subList(60, 62));      // the fourth Confirmed at 61
     assertEquals(List.of(4.0, 3.0), values.subList(71, 73));      // the first leaves at 72
@@ -312,14 +466,15 @@ class BridgeTest {
   @Test
   @SuppressWarnings("unchecked")
   void totalDurationPlotsTheMinutesSpentInExcursionsAgainstItsLimit() {
-    Map<String, Object> running = (Map<String, Object>) run("total-duration", "{}").get("running");
-    assertEquals("totalDuration(excursion)", running.get("label"));
-    assertEquals("min", running.get("unit"));
-    assertEquals(45.0, running.get("limit"));
-    List<Double> values = (List<Double>) running.get("values");   // one per minute
+    Map<String, Object> plot = (Map<String, Object>) run("total-duration", "{}").get("expression");
+    assertEquals("totalDuration(excursion)", plot.get("name"));
+    assertEquals("min", plot.get("unit"));
+    assertEquals(45.0, plot.get("threshold"));
+    List<Double> values = (List<Double>) plot.get("values");   // one per minute
     assertEquals(List.of(0.0, 1.0), values.subList(20, 22));      // grows while one runs
     assertEquals(List.of(20.0, 20.0), values.subList(40, 42));     // and keeps it after
-    assertEquals(List.of(35.0, 45.0, 46.0), List.of(values.get(150), values.get(160), values.get(161)));
+    assertEquals(List.of(35.0, 45.0, 46.0),
+        List.of(values.get(150), values.get(160), values.get(161)));  // crossed at 161
     assertEquals(60.0, values.get(240));
   }
 
@@ -360,16 +515,17 @@ class BridgeTest {
   @SuppressWarnings("unchecked")
   static void assertPlotAboveLimitExactlyDuring(String scenarioId, String parameters, String rule) {
     Map<String, Object> result = run(scenarioId, parameters);
-    Map<String, Object> running = (Map<String, Object>) result.get("running");
-    List<Double> values = (List<Double>) running.get("values");
+    Map<String, Object> plot = (Map<String, Object>) result.get("expression");
+    List<Double> values = (List<Double>) plot.get("values");
     List<Map<String, Object>> samples = (List<Map<String, Object>>) result.get("samples");
     List<Map<String, Object>> events = ((List<Map<String, Object>>) result.get("events")).stream()
         .filter(e -> rule.equals(e.get("name"))).toList();
     for (int i = 0; i < samples.size(); i++) {
       double t = (Double) samples.get(i).get("timestamp");
       boolean runs = events.stream().anyMatch(e -> (Double) e.get("start") <= t
-          && (t < (Double) e.get("end") || e.get("truncatedEnd") == Boolean.TRUE && t == (Double) e.get("end")));
-      assertEquals(runs, values.get(i) > (Double) running.get("limit"), parameters + " at " + t);
+          && (t < (Double) e.get("end")
+              || e.get("truncatedEnd") == Boolean.TRUE && t == (Double) e.get("end")));
+      assertEquals(runs, values.get(i) > (Double) plot.get("threshold"), parameters + " at " + t);
     }
   }
 
@@ -389,5 +545,82 @@ class BridgeTest {
     Map<String, Object> first = scenarios().get(0);
     assertEquals(List.of("HighTemperature"), first.get("rules"));
     assertEquals(Map.of("name", "s", "millis", 1000.0), first.get("timeUnit"));
+  }
+
+  /** The Expression's values in a result, null where it is undefined. */
+  @SuppressWarnings("unchecked")
+  static List<Double> expressionValues(Map<String, Object> result) {
+    return (List<Double>) ((Map<String, Object>) result.get("expression")).get("values");
+  }
+
+  @Test
+  void movingAverageOverFiveSamplesIsUndefinedForTheFirstFour() {
+    List<Double> values =
+        expressionValues(run("expressions", "{\"expression\": 1, \"samples\": 5}"));
+    assertEquals(Arrays.asList(null, null, null, null), values.subList(0, 4));
+    assertEquals(26.0, values.get(4), 1e-12); // mean of 26, 26.2, 25.9, 26.1, 25.8
+  }
+
+  @Test
+  void noEventStartsWhileTheMovingAverageWarmsUp() {
+    // temp is above 24 from the first Sample, but the average is undefined until 4 s.
+    assertEquals(
+        List.of("AboveLimit 4000..7000 truncatedStart", "AboveLimit 37000..59000 truncatedEnd"),
+        events(run("expressions", "{}")));
+  }
+
+  /** The number of Samples before the Expression is first defined. */
+  static long warmUp(Map<String, Object> result) {
+    return expressionValues(result).stream().takeWhile(v -> v == null).count();
+  }
+
+  @Test
+  void rateIsDefinedFromTheSecondValueAndSeesTheOutlier() {
+    Map<String, Object> result = run("expressions", "{\"expression\": 0}");
+    assertEquals(1, warmUp(result));
+    assertEquals(8.2, expressionValues(result).get(15), 1e-12); // 28 after 19.8, one second apart
+    assertEquals(List.of("AboveLimit 15000..16000", "AboveLimit 31000..39000"), events(result));
+  }
+
+  @Test
+  void movingAverageOverADurationIsUndefinedUntilItsValuesSpanTheWindow() {
+    assertEquals(10, warmUp(run("expressions", "{\"expression\": 2}")));
+    assertEquals(5, warmUp(run("expressions", "{\"expression\": 2, \"window\": 5}")));
+  }
+
+  @Test
+  void differenceOfTwoChannelsIsUndefinedUntilBothHaveAValue() {
+    Map<String, Object> result = run("expressions", "{\"expression\": 3}");
+    assertEquals(5, warmUp(result));
+    assertEquals(4.1, expressionValues(result).get(5), 1e-12); // 26.1 - 22
+    assertEquals(List.of("AboveLimit 15000..16000", "AboveLimit 38000..59000 truncatedEnd"),
+        events(result));
+  }
+
+  @Test
+  void anExpressionThatIsNoOptionReturnsAnError() {
+    assertEquals(Map.of("error", "Parameter expression has no option 4.0"),
+        run("expressions", "{\"expression\": 4}"));
+    assertEquals(Map.of("error", "Parameter expression has no option 0.5"),
+        run("expressions", "{\"expression\": 0.5}"));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void catalogueListsTheExpressionsAsOptionsWithTheirSource() {
+    Map<String, Object> scenario = scenarios().stream()
+        .filter(s -> s.get("id").equals("expressions")).findFirst().orElseThrow();
+    Map<String, Object> expression =
+        ((List<Map<String, Object>>) scenario.get("parameters")).get(0);
+    assertEquals("expression", expression.get("id"));
+    assertEquals(1.0, expression.get("default"));
+    assertEquals(Map.of("label", "Moving average over Samples",
+            "source", "temp.averageOverSamples(${samples}).above(24)"),
+        ((List<Object>) expression.get("options")).get(1));
+  }
+
+  @Test
+  void aScenarioWithoutAnExpressionHasNoneInItsResult() {
+    assertFalse(run("first-rule", "{}").containsKey("expression"));
   }
 }

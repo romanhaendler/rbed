@@ -3,7 +3,6 @@ package io.github.romanhaendler.rbed.site;
 import static io.github.romanhaendler.rbed.Conditions.count;
 
 import io.github.romanhaendler.rbed.Channel;
-import io.github.romanhaendler.rbed.Event;
 import io.github.romanhaendler.rbed.Rule;
 import io.github.romanhaendler.rbed.Sample;
 import java.util.ArrayList;
@@ -62,19 +61,10 @@ final class CountScenario extends Scenario {
     return new Rule[] {run, frequentStarts};
   }
 
-  /** count(run).within(window): the Runs Confirmed at most the window before each Sample. */
   @Override
-  Running running(Map<String, Double> values, List<Sample> samples, List<Event> events) {
+  Plot plot(Map<String, Double> values) {
     long window = Math.round(values.get("window") * MINUTE);
-    double[] counts = new double[samples.size()];
-    for (int i = 0; i < counts.length; i++) {
-      long now = samples.get(i).timestamp();
-      for (Event e : events) {
-        long confirmed = e.confirmed().getAsLong();
-        if (e.name().equals("Run") && confirmed <= now && now - confirmed <= window) counts[i]++;
-      }
-    }
-    return new Running("count(run).within(" + window / MINUTE + " min)", "Runs",
-        values.get("limit"), counts);
+    return new Plot("count(run).within(" + window / MINUTE + " min)",
+        count(rules(values)[0]).within(window), values.get("limit"), "Runs");
   }
 }

@@ -1,0 +1,18 @@
+# Cranes
+
+A crane's load cell reports the weight on the hook every 500 ms, and the crane's rated load arrives once, as the Channel `ratedLoad` in the first Sample, and holds from then on. Here a pallet is lifted and set down, then a container heavier than the rated load is lifted, partly set down (half of its weight is released) and set down completely.
+
+<!-- scenario cranes -->
+
+## The Rules
+
+- **LoadLifted**: above 500 kg for 2 s, over only once the weight is below 50 kg for 1 s (hysteresis); a gap of more than 5 s in the data ends it.
+- **Overload**: the weight above the rated load during a lift, for 2 Samples.
+- **PartialSetDown**: during a lift, the weight below half of the lift's maximum so far (`latest(loadLifted).max(weight)`) but still above 50 kg, for 2 Samples.
+- The listener classifies each lift by its mean weight, shown as a note in the table: below 1500 kg a pallet, otherwise a container. The container's mean is 5125 kg, from 6 Samples at 6000 kg and 2 at 2500 kg.
+
+## Source and reference
+
+The example is [CraneScenarioTest](https://github.com/romanhaendler/rbed/blob/main/src/test/java/io/github/romanhaendler/rbed/CraneScenarioTest.java), listed in the README's [Examples](https://github.com/romanhaendler/rbed#examples) with its expected Events.
+
+Methods used: [`Rule.when`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io/github/romanhaendler/rbed/Rule.html#when%28io.github.romanhaendler.rbed.Condition%29), [`forDuration`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io/github/romanhaendler/rbed/Rule.html#forDuration%28java.time.Duration%29), [`endWhen`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io/github/romanhaendler/rbed/Rule.html#endWhen%28io.github.romanhaendler.rbed.Condition%29), [`maxGap`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io/github/romanhaendler/rbed/Rule.html#maxGap%28java.time.Duration%29), [`forSamples`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io/github/romanhaendler/rbed/Rule.html#forSamples%28int%29), [`above`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io/github/romanhaendler/rbed/Expression.html#above%28io.github.romanhaendler.rbed.Expression%29), [`below`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io/github/romanhaendler/rbed/Expression.html#below%28io.github.romanhaendler.rbed.Expression%29), [`times`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io/github/romanhaendler/rbed/Expression.html#times%28double%29), [`and`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io/github/romanhaendler/rbed/Condition.html#and%28io.github.romanhaendler.rbed.Condition%29), [`during`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io/github/romanhaendler/rbed/Conditions.html#during%28io.github.romanhaendler.rbed.Rule%29), [`latest`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io/github/romanhaendler/rbed/Conditions.html#latest%28io.github.romanhaendler.rbed.Rule%29), [`LatestEvent.max`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io/github/romanhaendler/rbed/LatestEvent.html#max%28io.github.romanhaendler.rbed.Channel%29), [`Event.aggregates`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io/github/romanhaendler/rbed/Event.html#aggregates%28io.github.romanhaendler.rbed.Channel%29), [`Aggregates.mean`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io/github/romanhaendler/rbed/Aggregates.html#mean%28%29).

@@ -1,6 +1,7 @@
 // The two functions of the Scenario module (site/scenarios, Bridge.java), typed.
 import * as compiled from 'rbed-scenarios';
 import type { Aggregates } from './aggregates.ts';
+import { fillSource } from './parameters.ts';
 
 export type Parameter = {
   id: string;
@@ -10,6 +11,8 @@ export type Parameter = {
   max: number;
   step: number;
   unit: string;
+  /** Present on a choice, whose value is the index of an option. */
+  options?: { label: string; source: string }[];
 };
 
 export type Scenario = {
@@ -37,21 +40,24 @@ export type Event = {
   truncatedEnd: boolean;
   /** By Channel name, for each Channel the Rule aggregates. */
   aggregates: Record<string, Aggregates>;
+  /** What the Scenario's listener makes of the Event, such as the load a crane lifted. */
+  note?: string;
 };
-
-/** A value at every Sample that a Rule compares with its limit, such as a running count of Events;
-    derived from the Events rbed reported. */
-export type Running = { label: string; unit: string; limit: number; values: number[] };
 
 /** A Pending Event that stopped holding before it was Confirmed, and when that was noticed. */
 export type Discard = { name: string; start: number; discarded: number };
+
+/** For a Scenario that plots one: an Expression's value per Sample, null where it is undefined,
+ *  and the threshold its Rule's Condition compares it to. One with a `unit` of its own (a count of
+ *  Events, a duration) is not on the Channels' scale. */
+export type PlottedExpression = { name: string; unit?: string; threshold: number; values: (number | null)[] };
 
 export type Result =
   | {
       samples: { timestamp: number; values: Record<string, number | null> }[];
       events: Event[];
       discarded: Discard[];
-      running?: Running;
+      expression?: PlottedExpression;
     }
   | { error: string };
 
@@ -65,7 +71,5 @@ export function run(scenarioId: string, parameters: Record<string, number>): Res
 
 /** The source with each placeholder replaced by its parameter's value. */
 export function source(scenario: Scenario, parameters: Record<string, number>): string {
-  return scenario.source.replace(/\$\{(\w+)\}/g, (_, id: string) =>
-    Number.isNaN(parameters[id]) ? 'Double.NaN' : String(parameters[id]),
-  );
+  return fillSource(scenario.source, scenario.parameters, parameters);
 }

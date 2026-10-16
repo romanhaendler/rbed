@@ -3,14 +3,17 @@
 // and Channel, the Java source with the current values, and the Event table with each Event's
 // Aggregates, whose rows and the chart's bands select each other; a selected Event's Aggregates
 // are shown in full under the chart. Non-default values live in the address. The Detector runs
-// again on every change.
+// again on every change. A Scenario that plots an Expression adds it as a dashed line, with the
+// threshold its Rule compares it to and the stretches where it is undefined; on a chart of its
+// own under the Events if it has a unit of its own (a count of Events, a duration). On a Scenario
+// whose Rules read latest(...), hovering highlights the Event latest(...) reads at that time.
 import { LimitBand, LimitLine, Tooltip, type TooltipHit, useChart } from '@umriss-ui/charts';
-import { Alert, Button, Checkbox, FormField, Slider, VisuallyHidden } from '@umriss-ui/core';
+import { Alert, Button, Checkbox, FormField, RadioGroup, Slider, VisuallyHidden } from '@umriss-ui/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { type Aggregates, aggregatesLine, formatNumber } from './aggregates.ts';
-import { type Discard, type Event, type Running, type Scenario, run, source } from './bridge';
+import { type Discard, type Event, type PlottedExpression, type Scenario, run, source } from './bridge';
 import { CodeBlock } from './CodeBlock';
-import { fromQuery, toQuery } from './parameters';
+import { fromQuery, toQuery, usedParameters } from './parameters';
 
 type Row = { t: number } & Record<string, number | null>;
 /** A StateBand row: state 0 Pending, 1 Confirmed, null none; `key` names the Event a segment
@@ -34,6 +37,10 @@ const MARKS = [
   { name: 'Discarded', colour: 'var(--u-color-danger)', moments: (l: Lifecycle) => l.discarded.map((d) => d.discarded) },
   { name: 'Confirmed', colour: 'var(--u-color-success)', moments: (l: Lifecycle) => l.events.map((e) => e.confirmed) },
 ] as const;
+/** A Truncated start or end: a halo behind the edge's mark, so it reads as more than a colour. */
+const TRUNCATED = { name: 'Truncated', colour: 'color-mix(in srgb, var(--u-color-text) 30%, transparent)' };
+const truncatedEdges = (l: Lifecycle) =>
+  l.events.flatMap((e) => [...(e.truncatedStart ? [e.start] : []), ...(e.truncatedEnd ? [e.end] : [])]);
 /** The chart palette without the Events' colour, so a Channel never looks like a band. */
 const CHANNEL_COLOURS = [1, 3, 4, 5, 6].map((n) => `var(--uc-series-${n})`);
 const channelColour = (scenario: Scenario, channel: string) =>
@@ -43,6 +50,24 @@ const eventKey = (e: Event) => `${e.name} ${e.start}`;
 /** The highlight of the Event latest(...) reads at the hovered time. */
 const LATEST_COLOUR = 'var(--u-color-warning)';
 
+/** The row key of the plotted Expression's values, and its colour: the next one after the Channels'. */
+const EXPRESSION = 'expression';
+const expressionColour = (scenario: Scenario) => CHANNEL_COLOURS[scenario.channels.length % CHANNEL_COLOURS.length];
+const expressionValue = (v: number | null | undefined) => (v == null ? 'undefined' : String(Number(v.toPrecision(6))));
+
+/** Where the plotted Expression is undefined, in the Scenario's unit: from each undefined Sample to the next one. */
+function undefinedStretches(rows: Row[]): [number, number][] {
+  const stretches: [number, number][] = [];
+  rows.forEach((r, i) => {
+    if (r[EXPRESSION] !== null) return;
+    const to = rows[i + 1]?.t ?? r.t;
+    const last = stretches.at(-1);
+    if (last && last[1] === r.t) last[1] = to;
+    else stretches.push([r.t, to]);
+  });
+  return stretches;
+}
+
 function niceStep(rough: number): number {
   const power = 10 ** Math.floor(Math.log10(rough));
   const m = rough / power;
@@ -50,8 +75,8 @@ function niceStep(rough: number): number {
 }
 
 /** The Channels' axis: ticks over the values only, and a domain stretched below them for the lanes. */
-function courseAxis(rows: Row[], channels: string[], lanes: number) {
-  const values = rows.flatMap((r) => channels.map((c) => r[c])).filter(Number.isFinite) as number[];
+function courseAxis(rows: Row[], channels: string[], lanes: number, also: number[] = []) {
+  const values = [...rows.flatMap((r) => channels.map((c) => r[c])), ...also].filter(Number.isFinite) as number[];
   const lo = Math.min(...values);
   const hi = Math.max(...values);
   const step = niceStep((hi - lo) / 4 || Math.abs(hi) || 1);
@@ -111,11 +136,12 @@ type Shown = {
   /** Told the key of the Event latest(...) reads at the hovered time; undefined when there is
       none. A state setter, so it stays the same function across renders. */
   hoverLatest: (key: string | undefined) => void;
+  expression?: PlottedExpression;
 };
 
 /** The tooltip: every shown Channel's value and Rule's state at the hovered time. */
 function Readout({ shown, t }: { shown: Shown; t: number }) {
-  const { scenario, rows, lifecycle, channels, rules } = shown;
+  const { scenario, rows, lifecycle, channels, rules, expression } = shown;
   const row = rows.findLast((r) => r.t <= t) ?? rows[0];
   const { millis } = scenario.timeUnit;
   const latest = scenario.latest && latestEvent(ofRule(lifecycle, scenario.latest).events, t, millis);
@@ -138,6 +164,12 @@ function Readout({ shown, t }: { shown: Shown; t: number }) {
       </div>
       <div className="uc-tooltip-list">
         {channels.map((c) => line(c, channelColour(scenario, c), String(row[c] ?? '–')))}
+        {expression &&
+          line(
+            expression.name,
+            expressionColour(scenario),
+            expressionValue(row[EXPRESSION]) + (expression.unit ? ` ${expression.unit}` : ''),
+          )}
         {rules.map((r) => line(r, EVENT_COLOUR, ruleState(ofRule(lifecycle, r), t, millis)))}
         {scenario.latest &&
           line(
@@ -164,6 +196,8 @@ function EventChart({
 }) {
   const { scenario, rows, lifecycle, channels, rules } = shown;
   const { name: unit, millis } = scenario.timeUnit;
+  // An Expression with a unit of its own has its own chart (ExpressionChart).
+  const expression = shown.expression?.unit === undefined ? shown.expression : undefined;
   // A click (or Enter) on the chart selects the Event under it, if any.
   const { Chart, XAxis, YAxis, Line, Scatter, StateBand } = useChart(rows, {
     onSelect: (hit) => {
@@ -176,7 +210,9 @@ function EventChart({
   live.current = shown;
   const lanes = rules.length;
   // The axis keeps its scale while Channels are hidden.
-  const course = courseAxis(rows, scenario.channels, lanes);
+  const course = expression
+    ? courseAxis(rows, [...scenario.channels, EXPRESSION], lanes, [expression.threshold])
+    : courseAxis(rows, scenario.channels, lanes);
   return (
     <Chart
       height={300}
@@ -195,6 +231,11 @@ function EventChart({
         ticks={rules.map((_, i) => lanes - i - 0.5)}
         tickFormat={(v) => rules[Math.round(lanes - 0.5 - v)] ?? ''}
       />
+      {expression &&
+        undefinedStretches(rows).map(([from, to]) => (
+          <LimitBand key={from} orientation="x" from={from} to={to} color="var(--u-color-text-muted)" label="undefined" />
+        ))}
+      {expression && <LimitLine value={expression.threshold} label={`threshold ${expression.threshold}`} />}
       {selected && (
         <LimitBand orientation="x" from={selected.start / millis} to={selected.end / millis} color="var(--u-color-accent)" />
       )}
@@ -211,6 +252,14 @@ function EventChart({
           name={rule}
         />
       ))}
+      <Scatter<MarkRow>
+        data={rules.flatMap((rule, i) => truncatedEdges(ofRule(lifecycle, rule)).map((t) => ({ t: t / millis, y: lanes - i - 0.5 })))}
+        value="y"
+        yAxisId="lanes"
+        name={TRUNCATED.name}
+        color={TRUNCATED.colour}
+        radius={9}
+      />
       {MARKS.map((m) => (
         <Scatter<MarkRow>
           key={m.name}
@@ -230,29 +279,41 @@ function EventChart({
           <Line key={c} value={c} name={c} color={channelColour(scenario, c)} markers="always" />
         ),
       )}
+      {expression && (
+        <Line value={EXPRESSION} name={expression.name} color={expressionColour(scenario)} dash={[6, 4]} markers="always" />
+      )}
       <Tooltip mode="x" render={(hit: TooltipHit<Row>) => <Readout shown={live.current} t={hit.xValue} />} />
     </Chart>
   );
 }
 
-/** A value a Rule compares with its limit, such as a running count of Events, at every Sample,
+/** An Expression with a unit of its own, such as a running count of Events, with its threshold,
     under the Events on the same time axis. */
-function RunningChart({ scenario, rows, running }: { scenario: Scenario; rows: Row[]; running: Running }) {
-  const data = rows.map((r, i) => ({ t: r.t, value: running.values[i] }));
-  const { Chart, XAxis, YAxis, Line } = useChart(data);
+function ExpressionChart({ scenario, rows, expression }: { scenario: Scenario; rows: Row[]; expression: PlottedExpression }) {
+  const { Chart, XAxis, YAxis, Line } = useChart(rows);
   const { name: unit } = scenario.timeUnit;
   return (
     <Chart
       height={160}
       syncId={scenario.id}
-      ariaLabel={`${running.label} in ${running.unit} at every Sample, over time in ${unit}, against its limit ${running.limit}`}
+      ariaLabel={`${expression.name} in ${expression.unit} at every Sample, over time in ${unit}, against the threshold ${expression.threshold}`}
     >
-      <XAxis value="t" domain={[data[0].t, data[data.length - 1].t]} label={`Time (${unit})`} />
-      <YAxis label={`${running.label} (${running.unit})`} />
-      <LimitLine value={running.limit} label={`limit ${running.limit}`} severity="alarm" />
-      <Line value="value" name={running.label} color="var(--uc-series-4)" />
+      <XAxis value="t" domain={[rows[0].t, rows[rows.length - 1].t]} label={`Time (${unit})`} />
+      <YAxis label={expression.unit} />
+      <LimitLine value={expression.threshold} label={`threshold ${expression.threshold}`} />
+      <Line value={EXPRESSION} name={expression.name} color={expressionColour(scenario)} dash={[6, 4]} />
       <Tooltip mode="x" />
     </Chart>
+  );
+}
+
+/** The plotted Expression in words: what it is compared to and where it is undefined. */
+function expressionSummary(expression: PlottedExpression | undefined, rows: Row[], unit: string): string {
+  if (!expression) return '';
+  const stretches = undefinedStretches(rows).map(([from, to]) => `from ${from} to ${to} ${unit}`);
+  return (
+    ` The dashed line is ${expression.name}, compared with the threshold ${expression.threshold}` +
+    (stretches.length === 0 ? '.' : `; it is undefined ${stretches.join(' and ')}.`)
   );
 }
 
@@ -270,12 +331,16 @@ function LifecycleKey() {
       {EVENT_STATES.map((s) => item(s.label, s.color, false))}
       <span>Marks:</span>
       {MARKS.map((m) => item(m.name, m.colour, true))}
+      <span>
+        <span className="swatch mark halo" style={{ background: TRUNCATED.colour }} />
+        Truncated start or end
+      </span>
     </div>
   );
 }
 
 /** The chart's text alternative: its Events and Discarded Pending Events in words. */
-function EventSummary({ scenario, lifecycle }: { scenario: Scenario; lifecycle: Lifecycle }) {
+function EventSummary({ scenario, lifecycle, also = '' }: { scenario: Scenario; lifecycle: Lifecycle; also?: string }) {
   const { name: unit, millis } = scenario.timeUnit;
   const { events, discarded } = lifecycle;
   const at = (ms: number) => `${ms / millis} ${unit}`;
@@ -300,6 +365,7 @@ function EventSummary({ scenario, lifecycle }: { scenario: Scenario; lifecycle: 
             ...discarded.map((d) => `${d.name} Pending from ${at(d.start)}, Discarded at ${at(d.discarded)}`),
           ].join('; ') +
           '.'}
+      {also}
     </VisuallyHidden>
   );
 }
@@ -394,6 +460,7 @@ function EventTable({
   select: (key: string | undefined) => void;
 }) {
   const { name: unit, millis } = scenario.timeUnit;
+  const notes = events.some((e) => e.note !== undefined);
   return (
     <div className="tableScroll">
       <table className="eventTable" id="events">
@@ -405,6 +472,7 @@ function EventTable({
             <th scope="col">Confirmed ({unit})</th>
             <th scope="col">End ({unit})</th>
             <th scope="col">Truncated</th>
+            {notes && <th scope="col">Note</th>}
           </tr>
         </thead>
         <tbody>
@@ -431,10 +499,11 @@ function EventTable({
                 <td>{e.confirmed / millis}</td>
                 <td>{e.end / millis}</td>
                 <td>{[e.truncatedStart && 'start', e.truncatedEnd && 'end'].filter(Boolean).join(', ')}</td>
+                {notes && <td>{e.note}</td>}
               </tr>,
               // The Aggregates under their Event, so the table stays five columns wide on a phone.
               <tr key={`${key} aggregates`} className="aggregateRow" data-selected={key === selected || undefined}>
-                <td colSpan={5}>
+                <td colSpan={notes ? 6 : 5}>
                   <span className="aggregateLabel">Aggregates</span>{' '}
                   {Object.entries(e.aggregates).map(([channel, a], i) => [
                     i > 0 && '; ',
@@ -458,7 +527,14 @@ export function ScenarioView({ scenario }: { scenario: Scenario }) {
   const [hoveredLatest, hoverLatest] = useState<string>();
   const result = useMemo(() => run(scenario.id, parameters), [scenario.id, parameters]);
   const rows = useMemo<Row[]>(
-    () => ('error' in result ? [] : result.samples.map((s) => ({ t: s.timestamp / scenario.timeUnit.millis, ...s.values }))),
+    () =>
+      'error' in result
+        ? []
+        : result.samples.map((s, i) => ({
+            t: s.timestamp / scenario.timeUnit.millis,
+            ...s.values,
+            ...(result.expression && { [EXPRESSION]: result.expression.values[i] }),
+          })),
     [result, scenario.timeUnit.millis],
   );
 
@@ -473,6 +549,8 @@ export function ScenarioView({ scenario }: { scenario: Scenario }) {
     return () => window.clearTimeout(t);
   }, [parameters, scenario.parameters]);
 
+  // A parameter only an unchosen option uses has no control.
+  const used = usedParameters(scenario.source, scenario.parameters, parameters);
   const atDefaults = scenario.parameters.every((p) => Object.is(parameters[p.id], p.default));
   const toggle = (name: string) =>
     setHidden(hidden.includes(name) ? hidden.filter((n) => n !== name) : [...hidden, name]);
@@ -506,6 +584,7 @@ export function ScenarioView({ scenario }: { scenario: Scenario }) {
       channels: scenario.channels.filter((c) => !hidden.includes(c)),
       rules: scenario.rules.filter((r) => !hidden.includes(r)),
       hoverLatest,
+      expression: result.expression,
     };
     const event = result.events.find((e) => eventKey(e) === selected);
     stage = (
@@ -517,9 +596,15 @@ export function ScenarioView({ scenario }: { scenario: Scenario }) {
           latest={result.events.find((e) => eventKey(e) === hoveredLatest)}
           select={select}
         />
-        {result.running && <RunningChart key={scenario.id} scenario={scenario} rows={rows} running={result.running} />}
+        {result.expression?.unit !== undefined && (
+          <ExpressionChart key={scenario.id} scenario={scenario} rows={rows} expression={result.expression} />
+        )}
         <LifecycleKey />
-        <EventSummary scenario={scenario} lifecycle={result} />
+        <EventSummary
+          scenario={scenario}
+          lifecycle={result}
+          also={expressionSummary(result.expression, rows, scenario.timeUnit.name)}
+        />
         {event && <AggregatesPanel scenario={scenario} event={event} />}
       </>
     );
@@ -536,7 +621,20 @@ export function ScenarioView({ scenario }: { scenario: Scenario }) {
               Reset
             </Button>
           </div>
-          {scenario.parameters.map((p) => (
+          {scenario.parameters.map(
+            (p) =>
+              p.options && (
+                <FormField key={p.id} label={p.label}>
+                  <RadioGroup
+                    name={p.id}
+                    options={p.options.map((o, i) => ({ value: String(i), label: o.label }))}
+                    value={String(parameters[p.id])}
+                    onChange={(v) => setParameters({ ...parameters, [p.id]: Number(v) })}
+                  />
+                </FormField>
+              ),
+          )}
+          {scenario.parameters.filter((p) => !p.options && used.includes(p.id)).map((p) => (
             <FormField key={p.id} label={p.label}>
               <Slider
                 name={p.id}

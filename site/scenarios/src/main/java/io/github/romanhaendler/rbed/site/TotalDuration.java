@@ -3,7 +3,6 @@ package io.github.romanhaendler.rbed.site;
 import static io.github.romanhaendler.rbed.Conditions.totalDuration;
 
 import io.github.romanhaendler.rbed.Channel;
-import io.github.romanhaendler.rbed.Event;
 import io.github.romanhaendler.rbed.Rule;
 import io.github.romanhaendler.rbed.Sample;
 import java.util.ArrayList;
@@ -55,21 +54,10 @@ final class TotalDuration extends Scenario {
     return new Rule[] {excursion, cumulativeLimit};
   }
 
-  /**
-   * totalDuration(excursion) in minutes: every Excursion Confirmed by a Sample, in full if it
-   * Ended by then, else up to that Sample.
-   */
+  /** totalDuration(excursion), in minutes like the limit. */
   @Override
-  Running running(Map<String, Double> values, List<Sample> samples, List<Event> events) {
-    double[] minutes = new double[samples.size()];
-    for (int i = 0; i < minutes.length; i++) {
-      long now = samples.get(i).timestamp();
-      for (Event e : events) {
-        if (e.name().equals("Excursion") && e.confirmed().getAsLong() <= now) {
-          minutes[i] += (double) (Math.min(e.end().getAsLong(), now) - e.start()) / MINUTE;
-        }
-      }
-    }
-    return new Running("totalDuration(excursion)", "min", values.get("limit"), minutes);
+  Plot plot(Map<String, Double> values) {
+    return new Plot("totalDuration(excursion)",
+        totalDuration(rules(values)[0]).dividedBy(MINUTE), values.get("limit"), "min");
   }
 }
