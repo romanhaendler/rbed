@@ -96,7 +96,7 @@ final class Sports extends Scenario {
 
   /** The example's listener, recording each recovery time next to the bridge's Lifecycle. */
   @Override
-  void detect(Rule[] rules, Lifecycle lifecycle) {
+  void detect(Rule[] rules, List<Sample> samples, Lifecycle lifecycle) {
     recoverySeconds.clear();
     Detector detector = Detector.builder().rules(rules).listener(new EventListener() {
       private long lastSprintEnd;
@@ -116,7 +116,7 @@ final class Sports extends Scenario {
         }
       }
     }).build();
-    for (Sample sample : samples()) {
+    for (Sample sample : samples) {
       lifecycle.now = sample.timestamp();
       detector.push(sample.timestamp(), sample.values());
     }

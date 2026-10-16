@@ -21,4 +21,5 @@
 - **ItOperations** declares `deploy` in `pulseChannels()`, so it is drawn as marks. It is separate from 09's `PulseChannels` Scenario (different data: one deployment, CPU, 120 minutes).
 - **JUnit**: one test per Scenario at `{}` in `Samples.describe` form (the Finance golden-cross day 366 is the literal the example's brute force finds; Sports also asserts the notes), plus two pinning claims the pages make (a slow average of 250 starts the DeathCross at day 249; a 15-minute gap makes the missing 20 h report interrupt the FloodWarning, `5.25..19.75 truncatedEnd`).
 - Intra-site links from page Markdown were avoided: a relative link would resolve wrongly in the twin at `dist/<name>.md`.
+- **Merged with 06 and 07:** `Sports.detect` takes the new `(rules, samples, lifecycle)` signature and pushes the Samples `run` passes. Checks re-run after the merge: `mvn -q verify`, `npm ci`, `npm run build`, `npm test` (100 Node tests), `npm run test:browser`, and the 1280/375 px light/dark check of the five pages.
 - **umriss-ui gaps:** none new.
