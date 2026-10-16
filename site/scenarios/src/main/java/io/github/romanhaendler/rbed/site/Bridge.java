@@ -114,7 +114,7 @@ public final class Bridge {
    * @param drawnChannels JSON object of Channel values the reader drew, by Channel name, one
    *     number per Sample of the Scenario (null: absent in that Sample); they replace that
    *     Channel's own values
-   * @return JSON object with the Samples, the Events (in the order they started), the Discarded Pending Events (with the
+   * @return JSON object with the Samples, the Events (in the order they Ended, as rbed reports them), the Discarded Pending Events (with the
    *     timestamp they were Discarded), the timestamps time was advanced to without a Sample,
    *     the timestamp of the restart if the Detector was restarted, each Expression the Scenario
    *     plots (its name, unit if it has one of its own, threshold or null, value per Sample and,
@@ -126,10 +126,19 @@ public final class Bridge {
   @JSExport
   public static String run(String scenarioId, String parameters, String drawnChannels) {
     Scenario scenario;
+    try {
+      scenario = scenario(scenarioId);
+    } catch (RuntimeException e) {
+      return error(e, "");
+    }
+    return run(scenario, parameters, drawnChannels);
+  }
+
+  /** {@link #run(String, String, String)} for a Scenario given, not looked up. */
+  static String run(Scenario scenario, String parameters, String drawnChannels) {
     Map<String, Double> values;
     List<Sample> samples;
     try {
-      scenario = scenario(scenarioId);
       values = values(scenario, parameters);
       samples = drawn(scenario, scenario.samples(values), drawnChannels);
     } catch (RuntimeException e) {
@@ -138,8 +147,11 @@ public final class Bridge {
     Lifecycle lifecycle = new Lifecycle();
     try {
       scenario.detect(scenario.rules(values), samples, values, lifecycle);
-    } catch (RuntimeException e) {
+    } catch (IllegalArgumentException | IllegalStateException e) {
+      // how rbed rejects Rules and Samples; anything else is a fault of the Scenario's code
       return error(e, ",\"by\":\"rbed\"");
+    } catch (RuntimeException e) {
+      return error(e, "");
     }
     try {
       return result(scenario, values, samples, lifecycle);
@@ -233,10 +245,7 @@ public final class Bridge {
 
   private static String result(Scenario scenario, Map<String, Double> values,
       List<Sample> samples, Lifecycle lifecycle) {
-    // In the order they started, not the order they Ended in, for the table and the chart.
-    List<Event> events = new ArrayList<>(lifecycle.ended);
-    events.sort((a, b) -> a.start() != b.start()
-        ? Long.compare(a.start(), b.start()) : a.name().compareTo(b.name()));
+    List<Event> events = lifecycle.ended;
     StringBuilder out = new StringBuilder("{\"samples\":[");
     for (int i = 0; i < samples.size(); i++) {
       Sample sample = samples.get(i);

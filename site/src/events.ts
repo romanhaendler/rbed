@@ -2,7 +2,7 @@
 // the chart's text alternative and the build's prerendered tables (prerender.mjs). Imports only
 // types and aggregates.ts, so Node can use it.
 import { aggregatesLine } from './aggregates.ts';
-import type { Discard, Event } from './bridge.ts';
+import type { Discard, Event, Result } from './bridge.ts';
 
 /** Events and Discarded Pending Events, of every Rule or of one. */
 export type Lifecycle = { events: Event[]; discarded: Discard[] };
@@ -50,11 +50,24 @@ export const eventCells = (e: Event, millis: number, notes: boolean) => [
   ...(notes ? [e.note ?? ''] : []),
 ];
 
+/** What the Aggregates of an Event whose Rule reads no Channel (one that only refers to other
+ *  Rules) say. */
+export const NO_AGGREGATES = 'none (the Rule reads no Channel)';
+
 /** An Event's Aggregates, one line per Channel, joined by "; ". */
 export const aggregatesText = (e: Event) =>
   Object.entries(e.aggregates)
     .map(([channel, a]) => aggregatesLine(channel, a))
-    .join('; ');
+    .join('; ') || NO_AGGREGATES;
+
+/** The Events in the order they started, then by name, for display; the bridge reports them in
+ *  rbed's order, the order they Ended. */
+export const byStart = (events: Event[]) =>
+  [...events].sort((a, b) => a.start - b.start || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+
+/** A bridge result as the site shows it, live and prerendered: its Events byStart. */
+export const forDisplay = (result: Result): Result =>
+  'error' in result ? result : { ...result, events: byStart(result.events) };
 
 /** The table of Discarded Pending Events: its column heads, and a row's cells. */
 export const discardedHead = (unit: string) => ['Name', `Start (${unit})`, `Discarded (${unit})`];

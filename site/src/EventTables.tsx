@@ -3,7 +3,7 @@
 // are those of the prerendered tables (src/events.ts).
 import { type Aggregates, aggregatesLine, formatNumber } from './aggregates.ts';
 import type { Discard, Event, Scenario } from './bridge';
-import { discardedCells, discardedHead, eventCells, eventHead, eventKey, hasNotes } from './events.ts';
+import { discardedCells, discardedHead, eventCells, eventHead, eventKey, hasNotes, NO_AGGREGATES } from './events.ts';
 
 /** The Pending Events that were Discarded; no table while there is none. */
 export function DiscardedTable({ scenario, discarded }: { scenario: Scenario; discarded: Discard[] }) {
@@ -145,10 +145,12 @@ export function EventTable({
               <tr key={`${key} aggregates`} className="aggregateRow" data-selected={key === selected || undefined}>
                 <td colSpan={head.length}>
                   <span className="aggregateLabel">Aggregates</span>{' '}
-                  {Object.entries(e.aggregates).map(([channel, a], i) => [
-                    i > 0 && '; ',
-                    <span key={channel}>{aggregatesLine(channel, a)}</span>,
-                  ])}
+                  {Object.keys(e.aggregates).length === 0
+                    ? NO_AGGREGATES
+                    : Object.entries(e.aggregates).map(([channel, a], i) => [
+                        i > 0 && '; ',
+                        <span key={channel}>{aggregatesLine(channel, a)}</span>,
+                      ])}
                 </td>
               </tr>,
             ];

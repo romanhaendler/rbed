@@ -43,12 +43,14 @@ jobs:
       - run: npm test
       # npm test has already installed rbed, built its Javadoc and compiled the Scenarios with TeaVM
       - run: npm run build:web
-      # the browser itself is cached, keyed on the @playwright/test version of package.json; its
-      # system libraries come from apt on every run
+      # the browser itself is cached, keyed on the installed @playwright/test version; its system
+      # libraries come from apt on every run
+      - id: playwright
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-chromium-1.63.0
+          key: playwright-chromium-${{ steps.playwright.outputs.version }}
       - run: npx playwright install chromium && npx playwright install-deps chromium
       - run: npm run test:browser
       - if: github.event_name != 'pull_request'

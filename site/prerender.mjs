@@ -10,7 +10,7 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { aggregatesText, discardedCells, discardedHead, eventCells, eventHead, hasNotes } from './src/events.ts';
+import { aggregatesText, discardedCells, discardedHead, eventCells, eventHead, forDisplay, hasNotes } from './src/events.ts';
 import { escape, LIVE_MARKER, parse, SCENARIO_MARKER } from './src/markdown.ts';
 import { markdownFile, PAGES, REPOSITORY, RUBRICS, rubricOf, titleOf } from './src/pages.ts';
 import { defaultsOf, fillSource } from './src/parameters.ts';
@@ -305,7 +305,7 @@ export async function prerender(dist, version) {
         unit: s.timeUnit.name,
         millis: s.timeUnit.millis,
         parameters: s.parameters,
-        result: JSON.parse(bridge.run(s.id, '{}', '{}')),
+        result: forDisplay(JSON.parse(bridge.run(s.id, '{}', '{}'))),
       },
     ]),
   );

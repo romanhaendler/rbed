@@ -44,7 +44,9 @@ export function fromQuery(search: string, parameters: Parameter[]): Record<strin
   const query = new URLSearchParams(search);
   return Object.fromEntries(
     parameters.map((p) => {
-      const given = Number(query.get(p.id) || NaN);
+      // a decimal number only: Number() reads '' and ' ' as 0 and '0x1A' as 26
+      const raw = query.get(p.id)?.trim();
+      const given = raw && /^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(raw) ? Number(raw) : NaN;
       if (!Number.isFinite(given)) return [p.id, p.default];
       const inRange = Math.min(Math.max(given, p.min), p.max);
       const stepped = p.min + Math.round((inRange - p.min) / p.step) * p.step;
