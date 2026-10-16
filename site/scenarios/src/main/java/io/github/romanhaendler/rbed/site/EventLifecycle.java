@@ -46,7 +46,7 @@ final class EventLifecycle extends Scenario {
   }
 
   @Override
-  List<Sample> samples() {
+  List<Sample> samples(Map<String, Double> values) {
     List<Sample> samples = new ArrayList<>();
     for (int i = 0; i < VALUES.length; i++) {
       samples.add(new Sample(i * 1_000L, Map.of(TEMP, VALUES[i])));

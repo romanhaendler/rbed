@@ -48,13 +48,13 @@ final class PulseChannels extends Scenario {
   }
 
   @Override
-  List<Sample> samples() {
+  List<Sample> samples(Map<String, Double> values) {
     List<Sample> samples = new ArrayList<>();
     for (int m = 0; m <= 120; m++) {
-      Map<Channel, Double> values = new HashMap<>();
-      values.put(ERRORS, m >= 25 && m < 35 ? 12.0 : m >= 100 && m < 105 ? 9.0 : 3.0);
-      if (m == 10 || m == 60) values.put(DEPLOY, 1.0);
-      samples.add(new Sample(m * MINUTE, values));
+      Map<Channel, Double> sample = new HashMap<>();
+      sample.put(ERRORS, m >= 25 && m < 35 ? 12.0 : m >= 100 && m < 105 ? 9.0 : 3.0);
+      if (m == 10 || m == 60) sample.put(DEPLOY, 1.0);
+      samples.add(new Sample(m * MINUTE, sample));
     }
     return samples;
   }

@@ -49,7 +49,7 @@ final class Logistics extends Scenario {
   }
 
   @Override
-  List<Sample> samples() {
+  List<Sample> samples(Map<String, Double> values) {
     List<Sample> series = new ArrayList<>();
     for (int m = 0; m < 480; m++) {
       series.add(new Sample(m * MINUTE,

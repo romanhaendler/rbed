@@ -71,7 +71,7 @@ final class Sports extends Scenario {
   }
 
   @Override
-  List<Sample> samples() {
+  List<Sample> samples(Map<String, Double> values) {
     List<Sample> series = new ArrayList<>();
     for (int s = 0; s < 420; s++) {
       series.add(new Sample(s * SECOND, Map.of(
@@ -96,7 +96,8 @@ final class Sports extends Scenario {
 
   /** The example's listener, recording each recovery time next to the bridge's Lifecycle. */
   @Override
-  void detect(Rule[] rules, List<Sample> samples, Lifecycle lifecycle) {
+  void detect(Rule[] rules, List<Sample> samples, Map<String, Double> values,
+      Lifecycle lifecycle) {
     recoverySeconds.clear();
     Detector detector = Detector.builder().rules(rules).listener(new EventListener() {
       private long lastSprintEnd;
@@ -116,10 +117,7 @@ final class Sports extends Scenario {
         }
       }
     }).build();
-    for (Sample sample : samples) {
-      lifecycle.now = sample.timestamp();
-      detector.push(sample.timestamp(), sample.values());
-    }
+    for (Sample sample : samples) lifecycle.push(detector, sample);
     detector.close();
   }
 

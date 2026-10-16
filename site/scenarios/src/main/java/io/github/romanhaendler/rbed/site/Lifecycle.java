@@ -3,6 +3,7 @@ package io.github.romanhaendler.rbed.site;
 import io.github.romanhaendler.rbed.Detector;
 import io.github.romanhaendler.rbed.Event;
 import io.github.romanhaendler.rbed.EventListener;
+import io.github.romanhaendler.rbed.Sample;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,6 +23,21 @@ final class Lifecycle implements EventListener {
   final List<Long> advances = new ArrayList<>();
   /** The timestamp of the first Sample after the Detector was restarted, or null. */
   Long restart;
+
+  /** Pushes the Sample to the Detector, keeping {@code now}. */
+  void push(Detector detector, Sample sample) {
+    now = sample.timestamp();
+    detector.push(sample.timestamp(), sample.values());
+  }
+
+  /**
+   * Pushes the Sample's values to a Detector with a sampling rate; the Sample's timestamp must be
+   * the one the Detector derives, which becomes {@code now}.
+   */
+  void pushValues(Detector detector, Sample sample) {
+    now = sample.timestamp();
+    detector.push(sample.values());
+  }
 
   /** Advances the Detector to {@code timestamp}, keeping {@code now} and the advances. */
   void advance(Detector detector, long timestamp) {

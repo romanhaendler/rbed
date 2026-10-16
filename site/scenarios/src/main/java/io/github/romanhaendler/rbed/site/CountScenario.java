@@ -40,7 +40,7 @@ final class CountScenario extends Scenario {
   }
 
   @Override
-  List<Sample> samples() {
+  List<Sample> samples(Map<String, Double> values) {
     List<Sample> samples = new ArrayList<>();
     for (int m = 0; m <= 240; m++) {
       double power = 0;

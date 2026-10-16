@@ -42,7 +42,7 @@ final class Latest extends Scenario {
   }
 
   @Override
-  List<Sample> samples() {
+  List<Sample> samples(Map<String, Double> values) {
     List<Sample> samples = new ArrayList<>();
     for (int s = 0; s <= 110; s++) {
       double weight = s >= 25 && s < 30 ? 300

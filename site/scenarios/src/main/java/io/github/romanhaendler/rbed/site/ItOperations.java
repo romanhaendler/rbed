@@ -60,14 +60,14 @@ final class ItOperations extends Scenario {
   }
 
   @Override
-  List<Sample> samples() {
+  List<Sample> samples(Map<String, Double> values) {
     List<Sample> series = new ArrayList<>();
     for (int m = 0; m < 120; m++) {
-      Map<Channel, Double> values = new HashMap<>(Map.of(
+      Map<Channel, Double> sample = new HashMap<>(Map.of(
           ERRORS, errors(m),
           CPU, m >= 90 && m < 100 ? 95.0 : 50.0));
-      if (m == 10) values.put(DEPLOY, 1.0); // sent once, never reset
-      series.add(new Sample(m * MINUTE, values));
+      if (m == 10) sample.put(DEPLOY, 1.0); // sent once, never reset
+      series.add(new Sample(m * MINUTE, sample));
     }
     return series;
   }

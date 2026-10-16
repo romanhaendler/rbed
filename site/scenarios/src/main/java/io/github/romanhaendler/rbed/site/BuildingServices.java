@@ -54,7 +54,7 @@ final class BuildingServices extends Scenario {
   }
 
   @Override
-  List<Sample> samples() {
+  List<Sample> samples(Map<String, Double> values) {
     List<Sample> series = new ArrayList<>();
     for (int s = 0; s < 2400; s += 10) series.add(new Sample(s * 1_000L, Map.of(POWER, power(s))));
     return series;

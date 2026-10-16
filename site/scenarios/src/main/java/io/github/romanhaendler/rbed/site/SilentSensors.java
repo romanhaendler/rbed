@@ -49,7 +49,7 @@ final class SilentSensors extends Scenario {
 
   /** The Samples that arrive, one a second from 0 to 60 s, none during the silence. */
   @Override
-  List<Sample> samples() {
+  List<Sample> samples(Map<String, Double> values) {
     List<Sample> samples = new ArrayList<>();
     for (long s = 0; s <= 60; s++) {
       if (silent(s)) continue;
@@ -78,9 +78,7 @@ final class SilentSensors extends Scenario {
       if (silent(s)) {
         if (values.get("timer") == 0) lifecycle.advance(detector, s * 1_000);
       } else {
-        Sample sample = samples.get(next++);
-        lifecycle.now = sample.timestamp();
-        detector.push(sample.timestamp(), sample.values());
+        lifecycle.push(detector, samples.get(next++));
       }
     }
     detector.close();

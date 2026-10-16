@@ -49,7 +49,7 @@ final class AggregatesScenario extends Scenario {
   }
 
   @Override
-  List<Sample> samples() {
+  List<Sample> samples(Map<String, Double> values) {
     List<Sample> samples = new ArrayList<>();
     for (double[] row : LOG) {
       samples.add(new Sample((long) row[0] * 1_000, Map.of(SPEED, row[1], TEMP, row[2])));

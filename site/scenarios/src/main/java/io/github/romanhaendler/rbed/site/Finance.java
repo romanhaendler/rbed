@@ -35,7 +35,7 @@ final class Finance extends Scenario {
   }
 
   @Override
-  List<Sample> samples() {
+  List<Sample> samples(Map<String, Double> values) {
     List<Sample> series = new ArrayList<>();
     for (int d = 0; d < 600; d++) series.add(new Sample(d * DAY, Map.of(PRICE, price(d))));
     return series;

@@ -35,12 +35,8 @@ abstract class Scenario {
     this.source = source;
   }
 
-  abstract List<Sample> samples();
-
-  /** The Samples for the given parameter values; the same for every value unless overridden. */
-  List<Sample> samples(Map<String, Double> values) {
-    return samples();
-  }
+  /** The Samples for the given value of every parameter, by parameter id. */
+  abstract List<Sample> samples(Map<String, Double> values);
 
   /** Those of its Channels that are Pulse Channels; rbed does not tell a Channel's kind. */
   List<Channel> pulseChannels() {
@@ -57,27 +53,17 @@ abstract class Scenario {
 
   /**
    * Runs the Rules over {@code samples} (its own, with any Channel values the reader drew) with
-   * {@code lifecycle} as the listener, setting {@code lifecycle.now} to each Sample's timestamp
-   * before pushing it, and closes the Detector. A Scenario that feeds its Detector differently (a
-   * sampling rate, time advances) overrides it and keeps {@code lifecycle.now} current the same way.
-   */
-  void detect(Rule[] rules, List<Sample> samples, Lifecycle lifecycle) {
-    Detector detector = Detector.builder().rules(rules).listener(lifecycle).build();
-    for (Sample sample : samples) {
-      lifecycle.now = sample.timestamp();
-      detector.push(sample.timestamp(), sample.values());
-    }
-    detector.close();
-  }
-
-  /**
-   * Like {@link #detect(Rule[], List, Lifecycle)}, for a Scenario whose feeding depends on its
-   * parameters (a sampling rate, a timer advancing time, a restart with or without History).
-   * The bridge calls this one.
+   * {@code lifecycle} as the listener, feeding each Sample through {@link Lifecycle#push}, and
+   * closes the Detector. A Scenario whose feeding depends on its parameters or is otherwise
+   * different (a sampling rate, time advances, a restart with or without History) overrides it
+   * and feeds through {@code lifecycle} the same way ({@code push}, {@code pushValues},
+   * {@code advance}), so the bridge sees every moment.
    */
   void detect(Rule[] rules, List<Sample> samples, Map<String, Double> values,
       Lifecycle lifecycle) {
-    detect(rules, samples, lifecycle);
+    Detector detector = Detector.builder().rules(rules).listener(lifecycle).build();
+    for (Sample sample : samples) lifecycle.push(detector, sample);
+    detector.close();
   }
 
   /**

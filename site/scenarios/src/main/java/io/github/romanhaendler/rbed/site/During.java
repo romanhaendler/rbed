@@ -41,7 +41,7 @@ final class During extends Scenario {
   }
 
   @Override
-  List<Sample> samples() {
+  List<Sample> samples(Map<String, Double> values) {
     List<Sample> samples = new ArrayList<>();
     for (int s = 0; s <= 300; s += 5) {
       double hr = s >= 40 && s < 200 ? 115 : s >= 230 && s < 250 ? 110 : 75;
