@@ -73,10 +73,10 @@ final class Count extends Scenario {
   }
 
   @Override
-  Plot plot(Map<String, Double> values) {
+  List<Plot> plots(Map<String, Double> values) {
     long window = Math.round(values.get("window") * MINUTE);
-    return new Plot("count(run).within(" + window / MINUTE + " min)",
-        count(rules(values)[0]).within(window), values.get("limit"), "Runs");
+    return List.of(new Plot("count(run).within(" + window / MINUTE + " min)",
+        count(rules(values)[0]).within(window), values.get("limit"), "Runs"));
   }
 
   @Override

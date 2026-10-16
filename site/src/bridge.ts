@@ -1,6 +1,7 @@
 // The two functions of the Scenario module (site/scenarios, Bridge.java), typed.
 import * as compiled from 'rbed-scenarios';
 import type { Aggregates } from './aggregates.ts';
+import { forDisplay } from './events.ts';
 import { fillSource } from './parameters.ts';
 
 export type Parameter = {
@@ -89,13 +90,13 @@ export function scenarios(): Scenario[] {
   return JSON.parse(compiled.scenarios());
 }
 
-/** `drawn`: Channel values the reader drew, by Channel name, one per Sample (null: absent), in place of the Scenario's own. */
+/** Runs a Scenario, its Events in the order they started (forDisplay). `drawn`: Channel values the reader drew, by Channel name, one per Sample (null: absent), in place of the Scenario's own. */
 export function run(
   scenarioId: string,
   parameters: Record<string, number>,
   drawn: Record<string, (number | null)[]> = {},
 ): Result {
-  return JSON.parse(compiled.run(scenarioId, JSON.stringify(parameters), JSON.stringify(drawn)));
+  return forDisplay(JSON.parse(compiled.run(scenarioId, JSON.stringify(parameters), JSON.stringify(drawn))));
 }
 
 /** The source with each placeholder replaced by its parameter's value. */

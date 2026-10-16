@@ -80,15 +80,9 @@ abstract class Scenario {
     return null;
   }
 
-  /** The Expression to plot for the given parameter values, or null for none. */
-  Plot plot(Map<String, Double> values) {
-    return null;
-  }
-
-  /** Every Expression to plot for the given parameter values: by default the one of {@code plot}. */
+  /** The Expressions to plot for the given parameter values: by default none. */
   List<Plot> plots(Map<String, Double> values) {
-    Plot plot = plot(values);
-    return plot == null ? List.of() : List.of(plot);
+    return List.of();
   }
 
   /**

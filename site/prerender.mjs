@@ -7,10 +7,10 @@
 // The default Events come from the compiled Scenario module (scenarios/target/js/rbed.js) run in
 // Node, not from a second JVM step: the Node parity test, which runs before every build in the
 // Pages workflow, holds that module to the JVM's results for every Scenario at its defaults.
-import { appendFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { aggregatesText, discardedCells, discardedHead, eventCells, eventHead, hasNotes } from './src/events.ts';
+import { aggregatesText, discardedCells, discardedHead, eventCells, eventHead, forDisplay, hasNotes } from './src/events.ts';
 import { escape, LIVE_MARKER, parse, SCENARIO_MARKER } from './src/markdown.ts';
 import { markdownFile, PAGES, REPOSITORY, RUBRICS, rubricOf, titleOf } from './src/pages.ts';
 import { defaultsOf, fillSource } from './src/parameters.ts';
@@ -285,18 +285,6 @@ export function sitemap(pages) {
   );
 }
 
-/** Gives the Javadoc copied to `dir` the site's look (api.css, appended to its stylesheet) and,
- *  first in every page's top bar, a link back to the site. */
-export function siteJavadoc(dir) {
-  appendFileSync(`${dir}/stylesheet.css`, `\n${readFileSync(site('api.css'), 'utf8')}`);
-  const link = `<li class="site-link"><a href="${BASE}">rbed documentation</a></li>`;
-  for (const file of readdirSync(dir, { recursive: true })) {
-    if (!file.endsWith('.html')) continue;
-    const html = readFileSync(`${dir}/${file}`, 'utf8');
-    writeFileSync(`${dir}/${file}`, html.replace(/(<ul id="navbar-top-firstrow"[^>]*>)/, `$1\n${link}`));
-  }
-}
-
 /** Writes every page's HTML and twin, llms.txt, llms-full.txt, sitemap.xml and 404.html into dist,
  *  and rbed's Javadoc of this commit (built by npm run install:rbed) into dist/api. */
 export async function prerender(dist, version) {
@@ -308,7 +296,12 @@ export async function prerender(dist, version) {
   const broken = javadocLinkErrors(markdowns, apidocs);
   if (broken.length > 0) throw new Error(`Links to no page or member of the Javadoc:\n${broken.join('\n')}`);
   cpSync(apidocs, `${dist}/api`, { recursive: true });
-  siteJavadoc(`${dist}/api`);
+  // the site's look and fonts on the Javadoc (api.css)
+  appendFileSync(`${dist}/api/stylesheet.css`, readFileSync(site('api.css')));
+  for (const font of ['geist-sans/files/geist-sans-latin-400', 'geist-sans/files/geist-sans-latin-600', 'geist-mono/files/geist-mono-latin-400']) {
+    const file = fileURLToPath(site(`node_modules/@fontsource/${font}-normal.woff2`));
+    cpSync(file, `${dist}/api/fonts/${file.split('/').pop()}`);
+  }
   const bridge = await import('./scenarios/target/js/rbed.js');
   const facts = new Map(
     JSON.parse(bridge.scenarios()).map((s) => [
@@ -318,7 +311,7 @@ export async function prerender(dist, version) {
         unit: s.timeUnit.name,
         millis: s.timeUnit.millis,
         parameters: s.parameters,
-        result: JSON.parse(bridge.run(s.id, '{}', '{}')),
+        result: forDisplay(JSON.parse(bridge.run(s.id, '{}', '{}'))),
       },
     ]),
   );

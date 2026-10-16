@@ -110,6 +110,10 @@ final class Json {
     while (pos < text.length()) {
       char c = text.charAt(pos++);
       if (c == '"') return s.toString();
+      if (c < 0x20) {
+        pos--;
+        throw error("a control character to be escaped");
+      }
       if (c != '\\') {
         s.append(c);
         continue;
@@ -132,22 +136,46 @@ final class Json {
           }
           s.append((char) code);
         }
-        default -> s.append(e);
+        case '"', '\\', '/' -> s.append(e);
+        default -> {
+          pos--;
+          throw error("an escape");
+        }
       }
     }
     throw error("'\"'");
   }
 
+  /** A number as JSON writes it: -?(0|[1-9][0-9]*)(.[0-9]+)?([eE][+-]?[0-9]+)? */
   private Double number() {
     int start = pos;
-    while (pos < text.length() && "+-0123456789.eE".indexOf(text.charAt(pos)) >= 0) pos++;
-    if (start == pos) throw error("a value");
-    try {
-      return Double.parseDouble(text.substring(start, pos));
-    } catch (NumberFormatException e) {
-      pos = start;
-      throw error("a number");
+    if (at('-')) pos++;
+    if (at('0')) {
+      pos++;
+    } else if (!digits()) {
+      throw error(pos == start ? "a value" : "a digit");
     }
+    if (at('.')) {
+      pos++;
+      if (!digits()) throw error("a digit");
+    }
+    if (at('e') || at('E')) {
+      pos++;
+      if (at('+') || at('-')) pos++;
+      if (!digits()) throw error("a digit");
+    }
+    return Double.parseDouble(text.substring(start, pos));
+  }
+
+  /** Skips digits; whether there was one. */
+  private boolean digits() {
+    int start = pos;
+    while (pos < text.length() && text.charAt(pos) >= '0' && text.charAt(pos) <= '9') pos++;
+    return pos > start;
+  }
+
+  private boolean at(char c) {
+    return pos < text.length() && text.charAt(pos) == c;
   }
 
   private Object literal(String word, Object value) {
