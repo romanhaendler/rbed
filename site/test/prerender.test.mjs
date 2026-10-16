@@ -99,7 +99,8 @@ test('the table has a Note column when the Scenario notes an Event, such as the 
   ]);
   const text = twin(markdown, noted, pages[1]);
   assert.ok(text.includes('| Name | Start (s) | Confirmed (s) | End (s) | Truncated | Note | Aggregates |\n'), text);
-  assert.ok(text.includes('| Run | 2 | 2 | 7.5 |  | pallet |  |\n| Stop | 8 | 8 | 9 |  |  |  |'), text);
+  const none = 'none (the Rule reads no Channel)';
+  assert.ok(text.includes(`| Run | 2 | 2 | 7.5 |  | pallet | ${none} |\n| Stop | 8 | 8 | 9 |  |  | ${none} |`), text);
 });
 
 test("the twin's links to other pages are absolute, since it is read away from the page", () => {

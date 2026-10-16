@@ -30,7 +30,7 @@ From these, `npm run build` (`prerender.mjs`, run at the end of `vite build`) wr
 - `dist/<path>/index.html`: the app with the page's head (title, description, canonical, Open Graph, the twin link) and its text prerendered in the site's header and navigation, each Scenario as its Java source and Event table at the default parameters; the app replaces it when it starts, and a reader without JavaScript reads it;
 - `dist/<name>.md`: the Markdown twin, the same text with each Scenario written out the same way, with its parameters listed;
 - `llms.txt`, `llms-full.txt` (README, glossary, every twin in navigation order), `sitemap.xml` and `404.html`;
-- `dist/api/`: rbed's Javadoc of the same commit, which `npm run install:rbed` builds (`mvn -Prelease javadoc:javadoc`).
+- `dist/api/`: rbed's Javadoc of the same commit, which `npm run install:rbed` builds (`mvn -Prelease javadoc:javadoc`, with a link back to the site as its `-header`), in the site's fonts and colors (`api.css`, which sets the custom properties of JDK 21's Javadoc stylesheet; the Pages workflow uses JDK 21).
 
 `node version.mjs` prints the rbed version of the root pom, which the scripts pass to the Scenario module (`-Drbed.version`; it has no default). `PORT=4391 npm run test:browser` serves the site on another port than 4173.
 
