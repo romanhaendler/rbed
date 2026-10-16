@@ -33,23 +33,34 @@ Move the threshold and the Detector runs again on the same three Samples. Or set
 
 <!-- scenario first-rule draw -->
 
+At the default threshold of 80 °C, `HighTemperature` runs from 2 s to 3 s: the README's "HighTemperature from 2000 to 3000".
+
+### Things to try
+
+- Lower the threshold to 70 °C: the first Sample already holds, so the Event starts at 1 s with a Truncated start.
+- Raise it to 90 °C: no Sample is above it, and there is no Event.
+
+### Three steps
+
 Three steps are always the same:
 
 1. **Build a Detector** from the Rules and a listener.
 2. **Feed it Samples** with `push(timestamp, values)`, in time order.
 3. **Close it** with `close()` when the data ends, so that an Event still in progress is reported, too.
 
-The Java on every page can be copied and run: it starts with its imports, and its statements are the body of a method, such as `main`. Where it calls a method of its own, that method follows under `// In the enclosing class:`. Time values are written as `java.time.Duration`; every method that takes one also takes a `long` in milliseconds. Short snippets in the text assume the Channels and Rules they name, and these imports:
+The Java on every page can be copied and run: it starts with its imports, and its statements are the body of a method, such as `main`. Where it calls a method of its own, that method follows under `// In the enclosing class:`. Time values are written as `java.time.Duration`; every method that takes one also takes a `long` in milliseconds. Short snippets in the text assume the Channels, Rules, variables and methods they name, and these imports:
 
 ```java
 import static io.github.romanhaendler.rbed.Conditions.*;   // during, after, count, totalDuration, latest
 
 import io.github.romanhaendler.rbed.*;
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 ```
 
-Import rbed's types with `io.github.romanhaendler.rbed.*` or one by one, not together with `import java.util.*;`: `EventListener` shares its simple name with `java.util.EventListener`.
+`EventListener` shares its simple name with `java.util.EventListener`: next to `import java.util.*;`, import `io.github.romanhaendler.rbed.EventListener` explicitly.
 
 ## Good to know
 
@@ -63,15 +74,15 @@ Methods used: [`Channel.named`](api/io.github.romanhaendler.rbed/io/github/roman
 
 Runnable end-to-end examples from different domains, each a test with its expected Events and a page of its own where it runs live.
 
-- [**Cranes** `CraneScenarioTest`: hysteresis, during, classifying a load, partial set-down via latest](cranes/)
-- [**Manufacturing** `MachineToolOverheatExample`: sampling-rate mode, rate, combined durings](manufacturing/)
-- [**Building services** `HvacShortCyclingExample`: after().within(), count().within()](building-services/)
-- [**Healthcare** `VitalSignsExample`: advanceTo and age() for a silent sensor, maxGap](healthcare/)
-- [**Automotive** `FleetTelematicsExample`: deceleration via rate, distance via integral](automotive/)
-- [**Finance** `TradingSignalsExample`: moving-average crosses, Truncated start after warm-up](finance/)
-- [**Logistics** `ColdChainExample`: attributing a cause with after, totalDuration limit](logistics/)
-- [**Environment** `FloodWarningExample`: smoothed rate of a moving average, hysteresis](environment/)
-- [**Sports** `IntervalTrainingExample`: after, rep count via count, listener-side timing](sports/)
-- [**IT operations** `DeploymentRegressionExample`: a Pulse Channel reporting deployments](it-operations/)
+- [**Cranes** `CraneScenarioTest` hysteresis, during, classifying a load, partial set-down via latest](cranes/)
+- [**Manufacturing** `MachineToolOverheatExample` sampling-rate mode, rate, combined durings](manufacturing/)
+- [**Building services** `HvacShortCyclingExample` after().within(), count().within()](building-services/)
+- [**Healthcare** `VitalSignsExample` advanceTo and age() for a silent sensor, maxGap](healthcare/)
+- [**Automotive** `FleetTelematicsExample` deceleration via rate, distance via integral](automotive/)
+- [**Finance** `TradingSignalsExample` moving-average crosses, Truncated start after warm-up](finance/)
+- [**Logistics** `ColdChainExample` attributing a cause with after, totalDuration limit](logistics/)
+- [**Environment** `FloodWarningExample` smoothed rate of a moving average, hysteresis](environment/)
+- [**Sports** `IntervalTrainingExample` after, rep count via count, listener-side timing](sports/)
+- [**IT operations** `DeploymentRegressionExample` a Pulse Channel reporting deployments](it-operations/)
 
 [Source on GitHub](https://github.com/romanhaendler/rbed) · [Maven Central](https://central.sonatype.com/artifact/io.github.romanhaendler/rbed) · [MIT licence](https://github.com/romanhaendler/rbed/blob/main/LICENSE)

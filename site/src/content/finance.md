@@ -6,10 +6,12 @@ Daily closing prices fall for 300 days and then rise. A golden cross is the 50-d
 
 ## The Rules
 
-- **DeathCross**: the fast average below the slow one. It is Truncated at its start: when both averages first exist, on day 199, the 50-day one is already below, so nobody knows when it crossed.
-- **GoldenCross**: the fast average above the slow one, from day 366, the day the example also finds by brute force over the two averages. It still holds when the data ends on day 599, so its end is Truncated.
+- **DeathCross**: the fast average below the slow one.
+- **GoldenCross**: the fast average above the slow one.
 
 `averageOverSamples(n)` is defined once `n` values exist, so the first Event starts once the longer of the two averages exists: on day 199 here, later with a longer one.
+
+At the defaults, `DeathCross` runs from day 199 to day 366. It is Truncated at its start: when both averages first exist, on day 199, the 50-day one is already below, so nobody knows when it crossed. `GoldenCross` follows from day 366, the day the example also finds by brute force over the two averages. It still holds when the data ends on day 599, so its end is Truncated.
 
 ### Things to try
 

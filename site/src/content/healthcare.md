@@ -11,6 +11,10 @@ A bedside monitor reports heart rate and oxygen saturation (SpO2) at 1 Hz, and h
 - **HypoxicTachycardia**: both at the same time.
 - **SensorLost**: no heart rate for more than 5 s, measured with `age()`.
 
+At the defaults, the heart rate is 120 from 60 s, and `Tachycardia` is Confirmed at 90 s. The SpO2 is 86 % from 120 s to 200 s: `Desaturation` is Confirmed at 130 s, and `HypoxicTachycardia` with it.
+
+The last Sample before the dropout is at 149 s. At the advance to 160 s the heart rate is 11 s old, more than the `maxGap` of 10 s: `Tachycardia` Ends Truncated at 159 s, the last moment evaluated before the gap, and `HypoxicTachycardia` with it at 160 s. `SensorLost` runs from 155 s, when the heart rate is 6 s old, until data resumes at 170 s, where a new `Tachycardia` starts Truncated. It is Confirmed at 200 s and Ends at 300 s, where the heart rate falls to 85.
+
 ### Things to try
 
 - Raise *Max gap* to 30 s: the 20 s dropout no longer interrupts `Tachycardia`, which runs as one Event from 60 s to 300 s, and `HypoxicTachycardia` lasts until `Desaturation` Ends at 200 s.

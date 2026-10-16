@@ -10,11 +10,14 @@ Rule cumulativeLimit = Rule.named("CumulativeLimit")
 
 ## A cumulative limit
 
-A cold chain logs its temperature once a minute. It is above 8 °C from minute 20 to 40, from 80 to 95 and from 150 to 175: 20, 15 and 25 minutes, an hour in all. A single excursion is tolerable, but not more than the limit in total. The chart under the Events plots `totalDuration(excursion)` at every Sample, as rbed computes it, in minutes like the limit.
+A cold chain logs its temperature once a minute. It is above 8 °C from minute 20 to 40, from 80 to 95 and from 150 to 175: 20, 15 and 25 minutes, an hour in all. A single excursion is tolerable, but not more than the limit in total.
+
+<!-- live -->
+The chart plots `totalDuration(excursion)` at every Sample, as rbed computes it, in minutes like the limit.
 
 <!-- scenario total-duration draw -->
 
-The line rises while an `Excursion` runs and stays level between them: 20 minutes after the first, 35 after the second. At the default limit of 45 minutes, the sum reaches 45 at minute 160, in the middle of the third excursion, and exceeds it at minute 161, where `CumulativeLimit` starts. It never Ends, since the sum never decreases: it runs to the end of the data, and `close()` gives it a Truncated end.
+`totalDuration(excursion)` rises while an `Excursion` runs and stays level between them: 20 minutes after the first, 35 after the second. At the default limit of 45 minutes, the sum reaches 45 at minute 160, in the middle of the third excursion, and exceeds it at minute 161, where `CumulativeLimit` starts. It never Ends, since the sum never decreases: it runs to the end of the data, and `close()` gives it a Truncated end.
 
 ### Things to try
 

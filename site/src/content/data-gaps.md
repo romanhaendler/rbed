@@ -18,7 +18,10 @@ Without `maxGap`, gaps of any length are accepted.
 
 ## A silent sensor
 
-A machine reports its `rpm` once a second and runs from 6 s to 31 s. For six seconds its sensor is silent: the Samples inside the gap are missing, which shows as a stretch of the line without dots. `Running` is an Event while `rpm` is above 100. Move the gap and change `maxGap`, and watch whether the Event is Ended at the gap or kept across it. A halo on a band's edge marks a Truncated start or end.
+A machine reports its `rpm` once a second and runs from 6 s to 31 s. For six seconds its sensor is silent: the Samples inside the gap are missing. `Running` is an Event while `rpm` is above 100.
+
+<!-- live -->
+The gap shows as a stretch without dots. Move the gap and change `maxGap`, and watch whether the Event is Ended at the gap or kept across it. A halo on a band's edge marks a Truncated start or end.
 
 <!-- scenario data-gaps -->
 

@@ -9,7 +9,10 @@ Like every reference to another Rule, `a` must be added before the Rule that ref
 
 ## A window after the door
 
-A cold room's door is open from minute 10 to minute 12, and once more at minute 60. Its temperature is above 8 °C from minute 15 to minute 25, soon after the first opening, and from minute 100 to minute 110, long after the second. `ExcursionAfterDoor` is an excursion within a window after the door was open. Move the window and watch which excursion still counts.
+A cold room's door is open from minute 10 to minute 12, and once more at minute 60. Its temperature is above 8 °C from minute 15 to minute 25, soon after the first opening, and from minute 100 to minute 110, long after the second. `ExcursionAfterDoor` is an excursion within a window after the door was open.
+
+<!-- live -->
+Move the window and watch which excursion still counts.
 
 <!-- scenario after draw -->
 
