@@ -2,8 +2,14 @@ package io.github.romanhaendler.rbed.site;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.romanhaendler.rbed.Channel;
+import io.github.romanhaendler.rbed.Detector;
+import io.github.romanhaendler.rbed.Expression;
+import io.github.romanhaendler.rbed.Rule;
+import io.github.romanhaendler.rbed.Sample;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -12,6 +18,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
+import java.util.function.BiFunction;
+import java.util.function.BinaryOperator;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 
@@ -924,5 +933,118 @@ class BridgeTest {
         run("first-rule", "{}", "{\"temp\": [1, 2]}"));
     assertEquals(Map.of("error", "Drawn Channel temp has a value that is not a number"),
         run("first-rule", "{}", "{\"temp\": [1, \"x\", 3]}"));
+  }
+
+  @Test
+  void malformedJsonIsRejectedAsInvalidJson() {
+    for (String parameters : List.of("{\"threshold\": 1.2.3}", "{\"threshold\": 80} x",
+        "{\"thres", "{\"\\uZZZZ\": 1}", "{\"\\u+0ff\": 1}", "{\"\\u00", "{\"threshold\" 80}",
+        "[1, 2", "")) {
+      Object error = run("first-rule", parameters).get("error");
+      assertTrue(error instanceof String s && s.startsWith("Invalid JSON: expected "),
+          parameters + ": " + error);
+    }
+    assertEquals(Map.of("\u00e9", "\u20ac"), Json.parse("{\"\\u00E9\": \"\\u20ac\"}"));
+  }
+
+  /** A Scenario that plots its Channel {@code a} through a given Expression, for ExpressionValues. */
+  static Scenario plotting(String name, BiFunction<Channel, Channel, Expression>
+      expression, double[] a, double[] b) {
+    Channel ca = Channel.named("a");
+    Channel cb = Channel.named("b");
+    Expression plotted = expression.apply(ca, cb);
+    return new Scenario("plot " + name, name, "s", 1000, List.of(ca, cb), List.of(), "") {
+      @Override
+      List<Sample> samples(Map<String, Double> values) {
+        List<Sample> samples = new ArrayList<>();
+        for (int i = 0; i < a.length; i++) {
+          samples.add(new Sample(1000L * (i + 1), Map.of(ca, a[i], cb, b[i])));
+        }
+        return samples;
+      }
+
+      @Override
+      Rule[] rules(Map<String, Double> values) {
+        return new Rule[] {Rule.named("Any").when(ca.above(0))};
+      }
+
+      @Override
+      Plot plot(Map<String, Double> values) {
+        return new Plot(name, plotted, 0);
+      }
+    };
+  }
+
+  @Test
+  void aScenarioThatAdvancesTimeBeforeItsFirstSampleCannotBePlotted() {
+    Channel a = Channel.named("a");
+    Scenario early = new Scenario("early", "early", "s", 1000, List.of(a), List.of(), "") {
+      @Override
+      List<Sample> samples(Map<String, Double> values) {
+        return List.of(new Sample(2000, Map.of(a, 1.0)));
+      }
+
+      @Override
+      Rule[] rules(Map<String, Double> values) {
+        return new Rule[] {Rule.named("Any").when(a.above(0))};
+      }
+
+      @Override
+      void detect(Rule[] rules, List<Sample> samples, Map<String, Double> values,
+          Lifecycle lifecycle) {
+        Detector detector =
+            Detector.builder().rules(rules).listener(lifecycle).build();
+        lifecycle.advance(detector, 1000);
+        lifecycle.push(detector, samples.get(0));
+        detector.close();
+      }
+    };
+    IllegalStateException e = assertThrows(
+        IllegalStateException.class,
+        () -> ExpressionValues.of(early, a, Map.of(), early.samples(Map.of())));
+    assertEquals("Scenario early advances time before its first Sample", e.getMessage());
+  }
+
+  /**
+   * ExpressionValues finds rbed's value of an Expression by comparisons alone; it must give the
+   * double rbed computes bit for bit, for random and special values (negative, -0.0, subnormal,
+   * huge) and where the Expression is undefined (a division by zero).
+   */
+  @Test
+  void plottedValuesAreExactlyTheDoublesRbedComputes() {
+    Random random = new Random(42);
+    double[] special = {0.0, -0.0, Double.MIN_VALUE, -Double.MIN_VALUE, Double.MIN_NORMAL,
+        Double.MAX_VALUE, -Double.MAX_VALUE, 1e-300, -1e300, 0.1, -0.3, 1, -1, 3};
+    int n = 120;
+    double[] a = new double[n];
+    double[] b = new double[n];
+    for (int i = 0; i < n; i++) {
+      a[i] = i < special.length ? special[i] : (random.nextDouble() - 0.5) * Math.pow(10, random.nextInt(20) - 10);
+      b[i] = i < special.length ? special[special.length - 1 - i] : (random.nextDouble() - 0.5) * 1000;
+    }
+    b[5] = 0; // a / b undefined there
+    Map<String, BinaryOperator<Double>> expected = Map.of(
+        "a", (x, y) -> x,
+        "a-b", (x, y) -> x - y,
+        "a*b", (x, y) -> x * y,
+        "a/b", (x, y) -> y == 0 ? Double.NaN : x / y,
+        "-|a-b|", (x, y) -> -Math.abs(x - y));
+    Map<String, BiFunction<Channel, Channel, Expression>> expressions = Map.of(
+        "a", (x, y) -> x,
+        "a-b", Expression::minus,
+        "a*b", Expression::times,
+        "a/b", Expression::dividedBy,
+        "-|a-b|", (x, y) -> x.minus(y).abs().times(-1));
+    for (String name : expected.keySet()) {
+      Scenario scenario = plotting(name, expressions.get(name), a, b);
+      double[] values = ExpressionValues.of(scenario, scenario.plot(Map.of()).expression(),
+          Map.of(), scenario.samples(Map.of())).atSamples();
+      for (int i = 0; i < n; i++) {
+        double want = expected.get(name).apply(a[i], b[i]) + 0.0; // the site writes -0.0 as 0
+        if (!Double.isFinite(want)) want = Double.NaN; // rbed: undefined
+        assertEquals(Double.doubleToLongBits(want), Double.doubleToLongBits(values[i]),
+            name + " at " + i + ": " + a[i] + ", " + b[i] + " gives " + values[i]);
+      }
+    }
   }
 }

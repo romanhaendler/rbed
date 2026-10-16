@@ -124,8 +124,13 @@ final class Json {
         case 't' -> s.append('\t');
         case 'u' -> {
           if (pos + 4 > text.length()) throw error("four hex digits");
-          s.append((char) Integer.parseInt(text.substring(pos, pos + 4), 16));
-          pos += 4;
+          int code = 0;
+          for (int end = pos + 4; pos < end; pos++) {
+            int digit = Character.digit(text.charAt(pos), 16);
+            if (digit < 0) throw error("four hex digits");
+            code = code * 16 + digit;
+          }
+          s.append((char) code);
         }
         default -> s.append(e);
       }
