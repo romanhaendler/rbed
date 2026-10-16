@@ -26,6 +26,13 @@ export const PAGES: Page[] = [
       'Rule-based event detection in time series: a small Java library that finds Events in multi-channel data by evaluating declarative Rules.',
   },
   {
+    path: '/samples-and-channels/',
+    title: 'Samples and Channels',
+    description:
+      'A Sample is the values of some Channels at one timestamp; a Channel missing from a Sample keeps its last value, so sensors at different rates share one Detector.',
+    rubric: 'Guide',
+  },
+  {
     path: '/event-lifecycle/',
     title: 'The Event lifecycle',
     description:
@@ -92,7 +99,7 @@ export const PAGES: Page[] = [
     path: '/aggregates/',
     title: 'Aggregates',
     description:
-      "Every Event carries each Channel's minimum, maximum, mean, count, time-weighted mean and integral over its Samples.",
+      "Every Event carries the minimum, maximum, mean, count, time-weighted mean and integral of each Channel its Rule aggregates.",
     rubric: 'Guide',
   },
   {
@@ -128,6 +135,13 @@ export const PAGES: Page[] = [
     title: 'Errors and validation',
     description:
       'rbed rejects a mistake as early as it can, mostly in build(), with a message that names it: try a few and read them.',
+    rubric: 'Guide',
+  },
+  {
+    path: '/memory/',
+    title: 'Memory and the Retention Limit',
+    description:
+      'What a Detector keeps in memory follows from its Rules; the Retention Limit caps every window, dropping the oldest entries, and droppedValues() tells when it did.',
     rubric: 'Guide',
   },
   {

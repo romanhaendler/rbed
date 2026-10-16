@@ -20,9 +20,13 @@ A crane's load cell reports the `weight` once a second. At 3 s it lifts a load t
 
 <!-- scenario end-conditions draw -->
 
-At an End threshold of 500 kg the Rule flaps: four Events, the first only one second long. Move the End threshold down to 450 kg and the noise around 500 no longer Ends anything: one Event from 4 s until the swing at 14 s, and a second one until the load is set down. At 440 kg or lower even the swing stays inside the hysteresis, and a single Event runs from 4 s to 22 s. The README's 50 kg Ends it at 23 s, the first Sample below 50.
+At the default End threshold of 500 kg the Rule flaps: four Events, the first only one second long.
 
-Lower the End threshold to 0 kg and the End Condition never holds: the Event runs until `close()`, which Ends it at the last Sample with a Truncated end.
+### Things to try
+
+- Move the End threshold down to 450 kg: the noise around 500 no longer Ends anything. One Event runs from 4 s until the swing at 14 s, and a second one until the load is set down.
+- Move it to 440 kg: even the swing stays inside the hysteresis, and a single Event runs from 4 s to 22 s. So it does down to 290 kg. Lower End thresholds End it later: the README's 50 kg at 23 s, the first Sample below 50.
+- Lower it to 0 kg: the End Condition never holds. The Event runs until `close()`, which Ends it at the last Sample with a Truncated end.
 
 ## When does the next Event start?
 
@@ -30,7 +34,15 @@ At an End threshold of 500 kg, the weight is above 500 again at 6 s and 7 s, yet
 
 ## A duration for the End Condition
 
-The End Condition can have its own duration, written right after it: `.endWhen(weight.below(450)).forDuration(1_000)` Ends the Event only once the weight has stayed below 450 for a second. Set the End threshold to 450 kg and the End duration to 1 s: the swing at 14 s lasts a single Sample, so it no longer Ends the Event, and the first Event now lasts until the load is set down.
+The End Condition can have its own duration, written right after it. This Ends the Event only once the weight has stayed below 450 for a second:
+
+```java
+Rule loadLifted = Rule.named("LoadLifted")
+    .when(weight.above(500))
+    .endWhen(weight.below(450)).forDuration(Duration.ofSeconds(1));
+```
+
+Set the End threshold to 450 kg and the End duration to 1 s: the swing at 14 s lasts a single Sample, so it no longer Ends the Event, and the first Event now lasts until the load is set down.
 
 The Event's `end()` is where the End Condition *started* holding, 22 s here, not where its duration was reached, so the Event's extent is what you would draw by hand. The listener's `onEnded` comes later, once the duration is reached: at 23 s with an End duration of 1 s, at 24 s with 2 s. Until then the Event is still Confirmed, and `during(...)` of it still holds.
 
@@ -39,4 +51,4 @@ The Event's `end()` is where the End Condition *started* holding, 22 s here, not
 - [End Conditions and hysteresis](https://github.com/romanhaendler/rbed#end-conditions-and-hysteresis) and [Durations: forDuration and forSamples](https://github.com/romanhaendler/rbed#durations-forduration-and-forsamples) in the README, the canonical text
 - [Rule](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html) in the Javadoc
 
-Methods used: [`when`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#when%28io.github.romanhaendler.rbed.Condition%29), [`above`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Expression.html#above%28double%29), [`endWhen`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#endWhen%28io.github.romanhaendler.rbed.Condition%29), [`below`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Expression.html#below%28double%29), [`forDuration`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#forDuration%28java.time.Duration%29), [`push`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#push%28long,java.util.Map%29), [`close`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#close%28%29).
+Methods used: [`Channel.named`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Channel.html#named%28java.lang.String%29), [`Rule.named`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#named%28java.lang.String%29), [`Rule.when`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#when%28io.github.romanhaendler.rbed.Condition%29), [`Expression.above`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Expression.html#above%28double%29), [`Rule.endWhen`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#endWhen%28io.github.romanhaendler.rbed.Condition%29), [`Expression.below`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Expression.html#below%28double%29), [`Rule.forDuration`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#forDuration%28java.time.Duration%29), [`Detector.builder`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#builder%28%29), [`Detector.Builder.rules`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.Builder.html#rules%28io.github.romanhaendler.rbed.Rule...%29), [`Detector.Builder.build`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.Builder.html#build%28%29), [`Detector.push`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#push%28long,java.util.Map%29), [`Detector.close`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#close%28%29).

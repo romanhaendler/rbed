@@ -19,6 +19,7 @@ import org.teavm.jso.JSExport;
 public final class Bridge {
   private static final List<Scenario> SCENARIOS = List.of(
       new FirstRule(),
+      new SamplesAndChannels(),
       new EventLifecycle(),
       new EndConditions(),
       new DataGaps(),
