@@ -4,9 +4,9 @@
 
 **Blocked by:** 01–04 and the code review fix round (all merged on `retention`)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Several Conditions counting the same Rule with different windows return the same counts as before (existing tests pass unchanged)
-- [ ] Counts stay correct across Retention Limit drops and History beyond the limit
-- [ ] A performance-suite check: with a large number of Confirmed Events inside the window, throughput does not degrade with the number of Events in the window (e.g. 1,000 vs. 100,000 Events in the window within a small factor)
-- [ ] The steady-state allocation checks still allocate nothing per Sample
+- [x] Several Conditions counting the same Rule with different windows return the same counts as before (existing tests pass unchanged)
+- [x] Counts stay correct across Retention Limit drops and History beyond the limit
+- [x] A performance-suite check: with a large number of Confirmed Events inside the window, throughput does not degrade with the number of Events in the window (e.g. 1,000 vs. 100,000 Events in the window within a small factor)
+- [x] The steady-state allocation checks still allocate nothing per Sample

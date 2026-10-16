@@ -75,10 +75,14 @@ final class EventState {
     endedDuration += end - event.start();
   }
 
-  /** Events Confirmed at most {@code window} before {@code now}. */
-  int confirmedWithin(long now, long window) {
+  /** Counts Events Confirmed at most {@code window} before the current moment; see {@link #countWithin}. */
+  Timestamps.Counter counter(long window) {
+    return confirmations.new Counter(window);
+  }
+
+  /** Drops confirmation times no window needs any more. */
+  void dropExpired(long now) {
     confirmations.dropOlderThan(now, countWindow);
-    return confirmations.countWithin(now, window);
   }
 
   /** Duration of the latest Confirmed Event, running up to {@code now}; NaN if there is none. */

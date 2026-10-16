@@ -155,6 +155,39 @@ class PerformanceTest {
         "allocated " + perSample + " bytes per Sample");
   }
 
+  /**
+   * Counting Events in a window costs the same however many Events the window holds: 1,000 vs.
+   * 100,000 Confirmed Events inside it (an Event every 4 ms) within a small factor.
+   */
+  @Test
+  void countWithinWindowDoesNotSlowDownWithEventsInWindow() {
+    double few = countThroughput(4_000);
+    double many = countThroughput(400_000);
+    report("count, 1,000 Events in window", few / 1e6, "million Samples/s");
+    report("count, 100,000 Events in window", many / 1e6, "million Samples/s");
+    assertTrue(many * 3 >= few, "100,000 Events: " + (long) many + " vs. 1,000: " + (long) few);
+  }
+
+  private static double countThroughput(long windowMillis) {
+    Rule event = Rule.named("E").when(X.above(50)).endWhen(X.below(10));
+    Feed feed = new Feed(2, X, i -> i == 0 ? 100.0 : 0.0);
+    Detector warm = Detector.builder()
+        .rules(event, Rule.named("C").when(count(event).within(windowMillis).above(1e9))).build();
+    feed.push(warm, WARM_UP_SAMPLES);
+    long best = Long.MAX_VALUE;
+    for (int run = 0; run < RUNS; run++) {
+      Detector detector = Detector.builder()
+          .rules(event, Rule.named("C").when(count(event).within(windowMillis).above(1e9)))
+          .build();
+      feed.push(detector, (int) (2 * windowMillis)); // fill the window, not measured
+      assertTrue(detector.retainedValues() >= windowMillis / 4, "window not filled: " + detector.retainedValues());
+      long start = System.nanoTime();
+      feed.push(detector, MEASURED_SAMPLES);
+      best = Math.min(best, System.nanoTime() - start);
+    }
+    return MEASURED_SAMPLES / (best / 1e9);
+  }
+
   /** The realistic Rule set, too, allocates nothing per Sample while no Event changes state. */
   @Test
   void realisticRuleSetDoesNotAllocateInSteadyState() {

@@ -39,6 +39,11 @@ public final class EventCount extends Expression {
     EventState events = detector.referencedEvent(rule);
     if (window < 0) return () -> events.count;
     events.countWithin(window);
-    return () -> events.confirmedWithin(detector.now(), window);
+    Timestamps.Counter counter = events.counter(window);
+    return () -> {
+      long now = detector.now();
+      events.dropExpired(now);
+      return counter.countWithin(now);
+    };
   }
 }

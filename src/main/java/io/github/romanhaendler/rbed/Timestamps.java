@@ -8,6 +8,8 @@ final class Timestamps {
   private long[] times;
   private int head;
   private int size;
+  /** Sequence number of the head: how many timestamps have ever left the front. */
+  private long base;
 
   Timestamps(Detector detector, String counted) {
     this.detector = detector;
@@ -20,6 +22,7 @@ final class Timestamps {
     if (size == detector.retentionLimit()) {
       head = (head + 1) % times.length;
       size--;
+      base++;
       detector.release();
       detector.recordDrop(rule);
     }
@@ -39,14 +42,31 @@ final class Timestamps {
     while (size > 0 && now - times[head] > window) {
       head = (head + 1) % times.length;
       size--;
+      base++;
       detector.release();
     }
   }
 
-  /** The number of timestamps at most {@code window} before {@code now}. */
-  int countWithin(long now, long window) {
-    int n = 0;
-    for (int i = size - 1; i >= 0 && now - times[(head + i) % times.length] <= window; i--) n++;
-    return n;
+  /**
+   * Counts timestamps at most {@code window} before a moving "now" in amortized constant time.
+   * Remembers where its window starts as a sequence number, which stays valid when timestamps
+   * are dropped; time only moves forward, so the position only moves forward.
+   */
+  final class Counter {
+    private final long window;
+    private long start;
+
+    Counter(long window) {
+      this.window = window;
+    }
+
+    int countWithin(long now) {
+      if (start < base) start = base;
+      long end = base + size;
+      while (start < end && now - times[(int) ((head + start - base) % times.length)] > window) {
+        start++;
+      }
+      return (int) (end - start);
+    }
   }
 }
