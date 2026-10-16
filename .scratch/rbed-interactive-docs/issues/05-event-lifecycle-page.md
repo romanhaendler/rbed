@@ -4,10 +4,23 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `run` returns the Confirmed timestamp of each Event and every Discarded Pending Event with its start and Discarded timestamp
-- [ ] The chart marks Pending start, Confirmed, Ended and Discarded distinctly, and the text alternative names them
-- [ ] JUnit: raising the lifecycle Scenario's duration past a short Event turns it from Confirmed into Discarded
-- [ ] The Node parity test covers the lifecycle Scenario at its defaults and at the pinned duration change
-- [ ] The Event table shows the Confirmed timestamp separately from the start
+- [x] `run` returns the Confirmed timestamp of each Event and every Discarded Pending Event with its start and Discarded timestamp
+- [x] The chart marks Pending start, Confirmed, Ended and Discarded distinctly, and the text alternative names them
+- [x] JUnit: raising the lifecycle Scenario's duration past a short Event turns it from Confirmed into Discarded
+- [x] The Node parity test covers the lifecycle Scenario at its defaults and at the pinned duration change
+- [x] The Event table shows the Confirmed timestamp separately from the start
+
+## Comments
+
+**Done.** Checked in headless Chromium (Playwright from a scratch directory) at 1280 and 375 px, light and dark, on `/event-lifecycle/` and the front page: no horizontal scroll, no page errors. Scripted: the text alternative, the Event and Discarded tables at 2 s, 3 s (address `?duration=3`) and 0 s, a hover sweep over every Sample (no Event, Pending, Confirmed, Ended at 9 s and 15 s, Pending at 17 s, Discarded at 18 s), and a click on a Confirmed band selecting its row.
+
+- **Bridge:** `run` no longer calls `detect`: it registers `Lifecycle` (an `EventListener` recording `onEnded` and `onDiscarded`, as the test Recorder does), pushes each Sample after setting `lifecycle.now` to its timestamp, then closes. The `Event` given to `onDiscarded` carries no timestamp of its own, so the Discarded moment is the Sample being pushed (the last Sample for a Pending Event Discarded by `close()`). Tickets that change how Samples are fed (sampling rate, `advanceTo`) must keep `lifecycle.now` current in that loop. The result has `"discarded":[{"name","start","discarded"}]` after `events` (always present, possibly empty). `confirmed` was already in the result since 01.
+- **Scenario** `event-lifecycle` (`EventLifecycle`): the README's `Overheat` (`temp` above 80, `forDuration`), 21 Samples one second apart, parameter `duration` in seconds (0..6, default 2). At 2 s: `Overheat 3000..9000` (Confirmed 5000), `Overheat 12000..15000` (Confirmed 14000), Discarded `17000..18000`; at 3 s the second Event is Discarded at 15000; at 0 s all three are Confirmed at their start. `BridgeTest` has `discarded(result)` and `confirmed(result)` helpers next to `events(result)`, whose format is unchanged.
+- **ScenarioView (every page):** a Rule's band now has two states, Pending (series-2 at 35 % via `color-mix`) and Confirmed (series-2); a Discarded Pending Event is a Pending segment up to its Discarded moment and has no `key` (clicking it clears the selection). Four `Scatter` series on the lane axis mark Pending start, Ended, Discarded and Confirmed (drawn last, so it covers a Pending start at the same moment), coloured with the `--u-color-warning/text/danger/success` tokens, which also exist outside the chart. A key under the chart (`.lifecycleKey`, `aria-hidden`) explains bands and marks; the text alternative names each Event's Pending start, Confirmed and Ended moments and every Discarded Pending Event. The readout says Pending, Confirmed, Ended (at the end) or Discarded (at that moment). `Shown.events` became `Shown.lifecycle` (`{events, discarded}`); `ofRule(lifecycle, rule)` picks one Rule's part. A `DiscardedTable` (`#discarded`: Name, Start, Discarded) follows the Event table, only while there is a Discarded Pending Event.
+- **Prerender:** `tables(fact)` returns the Event table and, when there are any, a "Discarded Pending Events at the default parameters" table; the twin and the HTML both render from it. Further Event columns (Aggregates, 09) still go into `eventRows`.
+- **Page:** `src/content/event-lifecycle.md`, adapted from the README's "The Event lifecycle" (the callbacks as a list, since the Markdown has no tables), linking the README sections and the Javadoc of `EventListener` and `Event` (javadoc.io `latest`, module path).
+- **Found in the README (not changed):** the truncation example under "The Event lifecycle" pushes 90 at 0 and 70 at 1000 and claims `Overheat 0..1000 with truncatedStart() == true`, but `Overheat` is defined with `forDuration(2_000)` just above, so that Pending Event is Discarded at 1000. The page leaves the example out and points to the front page's first Rule at threshold 70 instead.
+- The JS bundle is now 500 KB, just over Vite's 500 KB chunk warning (a warning, the build passes).
+- **umriss-ui gaps:** a `Scatter`'s marker shape cannot be chosen, so the four lifecycle marks differ by colour only (shape per series exists only with `encoding="marks"`, which also changes the lines); there is no `Legend` for StateBand states and Scatter marks of several lanes together, so the key is plain HTML under the chart.

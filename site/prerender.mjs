@@ -52,33 +52,52 @@ function eventRows({ unit, millis, result }) {
   ];
 }
 
+/** The Discarded Pending Events at the default parameters, like eventRows; none, no rows. */
+function discardedRows({ unit, millis, result }) {
+  if ('error' in result || result.discarded.length === 0) return [];
+  return [
+    ['Name', `Start (${unit})`, `Discarded (${unit})`],
+    ...result.discarded.map((d) => [d.name, String(d.start / millis), String(d.discarded / millis)]),
+  ];
+}
+
+/** The tables of a Scenario at its defaults: a caption with its rows, or a sentence. */
+function tables(fact) {
+  const events = eventRows(fact);
+  const discarded = discardedRows(fact);
+  return [
+    typeof events === 'string' ? events : { caption: 'Events at the default parameters', rows: events },
+    ...(discarded.length === 0 ? [] : [{ caption: 'Discarded Pending Events at the default parameters', rows: discarded }]),
+  ];
+}
+
 /** The Markdown twin: the page's Markdown, each Scenario marker replaced by its source and Events. */
 export function twin(markdown, facts) {
   return markdown.replace(new RegExp(SCENARIO_MARKER.source, 'gm'), (_, id) => {
     const fact = factOf(facts, id);
-    const rows = eventRows(fact);
-    const events =
-      typeof rows === 'string'
-        ? rows
-        : 'Events at the default parameters:\n\n' +
-          [rows[0], rows[0].map(() => '---'), ...rows.slice(1)].map((r) => `| ${r.join(' | ')} |`).join('\n');
-    return '```java\n' + fact.source + '\n```\n\n' + events;
+    const text = tables(fact).map((t) =>
+      typeof t === 'string'
+        ? t
+        : `${t.caption}:\n\n` +
+          [t.rows[0], t.rows[0].map(() => '---'), ...t.rows.slice(1)].map((r) => `| ${r.join(' | ')} |`).join('\n'),
+    );
+    return '```java\n' + fact.source + '\n```\n\n' + text.join('\n\n');
   });
 }
 
 function scenarioHtml(fact) {
-  const rows = eventRows(fact);
-  const table =
-    typeof rows === 'string'
-      ? `<p>${escape(rows)}</p>`
-      : '<table class="eventTable"><caption>Events at the default parameters</caption>' +
-        `<thead><tr>${rows[0].map((h) => `<th>${escape(h)}</th>`).join('')}</tr></thead><tbody>` +
-        rows
+  const html = tables(fact).map((t) =>
+    typeof t === 'string'
+      ? `<p>${escape(t)}</p>`
+      : `<table class="eventTable"><caption>${escape(t.caption)}</caption>` +
+        `<thead><tr>${t.rows[0].map((h) => `<th>${escape(h)}</th>`).join('')}</tr></thead><tbody>` +
+        t.rows
           .slice(1)
           .map((r) => `<tr>${r.map((c) => `<td>${escape(c)}</td>`).join('')}</tr>`)
           .join('') +
-        '</tbody></table>';
-  return `<pre><code>${escape(fact.source)}</code></pre>\n${table}`;
+        '</tbody></table>',
+  );
+  return `<pre><code>${escape(fact.source)}</code></pre>\n${html.join('\n')}`;
 }
 
 /** The built index.html with the page's head, and its text inside #root until the app replaces it. */

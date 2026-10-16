@@ -16,7 +16,7 @@ import org.teavm.jso.JSExport;
  * exports every reachable class that has such methods.
  */
 public final class Bridge {
-  private static final List<Scenario> SCENARIOS = List.of(new FirstRule());
+  private static final List<Scenario> SCENARIOS = List.of(new FirstRule(), new EventLifecycle());
 
   private Bridge() {}
 
@@ -67,7 +67,8 @@ public final class Bridge {
    * @param parameters JSON object of parameter values by id; missing ones take their default,
    *     null stands for NaN
    * @param drawnChannels JSON object reserved for Channel values the reader drew; ignored for now
-   * @return JSON object with the Samples and the Events, or {@code {"error": message}} if rbed
+   * @return JSON object with the Samples, the Events and the Discarded Pending Events (with the
+   *     timestamp they were Discarded), or {@code {"error": message}} if rbed
    *     rejected the Rules or the input was invalid
    */
   @JSExport
@@ -75,11 +76,17 @@ public final class Bridge {
     try {
       Scenario scenario = scenario(scenarioId);
       List<Sample> samples = scenario.samples();
-      List<Event> events = Detector.builder()
+      Lifecycle lifecycle = new Lifecycle();
+      Detector detector = Detector.builder()
           .rules(scenario.rules(values(scenario, parameters)))
-          .build()
-          .detect(samples);
-      return result(scenario, samples, events);
+          .listener(lifecycle)
+          .build();
+      for (Sample sample : samples) {
+        lifecycle.now = sample.timestamp();
+        detector.push(sample.timestamp(), sample.values());
+      }
+      detector.close();
+      return result(scenario, samples, lifecycle);
     } catch (RuntimeException e) {
       return Json.string(new StringBuilder("{\"error\":"), String.valueOf(e.getMessage()))
           .append('}').toString();
@@ -110,7 +117,8 @@ public final class Bridge {
     return values;
   }
 
-  private static String result(Scenario scenario, List<Sample> samples, List<Event> events) {
+  private static String result(Scenario scenario, List<Sample> samples, Lifecycle lifecycle) {
+    List<Event> events = lifecycle.ended;
     StringBuilder out = new StringBuilder("{\"samples\":[");
     for (int i = 0; i < samples.size(); i++) {
       Sample sample = samples.get(i);
@@ -136,6 +144,15 @@ public final class Bridge {
           .append(",\"end\":").append(e.end().getAsLong())
           .append(",\"truncatedStart\":").append(e.truncatedStart())
           .append(",\"truncatedEnd\":").append(e.truncatedEnd())
+          .append('}');
+    }
+    out.append("],\"discarded\":[");
+    for (int i = 0; i < lifecycle.discarded.size(); i++) {
+      Lifecycle.Discard d = lifecycle.discarded.get(i);
+      if (i > 0) out.append(',');
+      Json.string(out.append("{\"name\":"), d.event().name())
+          .append(",\"start\":").append(d.event().start())
+          .append(",\"discarded\":").append(d.at())
           .append('}');
     }
     return out.append("]}").toString();

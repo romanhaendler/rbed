@@ -19,6 +19,7 @@ const facts = new Map([
       result: {
         samples: [],
         events: [{ name: 'Run', start: 2000, confirmed: 2000, end: 7500, truncatedStart: false, truncatedEnd: true }],
+        discarded: [],
       },
     },
   ],
@@ -41,9 +42,25 @@ test('the twin is the Markdown with each Scenario as its Java source and its def
 test('a Scenario that rbed rejects at its defaults, or that has no Event, says so', () => {
   const error = new Map([['gaps', { ...facts.get('gaps'), result: { error: 'Limit is NaN' } }]]);
   assert.match(twin(markdown, error), /rbed rejects the default parameters: Limit is NaN/);
-  const none = new Map([['gaps', { ...facts.get('gaps'), result: { samples: [], events: [] } }]]);
+  const none = new Map([['gaps', { ...facts.get('gaps'), result: { samples: [], events: [], discarded: [] } }]]);
   assert.match(twin(markdown, none), /No Event at the default parameters\./);
   assert.throws(() => twin('<!-- scenario nope -->', facts), /nope/);
+});
+
+test('Discarded Pending Events at the defaults get a table of their own, after the Events', () => {
+  const result = { ...facts.get('gaps').result, discarded: [{ name: 'Run', start: 9000, discarded: 9500 }] };
+  const discarded = new Map([['gaps', { ...facts.get('gaps'), result }]]);
+  assert.ok(
+    twin(markdown, discarded).includes(
+      '| Run | 2 | 2 | 7.5 | end |\n\n' +
+        'Discarded Pending Events at the default parameters:\n\n' +
+        '| Name | Start (s) | Discarded (s) |\n| --- | --- | --- |\n| Run | 9 | 9.5 |\n\nThat is all.',
+    ),
+  );
+  const html = pageHtml(template, pages[1], markdown, discarded);
+  assert.ok(html.includes('<caption>Discarded Pending Events at the default parameters</caption>'));
+  assert.ok(html.includes('<td>Run</td><td>9</td><td>9.5</td>'));
+  assert.ok(!twin(markdown, facts).includes('Discarded'), 'no table while there is none');
 });
 
 test("a page's HTML holds its head, its text, its Java source and its default Events before any script", () => {

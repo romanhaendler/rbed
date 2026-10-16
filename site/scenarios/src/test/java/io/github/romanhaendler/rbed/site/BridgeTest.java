@@ -57,6 +57,22 @@ class BridgeTest {
         .toList();
   }
 
+  /** The Discarded Pending Events of a result as "Name start..discarded". */
+  @SuppressWarnings("unchecked")
+  static List<String> discarded(Map<String, Object> result) {
+    return ((List<Map<String, Object>>) result.get("discarded")).stream()
+        .map(e -> e.get("name") + " " + time(e.get("start")) + ".." + time(e.get("discarded")))
+        .toList();
+  }
+
+  /** The Confirmed timestamp of each Event of a result. */
+  @SuppressWarnings("unchecked")
+  static List<String> confirmed(Map<String, Object> result) {
+    return ((List<Map<String, Object>>) result.get("events")).stream()
+        .map(e -> time(e.get("confirmed")))
+        .toList();
+  }
+
   static String time(Object millis) {
     return millis == null ? "?" : Long.toString(((Double) millis).longValue());
   }
@@ -93,6 +109,38 @@ class BridgeTest {
   void invalidThresholdReturnsRbedsMessage() {
     assertEquals(Map.of("error", "Limit is Infinity"), run("first-rule", "{\"threshold\": 1e999}"));
     assertEquals(Map.of("error", "Limit is NaN"), run("first-rule", "{\"threshold\": null}"));
+  }
+
+  @Test
+  void lifecycleAtDefaultsConfirmsTwoEventsAfterTwoSecondsAndDiscardsAOneSampleSpike() {
+    Map<String, Object> result = run("event-lifecycle", "{}");
+    assertEquals(List.of("Overheat 3000..9000", "Overheat 12000..15000"), events(result));
+    assertEquals(List.of("5000", "14000"), confirmed(result));
+    assertEquals(List.of("Overheat 17000..18000"), discarded(result));
+  }
+
+  @Test
+  void raisingTheLifecycleDurationPastAShortEventDiscardsIt() {
+    Map<String, Object> result = run("event-lifecycle", "{\"duration\": 3}");
+    assertEquals(List.of("Overheat 3000..9000"), events(result));
+    assertEquals(List.of("6000"), confirmed(result));
+    assertEquals(List.of("Overheat 12000..15000", "Overheat 17000..18000"), discarded(result));
+  }
+
+  @Test
+  void withoutADurationEveryLifecycleEventIsConfirmedAtItsStart() {
+    Map<String, Object> result = run("event-lifecycle", "{\"duration\": 0}");
+    assertEquals(
+        List.of("Overheat 3000..9000", "Overheat 12000..15000", "Overheat 17000..18000"),
+        events(result));
+    assertEquals(List.of("3000", "12000", "17000"), confirmed(result));
+    assertEquals(List.of(), discarded(result));
+  }
+
+  @Test
+  void negativeLifecycleDurationReturnsRbedsMessage() {
+    assertEquals(Map.of("error", "forDuration must be >= 0: -1000"),
+        run("event-lifecycle", "{\"duration\": -1}"));
   }
 
   @Test

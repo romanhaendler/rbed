@@ -524,7 +524,8 @@ pre {
 
 /* The chart's palette outside the chart, for the swatches: @umriss-ui/charts 0.40.0 defines it
    on its own root only. */
-.configuratorPanel {
+.configuratorPanel,
+.lifecycleKey {
   --uc-series-1: var(--u-chart-1, #2563eb);
   --uc-series-2: var(--u-chart-2, #db2777);
   --uc-series-3: var(--u-chart-3, #059669);
@@ -540,6 +541,21 @@ pre {
   margin-right: var(--u-space-2);
   border-radius: 2px;
   vertical-align: baseline;
+}
+
+/* A lifecycle mark is a dot on the chart, so its swatch is round. */
+.swatch.mark {
+  border-radius: 50%;
+}
+
+/* Under the chart: what the bands' colours and the marks on them mean. */
+.lifecycleKey {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--u-space-1) var(--u-space-4);
+  padding-top: var(--u-space-3);
+  font-size: var(--u-text-xs);
+  color: var(--u-color-text-secondary);
 }
 
 @media (min-width: 900px) {
