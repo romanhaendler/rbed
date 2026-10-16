@@ -39,7 +39,7 @@ final class AfterScenario extends Scenario {
   }
 
   @Override
-  List<Sample> samples() {
+  List<Sample> samples(Map<String, Double> values) {
     List<Sample> samples = new ArrayList<>();
     for (int m = 0; m <= 150; m++) {
       double door = m >= 10 && m < 12 || m == 60 ? 1 : 0;

@@ -52,7 +52,7 @@ final class History extends Scenario {
   }
 
   @Override
-  List<Sample> samples() {
+  List<Sample> samples(Map<String, Double> values) {
     List<Sample> samples = new ArrayList<>();
     for (long d = 0; d <= 200; d++) {
       samples.add(new Sample(d * DAY, Map.of(SERVICE_MODE, d == 10 || d == 140 ? 1.0 : 0.0)));
@@ -85,8 +85,7 @@ final class History extends Scenario {
         detector = builder.build();
         lifecycle.restart = restart;
       }
-      lifecycle.now = sample.timestamp();
-      detector.push(sample.timestamp(), sample.values());
+      lifecycle.push(detector, sample);
     }
     detector.close();
   }

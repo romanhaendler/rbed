@@ -14,12 +14,12 @@ import java.util.Map;
  * 10, 30, 45, 60, 150 and 200 and last five minutes each. The fourth start within an hour is
  * frequent.
  */
-final class CountScenario extends Scenario {
+final class Count extends Scenario {
   static final Channel POWER = Channel.named("power");
   static final long MINUTE = 60_000;
   private static final int[] STARTS = {10, 30, 45, 60, 150, 200};
 
-  CountScenario() {
+  Count() {
     super("count", "count", "min", MINUTE, List.of(POWER),
         List.of(
             new Parameter("window", "Window", 60, 10, 120, 10, "min"),
@@ -40,7 +40,7 @@ final class CountScenario extends Scenario {
   }
 
   @Override
-  List<Sample> samples() {
+  List<Sample> samples(Map<String, Double> values) {
     List<Sample> samples = new ArrayList<>();
     for (int m = 0; m <= 240; m++) {
       double power = 0;

@@ -1,7 +1,8 @@
 // The address of a page below the site's base, as the router and the build read it.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { markdownFile, pageAt, pathOf, titleOf } from '../src/pages.ts';
+import { markdownFile, PAGES, pageAt, pathOf, titleOf } from '../src/pages.ts';
 
 test('a path below the base is the page path, with or without its trailing slash', () => {
   assert.equal(pathOf('/rbed/', '/rbed/'), '/');
@@ -24,6 +25,16 @@ test('the front page is at the base, an unknown path is no page', () => {
 test('a page reads its Markdown from the file named after its path, which is also its twin', () => {
   assert.equal(markdownFile({ path: '/' }), 'index.md');
   assert.equal(markdownFile({ path: '/event-lifecycle/' }), 'event-lifecycle.md');
+});
+
+test("every link from one page to another names a page of the manifest", () => {
+  for (const page of PAGES) {
+    const markdown = readFileSync(new URL(`../src/content/${markdownFile(page)}`, import.meta.url), 'utf8');
+    for (const [, link] of markdown.matchAll(/\]\(((?!https?:|mailto:|#)[^)\s]+)\)/g)) {
+      const target = new URL(link, `https://site.example/rbed${page.path}`).pathname;
+      assert.ok(pageAt(target, '/rbed/') !== undefined, `${page.path} links ${link}`);
+    }
+  }
 });
 
 test('the document title names the page and the site', () => {

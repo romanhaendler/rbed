@@ -34,7 +34,7 @@ final class FirstRule extends Scenario {
   }
 
   @Override
-  List<Sample> samples() {
+  List<Sample> samples(Map<String, Double> values) {
     return List.of(
         new Sample(1_000, Map.of(TEMP, 75.0)),
         new Sample(2_000, Map.of(TEMP, 85.0)),

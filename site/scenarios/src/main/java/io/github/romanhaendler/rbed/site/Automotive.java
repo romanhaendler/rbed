@@ -53,7 +53,7 @@ final class Automotive extends Scenario {
   }
 
   @Override
-  List<Sample> samples() {
+  List<Sample> samples(Map<String, Double> values) {
     List<Sample> series = new ArrayList<>();
     for (int s = 0; s < 1500; s++) {
       series.add(new Sample(s * 1_000L, Map.of(SPEED, speed(s), RPM, s < 60 ? 0.0 : 800.0)));

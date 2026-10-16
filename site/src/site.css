@@ -1,7 +1,7 @@
 /* The site's own styles: header bar, sidebar, content column and what stands on a page.
 
    Trimmed from the umriss-ui demo shell (packages/demo/src/shell.css, page.css and
-   scripts/front-page.html, MIT). Every colour, spacing and radius is a token of
+   scripts/front-page.html, MIT). Every color, spacing and radius is a token of
    @umriss-ui/core, so both themes hold; the library styles nothing global, so the base is here. */
 
 :root {
@@ -561,6 +561,15 @@ pre {
   border-radius: 50%;
 }
 
+/* The restart is a dashed vertical line. */
+.swatch.line {
+  width: 0;
+  height: 12px;
+  border-left: 2px dashed;
+  border-radius: 0;
+  vertical-align: middle;
+}
+
 /* A Truncated edge is a large halo behind its mark. */
 .swatch.halo {
   width: 14px;
@@ -568,7 +577,7 @@ pre {
   vertical-align: middle;
 }
 
-/* Under the chart: what the bands' colours and the marks on them mean. */
+/* Under the chart: what the bands' colors and the marks on them mean. */
 .lifecycleKey {
   display: flex;
   flex-wrap: wrap;
@@ -643,6 +652,50 @@ pre {
 
 .tableScroll {
   overflow-x: auto;
+}
+
+/* On a phone, an Event's cells flow under its name as labelled pieces ("Start (s) 12"), so the
+   live tables need no sideways scrolling; the column heads stay for screen readers. */
+@media (max-width: 600px) {
+  .stacked thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .stacked tr {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: var(--u-space-3);
+    padding: var(--u-space-2) 0;
+    border-bottom: 1px solid var(--u-edge-color);
+  }
+  .stacked tr:has(+ .aggregateRow) {
+    padding-bottom: var(--u-space-1);
+    border-bottom: none;
+  }
+  .stacked .aggregateRow {
+    padding-top: 0;
+  }
+  .eventTable.stacked td {
+    padding: 0;
+    border-bottom: none;
+  }
+  .stacked td:first-child {
+    flex-basis: 100%;
+  }
+  .stacked td:empty {
+    display: none;
+  }
+  .stacked td[data-label]::before {
+    content: attr(data-label) ' ';
+    color: var(--u-color-text-muted);
+  }
+  .stacked tr[data-selected] {
+    background: color-mix(in srgb, var(--u-color-accent) 12%, transparent);
+  }
 }
 
 /* ---------------- Tiles ---------------- */

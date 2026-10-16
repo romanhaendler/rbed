@@ -13,6 +13,10 @@ import java.util.Map;
  * A parameterised example shown on the site: its Channels, its Samples, and Rules built from
  * parameter values. {@code source} is the Java source of the Rules, with a placeholder such as
  * {@code ${threshold}} for each parameter, which the site replaces by the current value.
+ *
+ * <p>A Scenario class is named after its page ({@code Cranes}, {@code During}, {@code Count}),
+ * with the suffix {@code Scenario} only where that name is a public rbed type
+ * ({@code AfterScenario}, {@code AggregatesScenario}).
  */
 abstract class Scenario {
   final String id;
@@ -35,12 +39,8 @@ abstract class Scenario {
     this.source = source;
   }
 
-  abstract List<Sample> samples();
-
-  /** The Samples for the given parameter values; the same for every value unless overridden. */
-  List<Sample> samples(Map<String, Double> values) {
-    return samples();
-  }
+  /** The Samples for the given value of every parameter, by parameter id. */
+  abstract List<Sample> samples(Map<String, Double> values);
 
   /** Those of its Channels that are Pulse Channels; rbed does not tell a Channel's kind. */
   List<Channel> pulseChannels() {
@@ -57,32 +57,24 @@ abstract class Scenario {
 
   /**
    * Runs the Rules over {@code samples} (its own, with any Channel values the reader drew) with
-   * {@code lifecycle} as the listener, setting {@code lifecycle.now} to each Sample's timestamp
-   * before pushing it, and closes the Detector. A Scenario that feeds its Detector differently (a
-   * sampling rate, time advances) overrides it and keeps {@code lifecycle.now} current the same way.
+   * {@code lifecycle} as the listener, feeding each Sample through {@link Lifecycle#push}, and
+   * closes the Detector. A Scenario whose feeding depends on its parameters or is otherwise
+   * different (a sampling rate, time advances, a restart with or without History) overrides it
+   * and feeds through {@code lifecycle} the same way ({@code push}, {@code pushValues},
+   * {@code advance}), so the bridge sees every moment.
    */
-  void detect(Rule[] rules, List<Sample> samples, Lifecycle lifecycle) {
+  void detect(Rule[] rules, List<Sample> samples, Map<String, Double> values,
+      Lifecycle lifecycle) {
     Detector detector = Detector.builder().rules(rules).listener(lifecycle).build();
-    for (Sample sample : samples) {
-      lifecycle.now = sample.timestamp();
-      detector.push(sample.timestamp(), sample.values());
-    }
+    for (Sample sample : samples) lifecycle.push(detector, sample);
     detector.close();
   }
 
   /**
-   * Like {@link #detect(Rule[], List, Lifecycle)}, for a Scenario whose feeding depends on its
-   * parameters (a sampling rate, a timer advancing time, a restart with or without History).
-   * The bridge calls this one.
-   */
-  void detect(Rule[] rules, List<Sample> samples, Map<String, Double> values,
-      Lifecycle lifecycle) {
-    detect(rules, samples, lifecycle);
-  }
-
-  /**
    * What the Scenario's listener makes of an Event at the given parameter values, such as the
-   * class of a lifted load; or null.
+   * class of a lifted load; or null. A listener that needs more than the Event (the end of an
+   * earlier one) notes it on the {@link Lifecycle} during {@code detect} instead, so the note
+   * travels with the run and the Scenario keeps no state.
    */
   String note(Event event, Map<String, Double> values) {
     return null;

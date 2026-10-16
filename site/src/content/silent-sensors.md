@@ -20,13 +20,13 @@ detector.push(13_000, Map.of(hr, 70.0));   // SensorLost Ended at 13000
 
 ## A heart rate that falls silent
 
-A heart rate is reported every second. From 12 s it is high, and from 25 to 44 s the sensor is silent. `HighHeartRate` trusts a high reading only while it is recent: `hr` above 120 and not older than the limit. `SensorLost` is the opposite, a reading older than the limit. The small marks just above the lanes are the moments a timer advanced time, once a second while no Sample arrived.
+A heart rate is reported every second. From 12 s it is high, and from 25 to 44 s the sensor is silent. `HighHeartRate` trusts a high reading only while it is recent: `hr` above 120 and not older than the limit. `SensorLost` is the opposite, a reading older than the limit. The small marks just above the lanes are the moments a timer advanced time, once a second while no Sample arrived. The dashed line under the Channel is `hr.age()` in seconds, as rbed computes it at every Sample and every advance, with the limit as a line.
 
-<!-- scenario silent-sensors -->
+<!-- scenario silent-sensors draw -->
 
-With the timer, the last reading at 24 s grows older with every advance. At 30 s it is 6 s old, more than the limit of 5 s: `HighHeartRate` Ends there and `SensorLost` is Confirmed, both without a Sample. `SensorLost` Ends at 45 s, when the sensor reports again. Raise *Silent after*, and both move later.
+With the timer, the last reading at 24 s grows older with every advance: the dashed line climbs a second per second. At 30 s it is 6 s old, more than the limit of 5 s: `HighHeartRate` Ends there and `SensorLost` is Confirmed, both without a Sample. `SensorLost` Ends at 45 s, when the sensor reports again. Raise *Silent after*, and both move later.
 
-Choose "Nothing happens" instead of the timer, and the Detector learns of the silence only when the next Sample arrives at 45 s. That Sample carries `hr`, so its age is 0 again: `SensorLost` never happens, and `HighHeartRate` runs through the whole silence on a reading that is 21 seconds old by the time the next one arrives.
+Choose "Nothing happens" instead of the timer, and the Detector learns of the silence only when the next Sample arrives at 45 s. That Sample carries `hr`, so its age is 0 again, and the dashed line, read only at Samples, stays at 0 throughout: `SensorLost` never happens, and `HighHeartRate` runs through the whole silence on a reading that is 21 seconds old by the time the next one arrives.
 
 ## What an advance does
 
@@ -39,3 +39,5 @@ An advance must lie after the previous Sample or advance, and a Detector with a 
 - [Silent sensors: advancing time](https://github.com/romanhaendler/rbed#silent-sensors-advancing-time) in the README, the canonical text
 - [Detector](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html) in the Javadoc: `advanceTo`
 - The [Healthcare](../healthcare/) example: a sensor dropout during which the monitor advances its Detector every second
+
+Methods used: [`when`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#when%28io.github.romanhaendler.rbed.Condition%29), [`age`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/ChannelExpression.html#age%28%29), [`above`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Expression.html#above%28double%29), [`push`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#push%28long,java.util.Map%29), [`advanceTo`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#advanceTo%28long%29), [`and`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Condition.html#and%28io.github.romanhaendler.rbed.Condition%29), [`not`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Condition.html#not%28%29).

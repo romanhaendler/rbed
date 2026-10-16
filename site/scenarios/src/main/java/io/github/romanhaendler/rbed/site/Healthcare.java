@@ -64,7 +64,7 @@ final class Healthcare extends Scenario {
 
   /** The Samples that arrive: none during the dropout. */
   @Override
-  List<Sample> samples() {
+  List<Sample> samples(Map<String, Double> values) {
     List<Sample> series = new ArrayList<>();
     for (long s = 0; s < 600; s++) {
       if (!dropout(s)) series.add(new Sample(s * 1_000, values(s)));
@@ -89,20 +89,15 @@ final class Healthcare extends Scenario {
     return new Rule[] {tachycardia, desaturation, hypoxicTachycardia, sensorLost};
   }
 
-  /**
-   * Pushes a Sample every second, and advances time instead during the dropout. It makes its
-   * values itself, so drawn values do not reach it; its page does not offer drawing.
-   */
+  /** Pushes a Sample every second, and advances time instead during the dropout. */
   @Override
-  void detect(Rule[] rules, List<Sample> samples, Lifecycle lifecycle) {
+  void detect(Rule[] rules, List<Sample> samples, Map<String, Double> values,
+      Lifecycle lifecycle) {
     Detector detector = Detector.builder().rules(rules).listener(lifecycle).build();
+    int next = 0;
     for (long s = 0; s < 600; s++) {
-      if (dropout(s)) {
-        lifecycle.advance(detector, s * 1_000);
-      } else {
-        lifecycle.now = s * 1_000;
-        detector.push(s * 1_000, values(s));
-      }
+      if (dropout(s)) lifecycle.advance(detector, s * 1_000);
+      else lifecycle.push(detector, samples.get(next++));
     }
     detector.close();
   }

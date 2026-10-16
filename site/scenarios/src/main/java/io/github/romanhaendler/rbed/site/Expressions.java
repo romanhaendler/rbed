@@ -43,7 +43,7 @@ final class Expressions extends Scenario {
   }
 
   @Override
-  List<Sample> samples() {
+  List<Sample> samples(Map<String, Double> values) {
     List<Sample> samples = new ArrayList<>();
     for (int i = 0; i < 60; i++) {
       double noise = NOISE[i % NOISE.length];

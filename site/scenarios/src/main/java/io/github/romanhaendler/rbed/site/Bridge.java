@@ -29,10 +29,11 @@ public final class Bridge {
       new PulseChannels(),
       new During(),
       new AfterScenario(),
-      new CountScenario(),
+      new Count(),
       new TotalDuration(),
       new Latest(),
       new History(),
+      new Validation(),
       new Cranes(),
       new Manufacturing(),
       new BuildingServices(),
@@ -115,8 +116,8 @@ public final class Bridge {
    * @return JSON object with the Samples, the Events, the Discarded Pending Events (with the
    *     timestamp they were Discarded), the timestamps time was advanced to without a Sample,
    *     the timestamp of the restart if the Detector was restarted, and, for a Scenario that
-   *     plots an Expression, its name, unit (if it has one of its own),
-   *     threshold and value per Sample (null where undefined); or {@code {"error": message}} if
+   *     plots an Expression, its name, unit (if it has one of its own), threshold, value per
+   *     Sample and, if time was advanced, value per advance (null where undefined); or {@code {"error": message}} if
    *     rbed rejected the Rules or the input was invalid
    */
   @JSExport
@@ -231,7 +232,8 @@ public final class Bridge {
           .append(",\"truncatedStart\":").append(e.truncatedStart())
           .append(",\"truncatedEnd\":").append(e.truncatedEnd());
       aggregates(out.append(",\"aggregates\":"), scenario, e);
-      String note = scenario.note(e, values);
+      String note = lifecycle.noteOf(e);
+      if (note == null) note = scenario.note(e, values);
       if (note != null) Json.string(out.append(",\"note\":"), note);
       out.append('}');
     }
@@ -255,16 +257,26 @@ public final class Bridge {
     if (plot != null) {
       Json.string(out.append(",\"expression\":{\"name\":"), plot.name());
       if (plot.unit() != null) Json.string(out.append(",\"unit\":"), plot.unit());
-      Json.number(out.append(",\"threshold\":"), plot.threshold()).append(",\"values\":[");
-      double[] plotted =
-          ExpressionValues.of(plot.expression(), scenario.rules(values), samples);
-      for (int i = 0; i < plotted.length; i++) {
-        if (i > 0) out.append(',');
-        Json.number(out, plotted[i]);
+      ExpressionValues.Values plotted =
+          ExpressionValues.of(scenario, plot.expression(), values, samples);
+      Json.number(out.append(",\"threshold\":"), plot.threshold());
+      numbers(out.append(",\"values\":"), plotted.atSamples());
+      if (plotted.atAdvances().length > 0) {
+        numbers(out.append(",\"atAdvances\":"), plotted.atAdvances());
       }
-      out.append("]}");
+      out.append('}');
     }
     return out.append('}').toString();
+  }
+
+  /** A JSON array of the numbers; NaN becomes null. */
+  private static StringBuilder numbers(StringBuilder out, double[] numbers) {
+    out.append('[');
+    for (int i = 0; i < numbers.length; i++) {
+      if (i > 0) out.append(',');
+      Json.number(out, numbers[i]);
+    }
+    return out.append(']');
   }
 
   /** The Event's Aggregates by Channel name, in the Scenario's Channel order; NaN becomes null. */

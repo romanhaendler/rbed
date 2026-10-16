@@ -62,7 +62,7 @@ final class Manufacturing extends Scenario {
   }
 
   @Override
-  List<Sample> samples() {
+  List<Sample> samples(Map<String, Double> values) {
     List<Sample> series = new ArrayList<>();
     for (int s = 0; s < 600; s++) {
       series.add(new Sample(s * 1_000L, Map.of(TEMP, temperature(s), LOAD, load(s))));
@@ -88,12 +88,10 @@ final class Manufacturing extends Scenario {
 
   /** The Samples' values in order; the Detector derives the timestamps from its sampling rate. */
   @Override
-  void detect(Rule[] rules, List<Sample> samples, Lifecycle lifecycle) {
+  void detect(Rule[] rules, List<Sample> samples, Map<String, Double> values,
+      Lifecycle lifecycle) {
     Detector detector = Detector.builder().samplingRate(1).rules(rules).listener(lifecycle).build();
-    for (Sample sample : samples) {
-      lifecycle.now = sample.timestamp();  // the derived round(index * 1000 / 1)
-      detector.push(sample.values());
-    }
+    for (Sample sample : samples) lifecycle.pushValues(detector, sample);  // round(i * 1000 / 1)
     detector.close();
   }
 }

@@ -16,6 +16,17 @@ export default defineConfig({
     rolldownOptions: {
       // umriss-ui's modules start with "use client", which only means something to server rendering
       onLog: (level, log, handler) => log.code !== 'MODULE_LEVEL_DIRECTIVE' && handler(level, log),
+      // React, umriss-ui and the compiled Scenarios each in a file of their own, loaded in
+      // parallel and cached apart from the app, which changes most often.
+      output: {
+        codeSplitting: {
+          groups: [
+            { name: 'react', test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
+            { name: 'umriss', test: /node_modules[\\/]@umriss-ui[\\/]/ },
+            { name: 'rbed', test: /scenarios[\\/]target[\\/]js[\\/]rbed\.js$/ },
+          ],
+        },
+      },
     },
   },
   resolve: {

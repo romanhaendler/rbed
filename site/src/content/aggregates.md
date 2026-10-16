@@ -31,8 +31,10 @@ The time-weighted values are NaN if the Channel had no value during the Event, a
 
 ## While an Event runs
 
-The listener receives a snapshot of the Event at each stage of its lifecycle. Aggregates in the Pending and Confirmed snapshots cover the Event so far; those of the Ended Event cover it from its start to its end.
+The listener receives the Event as it stands at each stage of its lifecycle. Aggregates of the Pending and the Confirmed Event cover the Event so far; those of the Ended Event cover it from its start to its end.
 
 Another Rule can use them in its Conditions: `latest(rule).min(x)`, `.max(x)` and `.mean(x)` are the Aggregates of the most recent Confirmed Event of `rule` (see [latest](https://github.com/romanhaendler/rbed#latest-values-of-the-most-recent-event)).
 
 The README's [Aggregates](https://github.com/romanhaendler/rbed#aggregates) chapter is the reference for this page.
+
+Methods used: [`when`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#when%28io.github.romanhaendler.rbed.Condition%29), [`above`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Expression.html#above%28double%29), [`aggregate`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#aggregate%28io.github.romanhaendler.rbed.Channel...%29), [`listener`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.Builder.html#listener%28io.github.romanhaendler.rbed.EventListener%29), [`aggregates`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Event.html#aggregates%28io.github.romanhaendler.rbed.Channel%29), [`timeWeightedMean`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Aggregates.html#timeWeightedMean%28%29), [`max`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Aggregates.html#max%28%29), [`integral`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Aggregates.html#integral%28%29).

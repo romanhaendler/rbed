@@ -19,7 +19,7 @@ Rule roughRunning = Rule.named("RoughRunning").when(during(running).and(vibratio
 
 Each part keeps its own duration, End Condition and hysteresis, and the combination holds while both are Confirmed. A patient's heart rate `hr` is above 100 from 40 s to 200 s, and once more from 230 s to 250 s. Their oxygen saturation `spo2` dips below 90 for one Sample at 20 s, from 100 s to 160 s, and from 230 s to 260 s. `Tachycardia` needs 30 seconds, `Desaturation` 10, and `HypoxicTachycardia` holds while both are Confirmed. The three lanes share the time axis, so you can see the third band start and end where the other two overlap.
 
-<!-- scenario during -->
+<!-- scenario during draw -->
 
 At the default durations:
 
@@ -36,3 +36,5 @@ The [Healthcare](../healthcare/) example uses these Rules on a longer recording.
 
 - [during: while another Event runs](https://github.com/romanhaendler/rbed#during-while-another-event-runs) and [Rule order](https://github.com/romanhaendler/rbed#rule-order) in the README, the canonical text
 - [Conditions](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Conditions.html) in the Javadoc
+
+Methods used: [`when`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#when%28io.github.romanhaendler.rbed.Condition%29), [`above`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Expression.html#above%28double%29), [`forDuration`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#forDuration%28long%29), [`during`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Conditions.html#during%28io.github.romanhaendler.rbed.Rule%29), [`and`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Condition.html#and%28io.github.romanhaendler.rbed.Condition%29), [`below`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Expression.html#below%28double%29), [`push`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#push%28long,java.util.Map%29).

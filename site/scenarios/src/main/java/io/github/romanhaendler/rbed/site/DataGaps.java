@@ -39,11 +39,6 @@ final class DataGaps extends Scenario {
   }
 
   @Override
-  List<Sample> samples() {
-    return samples(Map.of("gap", parameters.get(0).defaultValue()));
-  }
-
-  @Override
   List<Sample> samples(Map<String, Double> values) {
     long gapFrom = Math.round(values.get("gap") * 1_000);
     List<Sample> samples = new ArrayList<>();

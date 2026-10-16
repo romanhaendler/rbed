@@ -4,11 +4,10 @@
 import { CommandPalette, useCommandPaletteShortcut } from '@umriss-ui/core';
 import { useEffect, useRef, useState } from 'react';
 import { CATALOGUE, MarkdownPage, markdownOf } from './MarkdownPage';
-import { markdownFile, PAGES, pageAt, titleOf } from './pages.ts';
+import { markdownFile, PAGES, pageAt, REPOSITORY, titleOf } from './pages.ts';
 import { searchItems } from './search.ts';
 
 const BASE = import.meta.env.BASE_URL;
-const REPOSITORY = 'https://github.com/romanhaendler/rbed';
 const SHORTCUT = /Mac|iP/.test(navigator.platform) ? '⌘K' : 'Ctrl K';
 
 const SEARCH = searchItems(PAGES, markdownOf, (id) => CATALOGUE.find((s) => s.id === id)?.source ?? '');

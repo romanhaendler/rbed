@@ -44,8 +44,7 @@ final class SamplingRate extends Scenario {
   }
 
   /** Every 100 ms from 0 to 8 s, except 2.1 to 2.9 s; above 3 from 1.5 to 3.5 s and 5 to 7 s. */
-  @Override
-  List<Sample> samples() {
+  static List<Sample> recorded() {
     List<Sample> samples = new ArrayList<>();
     for (int tenth = 0; tenth <= 80; tenth++) {
       if (tenth > 20 && tenth < 30) continue;
@@ -60,9 +59,9 @@ final class SamplingRate extends Scenario {
   /** With a sampling rate, the timestamps rbed derives: round(i * 1000 / rate). */
   @Override
   List<Sample> samples(Map<String, Double> values) {
-    if (values.get("mode") == 0) return samples();
+    List<Sample> recorded = recorded();
+    if (values.get("mode") == 0) return recorded;
     double hz = values.get("rate");
-    List<Sample> recorded = samples();
     List<Sample> derived = new ArrayList<>();
     for (int i = 0; i < recorded.size(); i++) {
       derived.add(new Sample(Math.round(i * 1000 / hz), recorded.get(i).values()));
@@ -79,15 +78,13 @@ final class SamplingRate extends Scenario {
   void detect(Rule[] rules, List<Sample> samples, Map<String, Double> values,
       Lifecycle lifecycle) {
     if (values.get("mode") == 0) {
-      detect(rules, samples, lifecycle);
+      super.detect(rules, samples, values, lifecycle);
       return;
     }
     Detector detector = Detector.builder().samplingRate(values.get("rate"))
         .rules(rules).listener(lifecycle).build();
-    for (Sample sample : samples) {
-      lifecycle.now = sample.timestamp();  // the derived round(index * 1000 / rate)
-      detector.push(sample.values());
-    }
+    // samples(values) gave them the derived round(index * 1000 / rate)
+    for (Sample sample : samples) lifecycle.pushValues(detector, sample);
     detector.close();
   }
 }

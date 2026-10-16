@@ -1,10 +1,10 @@
 # End Conditions and hysteresis
 
-Real signals hover around their thresholds. A Rule that only has `when` Ends its Event the moment the Condition stops holding, so a weight fluctuating between 490 and 520 around a threshold of 500 produces a new Event every few Samples. An End Condition fixes this: once an Event is Confirmed, it continues until the End Condition holds, whatever `when` does.
+Real Channels hover around their thresholds. A Rule that only has `when` Ends its Event the moment the Condition stops holding, so a weight fluctuating between 490 and 520 around a threshold of 500 produces a new Event every few Samples. An End Condition fixes this: once an Event is Confirmed, it continues until the End Condition holds, whatever `when` does.
 
 ## A separate end threshold
 
-Give the End Condition a threshold below the start threshold, and the signal has to fall clearly before the Event Ends:
+Give the End Condition a threshold below the start threshold, and the weight has to fall clearly before the Event Ends:
 
 ```java
 Rule loadLifted = Rule.named("LoadLifted")
@@ -38,3 +38,5 @@ The Event's `end()` is where the End Condition *started* holding, 22 s here, not
 
 - [End Conditions and hysteresis](https://github.com/romanhaendler/rbed#end-conditions-and-hysteresis) and [Durations: forDuration and forSamples](https://github.com/romanhaendler/rbed#durations-forduration-and-forsamples) in the README, the canonical text
 - [Rule](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html) in the Javadoc
+
+Methods used: [`when`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#when%28io.github.romanhaendler.rbed.Condition%29), [`above`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Expression.html#above%28double%29), [`endWhen`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#endWhen%28io.github.romanhaendler.rbed.Condition%29), [`below`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Expression.html#below%28double%29), [`forDuration`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#forDuration%28java.time.Duration%29), [`push`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#push%28long,java.util.Map%29), [`close`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#close%28%29).

@@ -11,7 +11,7 @@ Like every reference to another Rule, `a` must be added before the Rule that ref
 
 A cold room's door is open from minute 10 to minute 12, and once more at minute 60. Its temperature is above 8 °C from minute 15 to minute 25, soon after the first opening, and from minute 100 to minute 110, long after the second. `ExcursionAfterDoor` is an excursion within a window after the door was open. Move the window and watch which excursion still counts.
 
-<!-- scenario after -->
+<!-- scenario after draw -->
 
 The window is measured from where `DoorOpen` Ended, not from where it started. With the default 30 minutes, the first door opening Ended at minute 12, so the window lasts until minute 42 and covers the first excursion: `ExcursionAfterDoor` runs from 15 to 25. The second door opening Ended at minute 61, 39 minutes before the second excursion starts, so that excursion is not attributed to the door.
 
@@ -33,3 +33,5 @@ The [Pulse Channels](../pulse-channels/) page uses `after(...).within(...)` for 
 
 - [after: sequences](https://github.com/romanhaendler/rbed#after-sequences) in the README, the canonical text
 - [After](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/After.html) in the Javadoc
+
+Methods used: [`when`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#when%28io.github.romanhaendler.rbed.Condition%29), [`above`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Expression.html#above%28double%29), [`after`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Conditions.html#after%28io.github.romanhaendler.rbed.Rule%29), [`unless`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/After.html#unless%28io.github.romanhaendler.rbed.Rule...%29), [`within`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/After.html#within%28java.time.Duration%29), [`and`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Condition.html#and%28io.github.romanhaendler.rbed.Condition%29), [`push`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#push%28long,java.util.Map%29).

@@ -15,7 +15,7 @@ An Event counts from the moment it is Confirmed, so a running Event is included.
 
 A machine's power is sampled once a minute. It runs for five minutes from minutes 10, 30, 45, 60, 150 and 200. A `Run` needs 30 seconds above 500 W, so each one is Confirmed at the next Sample, a minute after its start. `FrequentStarts` holds while more than the limit of Runs were Confirmed within the window. The chart under the Events plots `count(run).within(...)` at every Sample, as rbed computes it, with the limit as a line.
 
-<!-- scenario count -->
+<!-- scenario count draw -->
 
 With an hour's window and a limit of 3:
 
@@ -32,3 +32,5 @@ The [Building services](../building-services/) example counts a compressor's sta
 
 - [count: how many Events](https://github.com/romanhaendler/rbed#count-how-many-events) in the README, the canonical text
 - [EventCount](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/EventCount.html) in the Javadoc
+
+Methods used: [`when`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#when%28io.github.romanhaendler.rbed.Condition%29), [`above`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Expression.html#above%28double%29), [`forDuration`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#forDuration%28long%29), [`count`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Conditions.html#count%28io.github.romanhaendler.rbed.Rule%29), [`within`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/EventCount.html#within%28java.time.Duration%29), [`push`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#push%28long,java.util.Map%29).

@@ -65,12 +65,12 @@ final class Cranes extends Scenario {
   }
 
   @Override
-  List<Sample> samples() {
+  List<Sample> samples(Map<String, Double> values) {
     List<Sample> series = new ArrayList<>();
     for (long t = 0; t <= 14000; t += 500) {
-      Map<Channel, Double> values = new HashMap<>(Map.of(WEIGHT, weightAt(t)));
-      if (t == 0) values.put(RATED_LOAD, 5000.0); // sent once, held from then on
-      series.add(new Sample(t, values));
+      Map<Channel, Double> sample = new HashMap<>(Map.of(WEIGHT, weightAt(t)));
+      if (t == 0) sample.put(RATED_LOAD, 5000.0); // sent once, held from then on
+      series.add(new Sample(t, sample));
     }
     return series;
   }

@@ -23,7 +23,7 @@ Detector detector = Detector.builder()
 
 A machine reports whether it is in service mode once a day, for 200 days; it is serviced on days 10 and 140. `OverdueService` holds while there was no `Maintenance` in the last 90 days. The vertical line marks the restart: the Detector is closed and a new one takes over from that day.
 
-<!-- scenario history -->
+<!-- scenario history draw -->
 
 With History, the restarted Detector knows the maintenance of day 10, so the service is overdue from day 102, when that maintenance lies more than 90 days back, until the next one is over on day 141. Choose "Without History", and the new Detector knows of no maintenance at all: from the restart on day 60 the service counts as overdue, at once and with a Truncated start.
 
@@ -37,3 +37,5 @@ History Events are matched to Rules by `name()`, so each must belong to a Rule a
 
 - [Restarts: History](https://github.com/romanhaendler/rbed#restarts-history) in the README, the canonical text
 - [Detector.Builder](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.Builder.html) in the Javadoc: `history`
+
+Methods used: [`when`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#when%28io.github.romanhaendler.rbed.Condition%29), [`above`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Expression.html#above%28double%29), [`after`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Conditions.html#after%28io.github.romanhaendler.rbed.Rule%29), [`within`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/After.html#within%28java.time.Duration%29), [`not`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Condition.html#not%28%29), [`history`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.Builder.html#history%28java.util.Collection%29), [`listener`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.Builder.html#listener%28io.github.romanhaendler.rbed.EventListener%29), [`close`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#close%28%29).

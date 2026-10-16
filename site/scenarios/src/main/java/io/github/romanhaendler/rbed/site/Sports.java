@@ -10,7 +10,6 @@ import io.github.romanhaendler.rbed.EventListener;
 import io.github.romanhaendler.rbed.Rule;
 import io.github.romanhaendler.rbed.Sample;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -22,9 +21,6 @@ final class Sports extends Scenario {
   static final Channel HR = Channel.named("hr");
   static final Channel SPEED = Channel.named("speed");
   static final long SECOND = 1_000;
-
-  /** Recovery seconds of the last run's Recovered Events, by their start. */
-  private final Map<Long, Long> recoverySeconds = new HashMap<>();
 
   Sports() {
     super("sports", "Sports", "s", SECOND, List.of(SPEED, HR),
@@ -71,7 +67,7 @@ final class Sports extends Scenario {
   }
 
   @Override
-  List<Sample> samples() {
+  List<Sample> samples(Map<String, Double> values) {
     List<Sample> series = new ArrayList<>();
     for (int s = 0; s < 420; s++) {
       series.add(new Sample(s * SECOND, Map.of(
@@ -94,12 +90,26 @@ final class Sports extends Scenario {
     return new Rule[] {sprint, recovered, sessionDone};
   }
 
-  /** The example's listener, recording each recovery time next to the bridge's Lifecycle. */
+  /**
+   * The example's listener, noting each recovery time on the bridge's Lifecycle, to which it
+   * passes every callback on.
+   */
   @Override
-  void detect(Rule[] rules, List<Sample> samples, Lifecycle lifecycle) {
-    recoverySeconds.clear();
+  void detect(Rule[] rules, List<Sample> samples, Map<String, Double> values,
+      Lifecycle lifecycle) {
     Detector detector = Detector.builder().rules(rules).listener(new EventListener() {
       private long lastSprintEnd;
+
+      @Override public void onPending(Event e) {
+        lifecycle.onPending(e);
+      }
+
+      @Override public void onConfirmed(Event e) {
+        lifecycle.onConfirmed(e);
+        if (e.name().equals("Recovered")) {
+          lifecycle.note(e, (e.start() - lastSprintEnd) / SECOND + " s");
+        }
+      }
 
       @Override public void onEnded(Event e) {
         lifecycle.onEnded(e);
@@ -109,23 +119,8 @@ final class Sports extends Scenario {
       @Override public void onDiscarded(Event e) {
         lifecycle.onDiscarded(e);
       }
-
-      @Override public void onConfirmed(Event e) {
-        if (e.name().equals("Recovered")) {
-          recoverySeconds.put(e.start(), (e.start() - lastSprintEnd) / SECOND);
-        }
-      }
     }).build();
-    for (Sample sample : samples) {
-      lifecycle.now = sample.timestamp();
-      detector.push(sample.timestamp(), sample.values());
-    }
+    for (Sample sample : samples) lifecycle.push(detector, sample);
     detector.close();
-  }
-
-  @Override
-  String note(Event event, Map<String, Double> values) {
-    Long seconds = event.name().equals("Recovered") ? recoverySeconds.get(event.start()) : null;
-    return seconds == null ? null : seconds + " s";
   }
 }

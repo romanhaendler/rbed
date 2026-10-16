@@ -47,7 +47,7 @@ final class Environment extends Scenario {
   }
 
   @Override
-  List<Sample> samples() {
+  List<Sample> samples(Map<String, Double> values) {
     List<Sample> series = new ArrayList<>();
     for (int quarter = 0; quarter < 72 * 4; quarter++) {
       if (quarter == 20 * 4) continue; // one missing report

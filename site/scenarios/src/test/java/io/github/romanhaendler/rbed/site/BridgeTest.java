@@ -19,6 +19,10 @@ import org.junit.jupiter.api.Test;
  * Tests the bridge on the JVM. Every call is also written with its JVM result to
  * target/parity.json, where site/test/parity.test.mjs repeats it against the compiled
  * JavaScript and compares.
+ *
+ * <p>The domain tests repeat the expected Event lists of rbed's example tests as literals: this
+ * module cannot depend on rbed's test code, which is not in its jar. Each names the example test
+ * it mirrors, so a change to an example is made in both places.
  */
 class BridgeTest {
   static final List<String> calls = new ArrayList<>();
@@ -114,6 +118,8 @@ class BridgeTest {
   }
 
   /** CraneScenarioTest's form: "Name start..end" in ms, then the load of a LoadLifted. */
+  // Mirrors the expected list of rbed's own test
+  // CraneScenarioTest#liftsOverloadAndSetDownsWithClassifiedLoads; change both together.
   @Test
   void cranesAtDefaultsYieldTheCraneScenarioTestsEvents() {
     Map<String, Object> result = run("cranes", "{}");
@@ -131,6 +137,8 @@ class BridgeTest {
         described);
   }
 
+  // Mirrors the expected list of rbed's own test
+  // examples.MachineToolOverheatExample#detectsOverheatingUnderLoad; change both together.
   @Test
   void manufacturingAtDefaultsYieldsTheMachineToolOverheatExamplesEvents() {
     assertEquals(List.of(
@@ -141,6 +149,8 @@ class BridgeTest {
         describe(run("manufacturing", "{}"), 1000));
   }
 
+  // Mirrors the expected list of rbed's own test
+  // examples.HvacShortCyclingExample#detectsShortCyclesAndQuickRestarts; change both together.
   @Test
   void buildingServicesAtDefaultsYieldTheHvacShortCyclingExamplesEvents() {
     Map<String, Object> result = run("building-services", "{}");
@@ -155,6 +165,8 @@ class BridgeTest {
     assertEquals(Arrays.asList(null, null, "short cycle", null, null), notes(result));
   }
 
+  // Mirrors the expected list of rbed's own test
+  // examples.VitalSignsExample#detectsCombinedAlarmsAndHandlesSensorDropout; change both together.
   @Test
   void healthcareAtDefaultsYieldsTheVitalSignsExamplesEvents() {
     assertEquals(List.of(
@@ -166,6 +178,8 @@ class BridgeTest {
         describe(run("healthcare", "{}"), 1000));
   }
 
+  // Mirrors the expected list of rbed's own test
+  // examples.FleetTelematicsExample#detectsTripsHarshBrakingAndIdling; change both together.
   @Test
   void automotiveAtDefaultsYieldsTheFleetTelematicsExamplesEvents() {
     Map<String, Object> result = run("automotive", "{}");
@@ -179,6 +193,8 @@ class BridgeTest {
     assertEquals(Arrays.asList(null, null, "11.94 km", null), notes(result));
   }
 
+  // Mirrors the expected list of rbed's own test
+  // examples.TradingSignalsExample#detectsMovingAverageCrosses; change both together.
   @Test
   void financeAtDefaultsYieldsTheTradingSignalsExamplesEvents() {
     // the example finds the golden cross by brute force over the two averages: day 366
@@ -198,6 +214,8 @@ class BridgeTest {
         describe(run("environment", "{\"gapMinutes\": 15}"), 3_600_000));
   }
 
+  // Mirrors the expected list of rbed's own test
+  // examples.ColdChainExample#detectsExcursionsAndTheirCause; change both together.
   @Test
   void logisticsAtDefaultsYieldsTheColdChainExamplesEvents() {
     assertEquals(List.of(
@@ -209,6 +227,8 @@ class BridgeTest {
         describe(run("logistics", "{}"), 60_000));
   }
 
+  // Mirrors the expected list of rbed's own test
+  // examples.FloodWarningExample#warnsWhileRisingAndLiftsWithHysteresis; change both together.
   @Test
   void environmentAtDefaultsYieldsTheFloodWarningExamplesEvents() {
     assertEquals(List.of("Receding 12.25..26", "FloodWarning 5.25..31.25"),
@@ -216,6 +236,8 @@ class BridgeTest {
   }
 
   /** IntervalTrainingExample's Events, and its listener's recovery times as notes. */
+  // Mirrors the expected list of rbed's own test
+  // examples.IntervalTrainingExample#detectsRepsAndRecoveryTimes; change both together.
   @Test
   void sportsAtDefaultsYieldsTheIntervalTrainingExamplesEvents() {
     Map<String, Object> result = run("sports", "{}");
@@ -228,6 +250,8 @@ class BridgeTest {
     assertEquals(Arrays.asList(null, "51 s", null, "51 s", null, "51 s", null), notes(result));
   }
 
+  // Mirrors the expected list of rbed's own test
+  // examples.DeploymentRegressionExample#attributesErrorSpikesToDeployments; change both together.
   @Test
   void itOperationsAtDefaultsYieldsTheDeploymentRegressionExamplesEvents() {
     assertEquals(List.of(
@@ -645,6 +669,30 @@ class BridgeTest {
   }
 
   @Test
+  @SuppressWarnings("unchecked")
+  void silentSensorsPlotsTheAgeOfTheHeartRateAtEverySampleAndEveryAdvance() {
+    Map<String, Object> plot = (Map<String, Object>) run("silent-sensors", "{}").get("expression");
+    assertEquals("hr.age()", plot.get("name"));
+    assertEquals("s", plot.get("unit"));
+    assertEquals(5.0, plot.get("threshold"));
+    List<Double> values = (List<Double>) plot.get("values");
+    assertEquals(41, values.size());
+    assertTrue(values.stream().allMatch(v -> v == 0.0), "every Sample reports hr: " + values);
+    List<Double> atAdvances = new ArrayList<>();
+    for (int s = 1; s <= 20; s++) atAdvances.add((double) s);   // the last Sample was at 24 s
+    assertEquals(atAdvances, plot.get("atAdvances"));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void withoutTheTimerTheAgeIsOnlyReadAtSamples() {
+    Map<String, Object> plot =
+        (Map<String, Object>) run("silent-sensors", "{\"timer\": 1}").get("expression");
+    assertTrue(((List<Double>) plot.get("values")).stream().allMatch(v -> v == 0.0));
+    assertFalse(plot.containsKey("atAdvances"));
+  }
+
+  @Test
   void withoutAdvancesTheSilenceGoesUnnoticed() {
     Map<String, Object> result = run("silent-sensors", "{\"timer\": 1}");
     assertEquals(List.of("HighHeartRate 12000..45000"), events(result));
@@ -655,6 +703,38 @@ class BridgeTest {
   void aLongerSilenceLimitNoticesTheSilenceLater() {
     assertEquals(List.of("HighHeartRate 12000..35000", "SensorLost 35000..45000"),
         events(run("silent-sensors", "{\"limit\": 10}")));
+  }
+
+  @Test
+  void validationAtDefaultsFindsTheWarmSpellAndTheHotPartOfIt() {
+    assertEquals(List.of("Hot 14000..30000", "Warm 12000..32000"), events(run("validation", "{}")));
+  }
+
+  @Test
+  void anAverageOverMoreSamplesThanTheRetentionLimitIsRejectedByBuild() {
+    assertEquals(Map.of("error", "Rule Warm: averageOverSamples(12) exceeds the Retention Limit of"
+            + " 10. Raise it with Detector.builder().retentionLimit(...)."),
+        run("validation", "{\"window\": 12}"));
+    assertEquals(List.of("Hot 14000..30000", "Warm 12000..32000"),
+        events(run("validation", "{\"window\": 5, \"retention\": 5}")));
+  }
+
+  @Test
+  void aRetentionLimitBelowOneIsRejected() {
+    assertEquals(Map.of("error", "Retention Limit must be >= 1: 0"),
+        run("validation", "{\"retention\": 0}"));
+  }
+
+  @Test
+  void aNegativeDurationIsRejected() {
+    assertEquals(Map.of("error", "forDuration must be >= 0: -1000"),
+        run("validation", "{\"duration\": -1}"));
+  }
+
+  @Test
+  void aRuleAddedBeforeTheRuleItRefersToIsRejectedByBuild() {
+    assertEquals(Map.of("error", "Rule Hot references Warm, which is not added before it"),
+        run("validation", "{\"order\": 1}"));
   }
 
   static final long DAY = 86_400_000;
@@ -748,6 +828,18 @@ class BridgeTest {
   void movingAverageOverADurationIsUndefinedUntilItsValuesSpanTheWindow() {
     assertEquals(10, warmUp(run("expressions", "{\"expression\": 2}")));
     assertEquals(5, warmUp(run("expressions", "{\"expression\": 2, \"window\": 5}")));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void thePlottedDifferenceIsExactlyTheDoubleSubtractionGives() {
+    Map<String, Object> result = run("expressions", "{\"expression\": 3}");
+    List<Double> values = expressionValues(result);
+    List<Map<String, Object>> samples = (List<Map<String, Object>>) result.get("samples");
+    for (int i = 5; i < samples.size(); i++) {
+      Map<String, Double> sample = (Map<String, Double>) samples.get(i).get("values");
+      assertEquals(sample.get("temp") - sample.get("ambient"), values.get(i), 0.0, "at " + i);
+    }
   }
 
   @Test
