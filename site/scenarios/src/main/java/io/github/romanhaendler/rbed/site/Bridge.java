@@ -231,7 +231,8 @@ public final class Bridge {
           .append(",\"truncatedStart\":").append(e.truncatedStart())
           .append(",\"truncatedEnd\":").append(e.truncatedEnd());
       aggregates(out.append(",\"aggregates\":"), scenario, e);
-      String note = scenario.note(e, values);
+      String note = lifecycle.noteOf(e);
+      if (note == null) note = scenario.note(e, values);
       if (note != null) Json.string(out.append(",\"note\":"), note);
       out.append('}');
     }

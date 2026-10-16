@@ -5,7 +5,9 @@ import io.github.romanhaendler.rbed.Event;
 import io.github.romanhaendler.rbed.EventListener;
 import io.github.romanhaendler.rbed.Sample;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The listener the bridge registers, recording the callbacks the test Recorder records. An Ended
@@ -23,6 +25,18 @@ final class Lifecycle implements EventListener {
   final List<Long> advances = new ArrayList<>();
   /** The timestamp of the first Sample after the Detector was restarted, or null. */
   Long restart;
+  /** Notes a Scenario's listener made of Events during this run, by Event name and start. */
+  private final Map<String, String> notes = new HashMap<>();
+
+  /** Records what the Scenario's listener made of an Event, for the Event table's Note. */
+  void note(Event event, String note) {
+    notes.put(event.name() + " " + event.start(), note);
+  }
+
+  /** The note recorded for the Event (by its name and start), or null. */
+  String noteOf(Event event) {
+    return notes.get(event.name() + " " + event.start());
+  }
 
   /** Pushes the Sample to the Detector, keeping {@code now}. */
   void push(Detector detector, Sample sample) {

@@ -68,7 +68,9 @@ abstract class Scenario {
 
   /**
    * What the Scenario's listener makes of an Event at the given parameter values, such as the
-   * class of a lifted load; or null.
+   * class of a lifted load; or null. A listener that needs more than the Event (the end of an
+   * earlier one) notes it on the {@link Lifecycle} during {@code detect} instead, so the note
+   * travels with the run and the Scenario keeps no state.
    */
   String note(Event event, Map<String, Double> values) {
     return null;
