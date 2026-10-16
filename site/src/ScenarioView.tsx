@@ -8,7 +8,16 @@
 import { Alert } from '@umriss-ui/core';
 import { useMemo, useRef, useState } from 'react';
 import { run, type Scenario, source } from './bridge';
-import { type ChannelAxis, type ChartModel, channelAxisOf, EXPRESSION, expressionRows, type Row } from './chartModel.ts';
+import {
+  type ChannelAxis,
+  type ChartModel,
+  channelAxisOf,
+  EXPRESSION,
+  expressionRows,
+  type Row,
+  timeDomain,
+  undefinedStretches,
+} from './chartModel.ts';
 import { CodeBlock } from './CodeBlock';
 import { drawnSource, drawTo } from './draw.ts';
 import { DrawLayer } from './DrawLayer';
@@ -91,10 +100,14 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
             select={select}
           />
           {pen !== '' && (
-            <DrawLayer x={[times[0], times[times.length - 1]]} channelAxis={channelAxis} draw={drawPoint} end={() => setFrozen(undefined)} />
+            <DrawLayer x={timeDomain(rows)} channelAxis={channelAxis} draw={drawPoint} end={() => setFrozen(undefined)} />
           )}
         </div>
-        <LifecycleKey advances={result.advances.length > 0} restart={result.restart !== undefined} />
+        <LifecycleKey
+          advances={result.advances.length > 0}
+          restart={result.restart !== undefined}
+          undefinedExpression={undefinedStretches(plotted).length > 0}
+        />
         <EventSummary
           scenario={scenario}
           lifecycle={result}

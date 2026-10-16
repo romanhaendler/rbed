@@ -31,6 +31,8 @@ import {
   SEPARATE_UNITS,
   TRUNCATED,
   truncatedEdges,
+  timeDomain,
+  UNDEFINED_COLOR,
   undefinedStretches,
 } from './chartModel.ts';
 import { eventKey, ofRule } from './events.ts';
@@ -117,7 +119,7 @@ export function EventChart({
       height={separate ? 380 : 300}
       ariaLabel={`${scenario.channels.join(', ')} over time in ${unit}, with the Events of ${scenario.rules.join(', ')} as bands, Pending then Confirmed, and their lifecycle marked`}
     >
-      <XAxis value="t" domain={[rows[0].t, rows[rows.length - 1].t]} label={`Time (${unit})`} />
+      <XAxis value="t" domain={timeDomain(rows)} label={`Time (${unit})`} />
       <YAxis domain={channelAxis.domain} ticks={channelAxis.ticks} label={channels.join(', ')} />
       {separate && separateAxis && <YAxis id="separate" grid={false} domain={separateAxis.domain} ticks={separateAxis.ticks} />}
       {/* Lane i (first Rule on top) spans lanes - i - 1 .. lanes - i. The lane names change with
@@ -132,7 +134,8 @@ export function EventChart({
       />
       {expression &&
         undefinedStretches(expressionRows).map(([from, to]) => (
-          <LimitBand key={from} orientation="x" from={from} to={to} color="var(--u-color-text-muted)" label="undefined" />
+          // No label: on the x axis it would cover a tick on a phone; the key names it.
+          <LimitBand key={from} orientation="x" from={from} to={to} color={UNDEFINED_COLOR} />
         ))}
       {onChannels && <LimitLine value={onChannels.threshold} label={`threshold ${onChannels.threshold}`} />}
       {separate && <LimitLine axisId="separate" value={separate.threshold} label={`threshold ${separate.threshold} ${separate.unit}`} />}
@@ -203,7 +206,7 @@ export function EventChart({
 }
 
 /** What the bands' colors and the marks mean; the text alternative says it in words. */
-export function LifecycleKey({ advances, restart }: { advances: boolean; restart: boolean }) {
+export function LifecycleKey({ advances, restart, undefinedExpression }: { advances: boolean; restart: boolean; undefinedExpression: boolean }) {
   const item = (label: string, color: string, mark: boolean) => (
     <span key={label}>
       <span className={mark ? 'swatch mark' : 'swatch'} style={{ background: color }} />
@@ -221,6 +224,7 @@ export function LifecycleKey({ advances, restart }: { advances: boolean; restart
         Truncated start or end
       </span>
       {advances && item('Time advance', ADVANCE_COLOR, true)}
+      {undefinedExpression && item('Expression undefined', `color-mix(in srgb, ${UNDEFINED_COLOR} 30%, transparent)`, false)}
       {restart && (
         <span>
           <span className="swatch line" style={{ borderColor: RESTART_COLOR }} />

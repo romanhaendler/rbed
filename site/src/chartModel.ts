@@ -100,6 +100,18 @@ export function bandAxis(rows: Row[], channels: string[], also: number[], below:
 }
 export type ChannelAxis = ReturnType<typeof bandAxis>;
 
+/** The time axis' domain: the Samples' span with a little room at both ends, so a mark at the
+    first or last Sample does not reach into the axes' labels. */
+export function timeDomain(rows: Row[]): [number, number] {
+  const first = rows[0].t;
+  const last = rows[rows.length - 1].t;
+  const room = (last - first) * 0.04;
+  return [first - room, last + room];
+}
+
+/** Where the plotted Expression is undefined, shaded; the key names it. */
+export const UNDEFINED_COLOR = 'var(--u-color-text-muted)';
+
 /** A Rule's Events as StateBand rows: Pending from the start, Confirmed from then on, a hole after
     the end; a Discarded Pending Event is Pending until it was Discarded. */
 export function bandRows(lifecycle: Lifecycle, millis: number): BandRow[] {
