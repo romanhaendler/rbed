@@ -36,6 +36,8 @@ public final class Detector implements AutoCloseable {
   private long lastSample;
   private long samples;
   private boolean closed;
+  /** Entries held by moving-average windows and count timestamps; see {@link #retainedValues}. */
+  long retained;
   private List<Event> collected;
   /** Timestamp of the Sample being applied by {@link #applyValue}. */
   private long sampleTimestamp;
@@ -45,7 +47,10 @@ public final class Detector implements AutoCloseable {
    */
   private final BiConsumer<Channel, Double> validateValue = Detector::validate;
   private final BiConsumer<Channel, Double> applyValue =
-      (channel, value) -> state(channel).update(sampleTimestamp, value);
+      (channel, value) -> {
+        ChannelState state = channels.get(channel);
+        if (state != null) state.update(sampleTimestamp, value); // unused Channels are ignored
+      };
 
   /**
    * While binding Rules: the Rule being bound, the names of all Rules and of those bound before
@@ -92,6 +97,15 @@ public final class Detector implements AutoCloseable {
       latestEnd = Math.max(latestEnd, e.end().getAsLong());
     }
     return latestEnd;
+  }
+
+  /**
+   * The number of entries this Detector currently holds: one per Channel a Rule uses, one per
+   * value in each moving-average window and one per timestamp kept for
+   * {@code count(...).within(...)}. A plain counter read, cheap to poll between pushes.
+   */
+  public long retainedValues() {
+    return channels.size() + retained;
   }
 
   public static Builder builder() {
@@ -228,7 +242,7 @@ public final class Detector implements AutoCloseable {
     listener.onEnded(event);
   }
 
-  /** A Channel's state, created when first referenced or pushed. */
+  /** A Channel's state, created when first referenced by a Rule. */
   private ChannelState state(Channel channel) {
     ChannelState state = channels.get(channel);
     if (state == null) {
@@ -274,7 +288,7 @@ public final class Detector implements AutoCloseable {
   EventState event(String name) {
     EventState state = events.get(name);
     if (state == null) {
-      state = new EventState();
+      state = new EventState(this);
       events.put(name, state);
     }
     return state;

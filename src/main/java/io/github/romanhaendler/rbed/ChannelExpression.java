@@ -1,7 +1,7 @@
 package io.github.romanhaendler.rbed;
 
 import java.time.Duration;
-import java.util.function.Supplier;
+import java.util.function.Function;
 
 /**
  * The current value of a Channel, or of a moving average derived from one, plus Expressions over
@@ -63,7 +63,7 @@ public abstract class ChannelExpression extends Expression {
   /** Mean of the last {@code n} values; undefined until {@code n} values exist. */
   public ChannelExpression averageOverSamples(int n) {
     if (n < 1) throw new IllegalArgumentException("averageOverSamples needs n >= 1: " + n);
-    return average(() -> new Window.OverSamples(n));
+    return average(d -> new Window.OverSamples(d, n));
   }
 
   /**
@@ -72,7 +72,7 @@ public abstract class ChannelExpression extends Expression {
    */
   public ChannelExpression averageOverDuration(long millis) {
     if (millis < 0) throw new IllegalArgumentException("averageOverDuration must be >= 0");
-    return average(() -> new Window.OverDuration(millis));
+    return average(d -> new Window.OverDuration(d, millis));
   }
 
   /** See {@link #averageOverDuration(long)}. */
@@ -92,11 +92,11 @@ public abstract class ChannelExpression extends Expression {
   }
 
   /** Each binding gets its own window, fed with every value of the source from the start. */
-  private ChannelExpression average(Supplier<Window> newWindow) {
+  private ChannelExpression average(Function<Detector, Window> newWindow) {
     ChannelExpression source = this;
     return new ChannelExpression() {
       @Override ValueTrack track(Detector detector) {
-        return source.track(detector).average(newWindow.get());
+        return source.track(detector).average(newWindow.apply(detector));
       }
     };
   }

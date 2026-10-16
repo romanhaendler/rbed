@@ -2,7 +2,7 @@ package io.github.romanhaendler.rbed;
 
 /** One Channel inside one Detector. */
 final class ChannelState extends ValueTrack {
-  /** The Channel as first referenced by a Rule or, if no Rule uses it, as first pushed. */
+  /** The Channel as first referenced by a Rule. */
   final Channel channel;
   /** Whether the Sample being applied carried this Channel; only maintained for pulses. */
   boolean carried;

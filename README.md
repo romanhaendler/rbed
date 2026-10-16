@@ -694,6 +694,20 @@ A running Event keeps Aggregates only for the Channels its Rule uses (plus those
 
 The performance tests are excluded from the default build because timings depend on the machine. The allocation checks among them are deterministic.
 
+## Memory
+
+Values of Channels that no Rule uses are ignored and leave no trace. What a Detector holds is known from its Rules:
+
+| Feature                         | Retains                                       |
+| ------------------------------- | --------------------------------------------- |
+| Channel used by a Rule          | 1 value                                       |
+| `averageOverSamples(n)`         | n values                                      |
+| `averageOverDuration(w)`        | every value within the window `w`             |
+| `count(...).within(w)`          | one timestamp per Confirmed Event within `w`  |
+| everything else                 | constant per Rule                             |
+
+`detector.retainedValues()` returns the number of entries currently held (Channels, moving-average values and count timestamps). It is a plain counter read, so it is cheap to poll, for example as a metrics gauge.
+
 ## Notes
 
 - A Detector is single-use and not thread-safe. Use one per data stream, and feed it from one thread at a time.

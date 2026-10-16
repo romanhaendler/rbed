@@ -2,9 +2,14 @@ package io.github.romanhaendler.rbed;
 
 /** Ascending timestamps in a growable ring buffer; old ones are dropped from the front. */
 final class Timestamps {
+  private final Detector detector;
   private long[] times = new long[16];
   private int head;
   private int size;
+
+  Timestamps(Detector detector) {
+    this.detector = detector;
+  }
 
   void add(long t) {
     if (size == times.length) {
@@ -15,6 +20,7 @@ final class Timestamps {
     }
     times[(head + size) % times.length] = t;
     size++;
+    detector.retained++;
   }
 
   /** Drops timestamps more than {@code window} before {@code now}. */
@@ -22,6 +28,7 @@ final class Timestamps {
     while (size > 0 && now - times[head] > window) {
       head = (head + 1) % times.length;
       size--;
+      detector.retained--;
     }
   }
 

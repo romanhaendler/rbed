@@ -8,6 +8,12 @@ package io.github.romanhaendler.rbed;
  * streams. Both keep the amortized cost per value constant.
  */
 abstract class Window {
+  final Detector detector;
+
+  Window(Detector detector) {
+    this.detector = detector;
+  }
+
   abstract void add(long time, double value);
 
   /** The mean of the window, or NaN while it is warming up. */
@@ -21,7 +27,8 @@ abstract class Window {
     private int evictedSinceExactSum;
     private final CompensatedSum sum = new CompensatedSum();
 
-    OverSamples(int n) {
+    OverSamples(Detector detector, int n) {
+      super(detector);
       values = new double[n];
     }
 
@@ -32,6 +39,7 @@ abstract class Window {
         evictedSinceExactSum++;
       } else {
         size++;
+        detector.retained++;
       }
       values[next] = value;
       sum.add(value);
@@ -61,7 +69,8 @@ abstract class Window {
     private boolean started;
     private long first;
 
-    OverDuration(long millis) {
+    OverDuration(Detector detector, long millis) {
+      super(detector);
       this.millis = millis;
     }
 
@@ -76,11 +85,13 @@ abstract class Window {
       times[tail] = time;
       values[tail] = value;
       size++;
+      detector.retained++;
       sum.add(value);
       while (time - times[head] > millis) {
         sum.add(-values[head]);
         head = (head + 1) % times.length;
         size--;
+        detector.retained--;
         evictedSinceExactSum++;
       }
       if (evictedSinceExactSum >= size) {

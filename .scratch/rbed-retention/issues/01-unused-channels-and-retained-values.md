@@ -4,11 +4,11 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Pushing many Samples, each with a fresh unused Channel name, leaves `retainedValues()` unchanged
-- [ ] An invalid value of an unused Channel is still rejected, and the rejected Sample leaves no trace
-- [ ] Channels used only through `.aggregate(...)` or `latest(...)` still work as before
-- [ ] `retainedValues()` grows with a filling `averageOverDuration` window and shrinks as values leave it by time; it counts `averageOverSamples(n)` and `count(...).within(...)` timestamps
-- [ ] Existing tests pass unchanged; the steady-state allocation checks still allocate nothing per Sample
-- [ ] README "Memory" subsection lists what each feature retains and documents `retainedValues()`
+- [x] Pushing many Samples, each with a fresh unused Channel name, leaves `retainedValues()` unchanged
+- [x] An invalid value of an unused Channel is still rejected, and the rejected Sample leaves no trace
+- [x] Channels used only through `.aggregate(...)` or `latest(...)` still work as before
+- [x] `retainedValues()` grows with a filling `averageOverDuration` window and shrinks as values leave it by time; it counts `averageOverSamples(n)` and `count(...).within(...)` timestamps
+- [x] Existing tests pass unchanged; the steady-state allocation checks still allocate nothing per Sample
+- [x] README "Memory" subsection lists what each feature retains and documents `retainedValues()`
