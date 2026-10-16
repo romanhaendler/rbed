@@ -95,8 +95,8 @@ final class EventState {
     hasBeenConfirmed = true;
     count++;
     if (confirmations != null) {
-      confirmations.add(timestamp);
       confirmations.dropOlderThan(timestamp, countWindow); // bounded even if never evaluated
+      confirmations.add(timestamp);
     }
   }
 }

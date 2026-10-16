@@ -152,4 +152,76 @@ class RetentionTest {
     assertThrows(IllegalArgumentException.class, () -> Detector.builder().retentionLimit(0));
     assertThrows(IllegalArgumentException.class, () -> Detector.builder().retentionLimit(-5));
   }
+
+  // Retention Limit on Event counts
+
+  private static Detector runs(int limit, int runs, List<Event> history) {
+    Rule run = Rule.named("Run").when(X.above(0));
+    Detector d = Detector.builder().retentionLimit(limit).history(history)
+        .rules(run, Rule.named("Many").when(count(run).within(1000).above(2))).build();
+    for (int i = 0; i < runs; i++) {
+      d.push(2 * i, Map.of(X, 1.0));
+      d.push(2 * i + 1, Map.of(X, 0.0));
+    }
+    return d;
+  }
+
+  @Test
+  void countWithinIsCappedAtTheLimitAndCountsDrops() {
+    Detector d = runs(3, 10, List.of());
+    assertEquals(1 + 3, d.retainedValues()); // x plus three timestamps
+    assertEquals(7, d.droppedValues());
+  }
+
+  @Test
+  void countAboveTheLimitIsNeverReached() {
+    Recorder rec = new Recorder();
+    Rule run = Rule.named("Run").when(X.above(0));
+    Detector d = Detector.builder().retentionLimit(3).listener(rec)
+        .rules(run, Rule.named("Four").when(count(run).within(1000).above(3))).build();
+    for (int i = 0; i < 10; i++) {
+      d.push(2 * i, Map.of(X, 1.0));
+      d.push(2 * i + 1, Map.of(X, 0.0));
+    }
+    assertTrue(rec.log.stream().noneMatch(l -> l.contains("Four")), rec.log.toString());
+  }
+
+  @Test
+  void historyBeyondTheLimitIsDroppedAndCounted() {
+    List<Event> history = new ArrayList<>();
+    for (int i = 0; i < 5; i++) {
+      long t = -100 + 10 * i;
+      history.add(new Event("Run", t, java.util.OptionalLong.of(t), java.util.OptionalLong.of(t + 1),
+          false, false, Map.of()));
+    }
+    Detector d = runs(3, 0, history);
+    assertEquals(2, d.droppedValues());
+    assertEquals(1 + 3, d.retainedValues());
+  }
+
+  @Test
+  void countDropWarnsOnceNamingTheRuleUsingTheCount() {
+    java.util.logging.Logger logger = java.util.logging.Logger.getLogger("io.github.romanhaendler.rbed");
+    List<java.util.logging.LogRecord> records = new ArrayList<>();
+    java.util.logging.Handler handler = new java.util.logging.Handler() {
+      @Override public void publish(java.util.logging.LogRecord r) { records.add(r); }
+      @Override public void flush() {}
+      @Override public void close() {}
+    };
+    logger.addHandler(handler);
+    try {
+      runs(3, 10, List.of());
+    } finally {
+      logger.removeHandler(handler);
+    }
+    assertEquals(1, records.size());
+    assertTrue(records.get(0).getMessage().contains("Many"), records.get(0).getMessage());
+  }
+
+  @Test
+  void countBelowTheLimitIsUnchanged() {
+    Detector d = runs(1000, 10, List.of());
+    assertEquals(0, d.droppedValues());
+    assertEquals(1 + 10, d.retainedValues());
+  }
 }

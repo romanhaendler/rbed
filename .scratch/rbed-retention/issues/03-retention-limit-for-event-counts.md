@@ -4,9 +4,9 @@
 
 **Blocked by:** 02 (Retention Limit for duration windows)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] With a small limit and more Confirmed Events in the window than the limit, `count(...).within(...)` yields the limit and `droppedValues()` reports the drops
-- [ ] History with more Events in the window than the limit is dropped to the limit and counted as drops
-- [ ] The warning names the Rule that uses the count and is still logged only once per Detector
-- [ ] Below the limit, counts and Events are identical to before
+- [x] With a small limit and more Confirmed Events in the window than the limit, `count(...).within(...)` yields the limit and `droppedValues()` reports the drops
+- [x] History with more Events in the window than the limit is dropped to the limit and counted as drops
+- [x] The warning names the Rule that uses the count and is still logged only once per Detector
+- [x] Below the limit, counts and Events are identical to before
