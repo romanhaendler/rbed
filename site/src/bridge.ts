@@ -49,5 +49,7 @@ export function run(scenarioId: string, parameters: Record<string, number>): Res
 
 /** The source with each placeholder replaced by its parameter's value. */
 export function source(scenario: Scenario, parameters: Record<string, number>): string {
-  return scenario.source.replace(/\$\{(\w+)\}/g, (_, id: string) => String(parameters[id]));
+  return scenario.source.replace(/\$\{(\w+)\}/g, (_, id: string) =>
+    Number.isNaN(parameters[id]) ? 'Double.NaN' : String(parameters[id]),
+  );
 }
