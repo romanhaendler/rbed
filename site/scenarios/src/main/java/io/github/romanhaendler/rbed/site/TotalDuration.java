@@ -60,4 +60,9 @@ final class TotalDuration extends Scenario {
     return new Plot("totalDuration(excursion)",
         totalDuration(rules(values)[0]).dividedBy(MINUTE), values.get("limit"), "min");
   }
+
+  @Override
+  List<Threshold> thresholds(Map<String, Double> values) {
+    return List.of(new Threshold(TEMP, "Excursion", "when >", 8));
+  }
 }

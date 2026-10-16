@@ -87,4 +87,9 @@ final class SamplingRate extends Scenario {
     for (Sample sample : samples) lifecycle.pushValues(detector, sample);
     detector.close();
   }
+
+  @Override
+  List<Threshold> thresholds(Map<String, Double> values) {
+    return List.of(new Threshold(ACCEL, "Vibration", "when >", 3));
+  }
 }

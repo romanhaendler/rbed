@@ -9,7 +9,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { aggregatesText, discardedCells, discardedHead, eventCells, eventHead, hasNotes } from './src/events.ts';
+import { aggregatesText, discardedCells, discardedHead, eventCells, eventHead, hasNotes, inStartOrder } from './src/events.ts';
 import { escape, parse, SCENARIO_MARKER } from './src/markdown.ts';
 import { markdownFile, PAGES, REPOSITORY, RUBRICS, rubricOf, titleOf } from './src/pages.ts';
 import { defaultsOf, fillSource } from './src/parameters.ts';
@@ -204,7 +204,7 @@ export async function prerender(dist, version) {
         source: fillSource(s.source, s.parameters, defaultsOf(s.parameters)).trimEnd(),
         unit: s.timeUnit.name,
         millis: s.timeUnit.millis,
-        result: JSON.parse(bridge.run(s.id, '{}', '{}')),
+        result: inStartOrder(JSON.parse(bridge.run(s.id, '{}', '{}'))),
       },
     ]),
   );

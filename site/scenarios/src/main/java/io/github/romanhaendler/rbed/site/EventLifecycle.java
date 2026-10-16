@@ -61,4 +61,9 @@ final class EventLifecycle extends Scenario {
           .forDuration(Math.round(values.get("duration") * 1_000))
     };
   }
+
+  @Override
+  List<Threshold> thresholds(Map<String, Double> values) {
+    return List.of(new Threshold(TEMP, "Overheat", "when >", 80));
+  }
 }

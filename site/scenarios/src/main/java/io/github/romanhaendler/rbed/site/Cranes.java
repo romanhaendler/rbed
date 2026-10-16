@@ -98,4 +98,11 @@ final class Cranes extends Scenario {
     if (!event.name().equals("LoadLifted")) return null;
     return event.aggregates(WEIGHT).mean() < 1500 ? "pallet" : "container";
   }
+
+  @Override
+  List<Threshold> thresholds(Map<String, Double> values) {
+    return List.of(new Threshold(WEIGHT, "LoadLifted", "when >", values.get("lift")),
+        new Threshold(WEIGHT, "LoadLifted", "endWhen <", 50),
+        new Threshold(WEIGHT, "Overload", "when > ratedLoad", 5000));
+  }
 }

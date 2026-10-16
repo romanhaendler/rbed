@@ -34,7 +34,8 @@ export function inline(text: string): string {
   for (const m of text.matchAll(INLINE)) {
     html += escape(text.slice(last, m.index));
     if (m[1] !== undefined) html += `<code>${escape(m[1])}</code>`;
-    else if (m[2] !== undefined) html += `<a href="${escape(m[3])}">${inline(m[2])}</a>`;
+    // Only web, mail and relative links; any other scheme (javascript:, data:) is its text only.
+    else if (m[2] !== undefined) html += /^(https?:|mailto:|[^:]*$)/.test(m[3]) ? `<a href="${escape(m[3])}">${inline(m[2])}</a>` : inline(m[2]);
     else if (m[4] !== undefined) html += `<strong>${inline(m[4])}</strong>`;
     else html += `<em>${inline(m[5])}</em>`;
     last = m.index + m[0].length;

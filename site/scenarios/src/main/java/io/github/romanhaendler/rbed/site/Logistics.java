@@ -73,4 +73,14 @@ final class Logistics extends Scenario {
         .when(totalDuration(excursion).above(values.get("totalMinutes") * MINUTE));
     return new Rule[] {excursion, doorOpen, excursionAfterDoor, cumulativeLimit};
   }
+
+  @Override
+  List<Threshold> thresholds(Map<String, Double> values) {
+    return List.of(new Threshold(TEMP, "Excursion, ExcursionAfterDoor", "when >", values.get("limit")));
+  }
+
+  @Override
+  List<Window> windows(Map<String, Double> values) {
+    return List.of(new Window("DoorOpen", Math.round(values.get("doorMinutes") * MINUTE)));
+  }
 }

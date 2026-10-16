@@ -63,4 +63,10 @@ final class Latest extends Scenario {
             .and(WEIGHT.below(latest(loadLifted).max(WEIGHT).times(values.get("fraction")))));
     return new Rule[] {loadLifted, partialSetDown};
   }
+
+  @Override
+  List<Threshold> thresholds(Map<String, Double> values) {
+    return List.of(new Threshold(WEIGHT, "LoadLifted", "when >", 500),
+        new Threshold(WEIGHT, "LoadLifted", "endWhen <", 50));
+  }
 }

@@ -123,4 +123,16 @@ final class Sports extends Scenario {
     for (Sample sample : samples) lifecycle.push(detector, sample);
     detector.close();
   }
+
+  @Override
+  List<Threshold> thresholds(Map<String, Double> values) {
+    return List.of(new Threshold(SPEED, "Sprint", "when >", values.get("sprint")),
+        new Threshold(SPEED, "Sprint", "endWhen <", 4),
+        new Threshold(HR, "Recovered", "when <", values.get("recoveredHr")));
+  }
+
+  @Override
+  List<Window> windows(Map<String, Double> values) {
+    return List.of(new Window("Sprint", Math.round(values.get("recoveryMinutes") * 60 * SECOND)));
+  }
 }

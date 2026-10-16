@@ -72,4 +72,9 @@ final class Validation extends Scenario {
     for (Sample sample : samples) lifecycle.push(detector, sample);
     detector.close();
   }
+
+  @Override
+  List<Threshold> thresholds(Map<String, Double> values) {
+    return List.of(new Threshold(TEMP, "Hot", "when >", 27));
+  }
 }

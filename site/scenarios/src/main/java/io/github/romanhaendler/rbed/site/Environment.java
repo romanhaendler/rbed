@@ -71,4 +71,10 @@ final class Environment extends Scenario {
         .when(LEVEL.falling().and(LEVEL.above(warning)));
     return new Rule[] {floodWarning, receding};
   }
+
+  @Override
+  List<Threshold> thresholds(Map<String, Double> values) {
+    return List.of(new Threshold(LEVEL, "FloodWarning, Receding", "when >", values.get("warning")),
+        new Threshold(LEVEL, "FloodWarning", "endWhen <", values.get("lift")));
+  }
 }

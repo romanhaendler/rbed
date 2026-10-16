@@ -1,11 +1,12 @@
 // A code block with a copy button, after the umriss-ui demo's CodeBlock and CopyButton (MIT).
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { javaTokens } from './java';
 
 type CopyState = 'settle' | 'copied' | 'failed';
 
-/** Copies `text`; says "Copied" or "Failed" on itself for 1.6 s and never throws into the page. */
-export function CopyButton({ text }: { text: string }) {
+/** Copies `text`, or the text it fetches; says "Copied" or "Failed" on itself for 1.6 s and
+    never throws into the page. */
+export function CopyButton({ text, label = 'Copy' }: { text: string | (() => Promise<string>); label?: string }) {
   const [state, setState] = useState<CopyState>('settle');
 
   useEffect(() => {
@@ -16,7 +17,9 @@ export function CopyButton({ text }: { text: string }) {
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(text);
+      if (typeof text === 'string') await navigator.clipboard.writeText(text);
+      // Handed the fetch as it runs, so the click still counts as the reader's (Safari).
+      else await navigator.clipboard.write([new ClipboardItem({ 'text/plain': text().then((t) => new Blob([t], { type: 'text/plain' })) })]);
       setState('copied');
     } catch {
       setState('failed');
@@ -25,20 +28,34 @@ export function CopyButton({ text }: { text: string }) {
 
   return (
     <button type="button" className="codeCopy" onClick={() => void copy()} data-state={state}>
-      {state === 'settle' ? 'Copy' : state === 'copied' ? 'Copied' : 'Failed'}
+      {state === 'settle' ? label : state === 'copied' ? 'Copied' : 'Failed'}
     </button>
   );
 }
 
-export function CodeBlock({ language, source }: { language: string; source: string }) {
+/** `language` picks the highlighting; `label` is what the bar says (the language if none). */
+export function CodeBlock({ language, label = language, source }: { language: string; label?: string; source: string }) {
+  // A line that runs past the edge fades out there, until the reader has scrolled to its end.
+  const pre = useRef<HTMLPreElement>(null);
+  const [cut, setCut] = useState(false);
+  const measure = () => {
+    const p = pre.current;
+    if (p) setCut(p.scrollLeft + p.clientWidth < p.scrollWidth - 1);
+  };
+  useEffect(() => {
+    const observer = new ResizeObserver(measure);
+    observer.observe(pre.current!);
+    return () => observer.disconnect();
+  }, []);
+  useEffect(measure, [source]);
   return (
     <div className="codeBlock">
       <div className="codeBar">
-        <span className="codeLanguage">{language}</span>
+        <span className="codeLanguage">{label}</span>
         <CopyButton text={source} />
       </div>
       {/* A long line scrolls the block sideways, so the keyboard has to reach it too. */}
-      <pre className="code" tabIndex={0} aria-label={`${language} source`}>
+      <pre ref={pre} className="code" tabIndex={0} aria-label={`${label} source`} data-cut={cut || undefined} onScroll={measure}>
         <code>
           {language.toLowerCase() === 'java'
             ? javaTokens(source).map(([kind, text], i) =>

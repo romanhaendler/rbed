@@ -2,8 +2,8 @@
 // number as a slider), a reset, the Channel to draw (where the page allows it) and a toggle for
 // each Rule and Channel. And the address, which follows the parameter values.
 import { Button, Checkbox, FormField, RadioGroup, SegmentedControl, Slider } from '@umriss-ui/core';
-import { useEffect } from 'react';
-import type { Scenario } from './bridge';
+import { type CSSProperties, useEffect } from 'react';
+import type { Parameter, Scenario } from './bridge';
 import { channelColor, EVENT_COLOR } from './chartModel.ts';
 import { toQuery, usedParameters } from './parameters';
 
@@ -64,6 +64,10 @@ export function ScenarioControls({
         }
       />
     ));
+  const sliders = scenario.parameters.filter((p) => !p.options && used.includes(p.id));
+  const format = (p: Parameter) => (v: number) => `${v} ${p.unit}`;
+  // Every readout as wide as the widest, so the sliders' tracks line up.
+  const readout = Math.max(...sliders.flatMap((p) => [p.min, p.max, p.min + p.step].map((v) => format(p)(Number(v.toPrecision(12))).length)));
   return (
     <>
       <div className="configuratorHead">
@@ -85,9 +89,8 @@ export function ScenarioControls({
             </FormField>
           ),
       )}
-      {scenario.parameters
-        .filter((p) => !p.options && used.includes(p.id))
-        .map((p) => (
+      <div className="sliders" style={{ '--readout': `${readout}ch` } as CSSProperties}>
+        {sliders.map((p) => (
           <FormField key={p.id} label={p.label}>
             <Slider
               name={p.id}
@@ -96,11 +99,12 @@ export function ScenarioControls({
               step={p.step}
               value={parameters[p.id]}
               onChange={(v) => setParameters({ ...parameters, [p.id]: v })}
-              format={(v) => `${v} ${p.unit}`}
+              format={format(p)}
               showValue
             />
           </FormField>
         ))}
+      </div>
       {drawable.length > 0 && (
         <FormField
           label="Draw"

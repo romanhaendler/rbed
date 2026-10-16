@@ -63,4 +63,9 @@ final class AggregatesScenario extends Scenario {
       Rule.named("Drive").when(SPEED.above(values.get("threshold"))).aggregate(TEMP)
     };
   }
+
+  @Override
+  List<Threshold> thresholds(Map<String, Double> values) {
+    return List.of(new Threshold(SPEED, "Drive", "when >", values.get("threshold")));
+  }
 }

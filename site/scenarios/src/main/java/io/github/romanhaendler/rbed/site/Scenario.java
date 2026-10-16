@@ -85,6 +85,28 @@ abstract class Scenario {
     return null;
   }
 
+  /** Every Expression to plot for the given parameter values: by default the one of {@code plot}. */
+  List<Plot> plots(Map<String, Double> values) {
+    Plot plot = plot(values);
+    return plot == null ? List.of() : List.of(plot);
+  }
+
+  /**
+   * Where the Rules compare a Channel with a value, for the given parameter values; the chart
+   * draws each as a line on that Channel's axis.
+   */
+  List<Threshold> thresholds(Map<String, Double> values) {
+    return List.of();
+  }
+
+  /**
+   * The windows the Rules' {@code after(rule).within(...)} open, for the given parameter values;
+   * the chart shades each from the end of every Event of that Rule.
+   */
+  List<Window> windows(Map<String, Double> values) {
+    return List.of();
+  }
+
   /**
    * An Expression plotted next to the Channels, with the threshold its Condition compares to. One
    * with a {@code unit} of its own (a count of Events, a duration) is plotted on its own axis,
@@ -94,7 +116,21 @@ abstract class Scenario {
     Plot(String name, Expression expression, double threshold) {
       this(name, expression, threshold, null);
     }
+
+    /** One the Rules compare with another Expression, not with a value: it has no threshold. */
+    Plot(String name, Expression expression) {
+      this(name, expression, Double.NaN, null);
+    }
   }
+
+  /**
+   * A comparison of a Channel with a value in the Rules: the Rule (or Rules) it belongs to, the
+   * condition ({@code "when >"}, {@code "endWhen <"}) and the value.
+   */
+  record Threshold(Channel channel, String rule, String condition, double value) {}
+
+  /** The time in milliseconds after each Event of {@code after} that a Rule's {@code within} counts. */
+  record Window(String after, long millis) {}
 
   /**
    * A number the reader can change, with its default and the limits of its control. A choice has

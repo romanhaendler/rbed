@@ -57,4 +57,14 @@ final class AfterScenario extends Scenario {
             .and(TEMP.above(8)));
     return new Rule[] {doorOpen, excursionAfterDoor};
   }
+
+  @Override
+  List<Threshold> thresholds(Map<String, Double> values) {
+    return List.of(new Threshold(TEMP, "ExcursionAfterDoor", "when >", 8));
+  }
+
+  @Override
+  List<Window> windows(Map<String, Double> values) {
+    return List.of(new Window("DoorOpen", Math.round(values.get("window") * MINUTE)));
+  }
 }

@@ -67,4 +67,9 @@ final class Count extends Scenario {
     return new Plot("count(run).within(" + window / MINUTE + " min)",
         count(rules(values)[0]).within(window), values.get("limit"), "Runs");
   }
+
+  @Override
+  List<Threshold> thresholds(Map<String, Double> values) {
+    return List.of(new Threshold(POWER, "Run", "when >", 500));
+  }
 }

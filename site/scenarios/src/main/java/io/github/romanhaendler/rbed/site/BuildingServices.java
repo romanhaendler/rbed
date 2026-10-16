@@ -82,4 +82,15 @@ final class BuildingServices extends Scenario {
         event.end().getAsLong() - event.start() < values.get("shortMinutes") * MINUTE;
     return event.name().equals("Run") && shortCycle ? "short cycle" : null;
   }
+
+  @Override
+  List<Threshold> thresholds(Map<String, Double> values) {
+    return List.of(new Threshold(POWER, "Run, QuickRestart", "when >", values.get("running")),
+        new Threshold(POWER, "Run, QuickRestart", "endWhen <", 100));
+  }
+
+  @Override
+  List<Window> windows(Map<String, Double> values) {
+    return List.of(new Window("Run", Math.round(values.get("restartMinutes") * MINUTE)));
+  }
 }

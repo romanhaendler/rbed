@@ -14,6 +14,12 @@ test('headings, paragraphs and lists become HTML, with ids on headings', () => {
   ]);
 });
 
+test('a link with a scheme other than http(s) or mailto is its text only', () => {
+  assert.deepEqual(parse('[a](javascript:x) [b](../b/) [c](#c) [d](mailto:x@y.z) [e](data:text/html,x)'), [
+    { kind: 'html', html: '<p>a <a href="../b/">b</a> <a href="#c">c</a> <a href="mailto:x@y.z">d</a> e</p>' },
+  ]);
+});
+
 test('inline code, emphasis and links; text is escaped', () => {
   assert.deepEqual(parse('**Bold** *em* `a < b && c*d*` [the `x` link](https://e.org/?a=1&b=2) 1 < 2'), [
     {

@@ -67,4 +67,14 @@ final class PulseChannels extends Scenario {
             .and(ERRORS.above(values.get("limit"))));
     return new Rule[] {deployment, regression};
   }
+
+  @Override
+  List<Threshold> thresholds(Map<String, Double> values) {
+    return List.of(new Threshold(ERRORS, "Regression", "when >", values.get("limit")));
+  }
+
+  @Override
+  List<Window> windows(Map<String, Double> values) {
+    return List.of(new Window("Deployment", (long) (values.get("window") * MINUTE)));
+  }
 }

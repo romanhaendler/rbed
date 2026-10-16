@@ -61,4 +61,13 @@ final class EndConditions extends Scenario {
           .forDuration(Math.round(values.get("endDuration") * 1_000))
     };
   }
+
+  @Override
+  List<Threshold> thresholds(Map<String, Double> values) {
+    double end = values.get("end");
+    return end == 500
+        ? List.of(new Threshold(WEIGHT, "LoadLifted", "when > and endWhen <", 500))
+        : List.of(new Threshold(WEIGHT, "LoadLifted", "when >", 500),
+            new Threshold(WEIGHT, "LoadLifted", "endWhen <", end));
+  }
 }
