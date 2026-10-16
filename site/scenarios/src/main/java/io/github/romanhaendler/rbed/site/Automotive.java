@@ -104,4 +104,11 @@ final class Automotive extends Scenario {
     long cents = hundredths % 100;
     return hundredths / 100 + (cents < 10 ? ".0" : ".") + cents + " km";
   }
+
+  @Override
+  List<Threshold> thresholds(Map<String, Double> values) {
+    return List.of(new Threshold(SPEED, "Trip", "when >", values.get("moving")),
+        new Threshold(SPEED, "Trip endWhen, Idling when", "<", 0.5),
+        new Threshold(RPM, "Idling", "when >", values.get("idlingRpm")));
+  }
 }

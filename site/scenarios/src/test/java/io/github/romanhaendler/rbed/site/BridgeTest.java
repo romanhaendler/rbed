@@ -2,6 +2,7 @@ package io.github.romanhaendler.rbed.site;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -569,7 +570,7 @@ class BridgeTest {
   @Test
   @SuppressWarnings("unchecked")
   void countPlotsTheRunsConfirmedWithinTheWindowAgainstItsLimit() {
-    Map<String, Object> plot = (Map<String, Object>) run("count", "{}").get("expression");
+    Map<String, Object> plot = plotOf(run("count", "{}"));
     assertEquals("count(run).within(60 min)", plot.get("name"));
     assertEquals(3.0, plot.get("threshold"));
     List<Double> values = (List<Double>) plot.get("values");   // one per minute
@@ -604,7 +605,7 @@ class BridgeTest {
   @Test
   @SuppressWarnings("unchecked")
   void totalDurationPlotsTheMinutesSpentInExcursionsAgainstItsLimit() {
-    Map<String, Object> plot = (Map<String, Object>) run("total-duration", "{}").get("expression");
+    Map<String, Object> plot = plotOf(run("total-duration", "{}"));
     assertEquals("totalDuration(excursion)", plot.get("name"));
     assertEquals("min", plot.get("unit"));
     assertEquals(45.0, plot.get("threshold"));
@@ -653,7 +654,7 @@ class BridgeTest {
   @SuppressWarnings("unchecked")
   static void assertPlotAboveLimitExactlyDuring(String scenarioId, String parameters, String rule) {
     Map<String, Object> result = run(scenarioId, parameters);
-    Map<String, Object> plot = (Map<String, Object>) result.get("expression");
+    Map<String, Object> plot = plotOf(result);
     List<Double> values = (List<Double>) plot.get("values");
     List<Map<String, Object>> samples = (List<Map<String, Object>>) result.get("samples");
     List<Map<String, Object>> events = ((List<Map<String, Object>>) result.get("events")).stream()
@@ -706,7 +707,7 @@ class BridgeTest {
   @Test
   @SuppressWarnings("unchecked")
   void silentSensorsPlotsTheAgeOfTheHeartRateAtEverySampleAndEveryAdvance() {
-    Map<String, Object> plot = (Map<String, Object>) run("silent-sensors", "{}").get("expression");
+    Map<String, Object> plot = plotOf(run("silent-sensors", "{}"));
     assertEquals("hr.age()", plot.get("name"));
     assertEquals("s", plot.get("unit"));
     assertEquals(5.0, plot.get("threshold"));
@@ -722,7 +723,7 @@ class BridgeTest {
   @SuppressWarnings("unchecked")
   void withoutTheTimerTheAgeIsOnlyReadAtSamples() {
     Map<String, Object> plot =
-        (Map<String, Object>) run("silent-sensors", "{\"timer\": 1}").get("expression");
+        plotOf(run("silent-sensors", "{\"timer\": 1}"));
     assertTrue(((List<Double>) plot.get("values")).stream().allMatch(v -> v == 0.0));
     assertFalse(plot.containsKey("atAdvances"));
   }
@@ -827,7 +828,46 @@ class BridgeTest {
   /** The Expression's values in a result, null where it is undefined. */
   @SuppressWarnings("unchecked")
   static List<Double> expressionValues(Map<String, Object> result) {
-    return (List<Double>) ((Map<String, Object>) result.get("expression")).get("values");
+    return (List<Double>) plotOf(result).get("values");
+  }
+
+  /** The first plotted Expression in a result. */
+  @SuppressWarnings("unchecked")
+  static Map<String, Object> plotOf(Map<String, Object> result) {
+    return ((List<Map<String, Object>>) result.get("expressions")).get(0);
+  }
+
+  @Test
+  void financePlotsBothMovingAveragesWithoutAThreshold() {
+    @SuppressWarnings("unchecked")
+    List<Map<String, Object>> plots =
+        (List<Map<String, Object>>) run("finance", "{\"fast\": 20}").get("expressions");
+    assertEquals(List.of("price.averageOverSamples(20)", "price.averageOverSamples(200)"),
+        plots.stream().map(p -> p.get("name")).toList());
+    assertNull(plots.get(0).get("threshold"));
+    @SuppressWarnings("unchecked")
+    List<Double> slow = (List<Double>) plots.get(1).get("values");
+    assertEquals(199, slow.stream().takeWhile(v -> v == null).count());
+    assertEquals(200 - 99.5 / 3, slow.get(199), 1e-9); // the mean of days 0 to 199
+  }
+
+  @Test
+  void thresholdsFollowTheParameters() {
+    assertEquals(
+        List.of(
+            Map.of("channel", "weight", "rule", "LoadLifted", "condition", "when >",
+                "value", 500.0),
+            Map.of("channel", "weight", "rule", "LoadLifted", "condition", "endWhen <",
+                "value", 450.0)),
+        run("end-conditions", "{\"end\": 450}").get("thresholds"));
+    assertEquals(List.of(), run("finance", "{}").get("thresholds"));
+  }
+
+  @Test
+  void windowsFollowTheParameters() {
+    assertEquals(List.of(Map.of("after", "DoorOpen", "millis", 45.0 * 60_000)),
+        run("after", "{\"window\": 45}").get("windows"));
+    assertEquals(List.of(), run("first-rule", "{}").get("windows"));
   }
 
   @Test
@@ -910,7 +950,7 @@ class BridgeTest {
 
   @Test
   void aScenarioWithoutAnExpressionHasNoneInItsResult() {
-    assertFalse(run("first-rule", "{}").containsKey("expression"));
+    assertEquals(List.of(), run("first-rule", "{}").get("expressions"));
   }
 
   @Test

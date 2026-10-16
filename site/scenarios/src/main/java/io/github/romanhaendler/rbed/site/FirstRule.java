@@ -48,4 +48,9 @@ final class FirstRule extends Scenario {
   Rule[] rules(Map<String, Double> values) {
     return new Rule[] {Rule.named("HighTemperature").when(TEMP.above(values.get("threshold")))};
   }
+
+  @Override
+  List<Threshold> thresholds(Map<String, Double> values) {
+    return List.of(new Threshold(TEMP, "HighTemperature", "when >", values.get("threshold")));
+  }
 }

@@ -103,4 +103,9 @@ final class History extends Scenario {
     }
     detector.close();
   }
+
+  @Override
+  List<Window> windows(Map<String, Double> values) {
+    return List.of(new Window("Maintenance", 90 * DAY));
+  }
 }

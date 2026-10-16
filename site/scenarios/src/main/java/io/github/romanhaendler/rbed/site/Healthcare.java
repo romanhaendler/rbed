@@ -113,4 +113,12 @@ final class Healthcare extends Scenario {
     }
     detector.close();
   }
+
+  @Override
+  List<Threshold> thresholds(Map<String, Double> values) {
+    return List.of(new Threshold(HR, "Tachycardia", "when >", values.get("tachycardia")),
+        new Threshold(HR, "Tachycardia", "endWhen <", 95),
+        new Threshold(SPO2, "Desaturation", "when <", values.get("desaturation")),
+        new Threshold(SPO2, "Desaturation", "endWhen ≥", 92));
+  }
 }

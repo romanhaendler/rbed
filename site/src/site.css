@@ -8,6 +8,11 @@
   color-scheme: light dark;
 }
 
+/* An element scrolled or tabbed to stops below the sticky header, not under it. */
+html {
+  scroll-padding-top: calc(56px + var(--u-space-4));
+}
+
 body {
   margin: 0;
   background: var(--u-color-bg);
@@ -74,7 +79,7 @@ pre {
   box-shadow: var(--u-edge);
   font: inherit;
   font-size: var(--u-text-sm);
-  color: var(--u-color-text-muted);
+  color: var(--u-color-text-secondary);
   cursor: pointer;
 }
 
@@ -93,7 +98,34 @@ pre {
 }
 
 .shellSearch:hover {
-  color: var(--u-color-text-secondary);
+  color: var(--u-color-text);
+}
+
+/* The first stop of the keyboard: it shows itself once it has the focus. */
+.skipLink {
+  position: absolute;
+  left: var(--u-space-4);
+  top: var(--u-space-2);
+  z-index: 30;
+  padding: var(--u-space-2) var(--u-space-3);
+  border-radius: var(--u-radius-md);
+  background: var(--u-color-surface);
+  box-shadow: var(--u-focus-ring);
+  color: var(--u-color-text);
+  font-size: var(--u-text-sm);
+}
+
+.skipLink:not(:focus) {
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.shellContent:focus {
+  outline: none;
 }
 
 .shellOut {
@@ -133,6 +165,12 @@ pre {
 .code:focus-visible {
   outline: none;
   box-shadow: var(--u-focus-ring);
+}
+
+/* The search's rows stand under their group's heading, so they need not repeat it on the right
+   (@umriss-ui/core 0.40.0 always writes it there). */
+dialog[aria-label='Search the documentation'] [role='option'] > [class*='_group_'] {
+  display: none;
 }
 
 /* Opens the sidebar as a drawer, only where the sidebar does not stand beside the page. */
@@ -244,9 +282,27 @@ pre {
   background: var(--u-color-scrim);
 }
 
+.shellDrawer[open] {
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in srgb, var(--u-color-surface) 55%, var(--u-color-bg));
+}
+
+.drawerHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  flex: none;
+  padding: 0 var(--u-space-3) 0 var(--u-space-6);
+  border-bottom: 1px solid var(--u-edge-color);
+}
+
 .shellDrawer .rail {
   position: static;
-  height: 100%;
+  flex: 1;
+  height: auto;
+  min-height: 0;
   overscroll-behavior: contain;
   border-right: none;
 }
@@ -322,6 +378,49 @@ pre {
    wrapper were not there. */
 .flow {
   display: contents;
+}
+
+/* Above the page's name: its rubric, and its Markdown twin to copy or to view. */
+.pageHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--u-space-2) var(--u-space-4);
+  margin-bottom: calc(-1 * var(--u-space-2));
+}
+
+.pageRubric {
+  margin: 0;
+  font-size: var(--u-text-xs);
+  font-weight: var(--u-weight-semibold);
+  letter-spacing: var(--u-tracking-caps);
+  text-transform: uppercase;
+  color: var(--u-color-accent-text);
+}
+
+.pageActions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--u-space-3);
+  margin-left: auto;
+  font-size: var(--u-text-xs);
+}
+
+.page .pageAction {
+  padding: var(--u-space-2) var(--u-space-4);
+  border: none;
+  border-radius: var(--u-radius-md);
+  background: var(--u-color-surface);
+  box-shadow: var(--u-edge);
+  font: inherit;
+  color: var(--u-color-text);
+  cursor: pointer;
+}
+
+.pageAction:focus-visible {
+  outline: none;
+  box-shadow: var(--u-focus-ring);
 }
 
 .flow > h1 {
@@ -447,6 +546,11 @@ pre {
   tab-size: 2;
 }
 
+/* A line that runs past the edge fades out there, until it is scrolled to its end. */
+.code[data-cut] {
+  mask-image: linear-gradient(to left, transparent, #000 var(--u-space-8));
+}
+
 .code .java-keyword,
 .code .java-annotation {
   color: var(--u-color-accent-text);
@@ -467,14 +571,78 @@ pre {
 /* ---------------- A Scenario: chart, controls, source ---------------- */
 
 /* The umriss configurator: the panel beside the stage from 900 px and under it below that, the
-   code always under the stage. */
+   code always under the stage. Below 900 px the stage sticks under the header while the reader
+   works the controls, until the panel ends (.configuratorLive); clip rather than hide the
+   overflow, which would end the sticking. */
 .configurator {
   display: grid;
-  grid-template-areas: 'stage' 'panel' 'code';
+  grid-template-areas: 'live' 'code';
   border-radius: var(--u-radius-md);
   box-shadow: var(--u-edge);
   background: var(--u-color-surface);
-  overflow: hidden;
+  overflow: clip;
+}
+
+.configuratorLive {
+  grid-area: live;
+  min-width: 0;
+}
+
+@media (max-width: 899px) {
+  .configuratorStage {
+    position: sticky;
+    top: 56px;
+    z-index: 3;
+    background: var(--u-color-surface);
+    border-bottom: 1px solid var(--u-edge-color);
+  }
+  .configuratorPanel * {
+    scroll-margin-top: calc(var(--stage-height, 0px) + var(--u-space-2));
+  }
+}
+
+/* Text in the charts and the panel at the secondary color, which holds WCAG AA in both themes;
+   @umriss-ui/charts 0.40.0 writes its ticks, titles and labels in the muted one. */
+.drawStage .uc-root {
+  --uc-color-text: var(--u-color-text-secondary);
+}
+
+.configuratorPanel [id$='-message'] {
+  color: var(--u-color-text-secondary);
+}
+
+/* Each axis' title beside its band of the plot (EventChart sets where the band's middle lies);
+   the class names are the charts' own, as in plotArea.ts. */
+.drawStage .uc-axis-y[data-axis='band0'] > .uc-axis-title {
+  top: var(--title-band0, 50%);
+}
+.drawStage .uc-axis-y[data-axis='band1'] > .uc-axis-title {
+  top: var(--title-band1, 50%);
+}
+.drawStage .uc-axis-y[data-axis='band2'] > .uc-axis-title {
+  top: var(--title-band2, 50%);
+}
+.drawStage .uc-axis-y[data-axis='separate'] > .uc-axis-title {
+  top: var(--title-separate, 50%);
+}
+
+/* On a phone, each Rule's name over its lane (EventChart). */
+.laneNames span {
+  position: absolute;
+  pointer-events: none;
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: var(--u-color-text-secondary);
+}
+
+/* Every slider's readout as wide as the widest, so the tracks line up (ScenarioControls). */
+.sliders {
+  display: contents;
+}
+.sliders [class*='_readout_'] {
+  min-width: var(--readout);
+  text-align: right;
 }
 
 .configuratorStage {
@@ -577,17 +745,36 @@ pre {
   vertical-align: middle;
 }
 
-/* Under the chart: what the bands' colors and the marks on them mean. */
+/* Under the chart: what the bands' colors, the lines and the marks on them mean. A group keeps
+   its heading with its first item when it wraps. */
 .lifecycleKey {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--u-space-1) var(--u-space-4);
+  gap: var(--u-space-1) var(--u-space-5);
   padding-top: var(--u-space-3);
   font-size: var(--u-text-xs);
   color: var(--u-color-text-secondary);
 }
 
+.keyGroup {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--u-space-1) var(--u-space-3);
+}
+
+/* A plotted Expression is a dashed line. */
+.swatch.dash {
+  width: 14px;
+  height: 0;
+  border-top: 2px dashed;
+  border-radius: 0;
+  vertical-align: middle;
+}
+
 @media (min-width: 900px) {
+  .configuratorLive {
+    display: contents;
+  }
   .configurator {
     grid-template-areas: 'stage panel' 'code panel';
     grid-template-columns: minmax(0, 1fr) 15rem;
@@ -691,7 +878,7 @@ pre {
   }
   .stacked td[data-label]::before {
     content: attr(data-label) ' ';
-    color: var(--u-color-text-muted);
+    color: var(--u-color-text-secondary);
   }
   .stacked tr[data-selected] {
     background: color-mix(in srgb, var(--u-color-accent) 12%, transparent);
@@ -770,9 +957,7 @@ pre {
 }
 
 .aggregateRow .aggregateLabel {
-  color: var(--u-color-text-muted);
+  font-weight: var(--u-weight-medium);
 }
 
-.aggregatesPanel {
-  margin-top: var(--u-space-4);
-}
+

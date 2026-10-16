@@ -102,4 +102,15 @@ final class ItOperations extends Scenario {
         .forDuration(Math.round(values.get("cpuMinutes") * MINUTE));
     return new Rule[] {deployment, errorSpike, regression, highCpu};
   }
+
+  @Override
+  List<Threshold> thresholds(Map<String, Double> values) {
+    return List.of(new Threshold(ERRORS, "ErrorSpike, Regression", "when >", values.get("errors")),
+        new Threshold(CPU, "HighCpu", "when >", values.get("cpu")));
+  }
+
+  @Override
+  List<Window> windows(Map<String, Double> values) {
+    return List.of(new Window("Deployment", Math.round(values.get("window") * MINUTE)));
+  }
 }

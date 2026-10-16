@@ -48,24 +48,34 @@ export type Event = {
  *  when that was noticed. */
 export type Discard = { name: string; start: number; discarded: number };
 
-/** For a Scenario that plots one: an Expression's value per Sample, null where it is undefined,
- *  and the threshold its Rule's Condition compares it to. One with a `unit` of its own (a count of
- *  Events, a duration) is not on the Channels' scale. */
+/** An Expression a Scenario plots: its value per Sample, null where it is undefined, and the
+ *  threshold its Rule's Condition compares it to (null where it is compared with another
+ *  Expression). One with a `unit` of its own (a count of Events, a duration) is not on the
+ *  Channels' scale. */
 export type PlottedExpression = {
   name: string;
   unit?: string;
-  threshold: number;
+  threshold: number | null;
   values: (number | null)[];
   /** Its value at each time advance (Result.advances), where time was advanced. */
   atAdvances?: (number | null)[];
 };
+
+/** Where a Rule compares a Channel with a value: `condition` is such as "when >" or "endWhen <";
+ *  `rule` names the Rule, or the Rules, it belongs to. */
+export type Threshold = { channel: string; rule: string; condition: string; value: number };
+
+/** The time after each Event of the Rule `after` that a Rule's within(...) counts. */
+export type Window = { after: string; millis: number };
 
 export type Result =
   | {
       samples: { timestamp: number; values: Record<string, number | null> }[];
       events: Event[];
       discarded: Discard[];
-      expression?: PlottedExpression;
+      expressions: PlottedExpression[];
+      thresholds: Threshold[];
+      windows: Window[];
       /** Timestamps the Detector was advanced to without a Sample. */
       advances: number[];
       /** Timestamp of the first Sample after the Detector was restarted, if it was. */

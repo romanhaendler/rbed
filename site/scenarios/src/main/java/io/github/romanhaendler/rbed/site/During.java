@@ -73,4 +73,10 @@ final class During extends Scenario {
         .when(during(tachycardia).and(during(desaturation)));
     return new Rule[] {tachycardia, desaturation, hypoxicTachycardia};
   }
+
+  @Override
+  List<Threshold> thresholds(Map<String, Double> values) {
+    return List.of(new Threshold(HR, "Tachycardia", "when >", 100),
+        new Threshold(SPO2, "Desaturation", "when <", 90));
+  }
 }

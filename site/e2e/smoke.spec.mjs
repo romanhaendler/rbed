@@ -1,7 +1,8 @@
 // The site's browser smoke tests: every page of the manifest loads at desktop and phone width
 // without a page error or sideways scrolling; on a concept page and on a domain page, moving a
 // control runs rbed again and changes the Event table; drawing a Channel changes the Java source;
-// on a phone, the Event tables fit without sideways scrolling.
+// on a phone, the Event tables fit without sideways scrolling, and the chart stays in view while
+// a control moves; an address with a fragment lands on its section; Tab first reaches the skip link.
 import { expect, test } from '@playwright/test';
 import { PAGES } from '../src/pages.ts';
 
@@ -106,4 +107,32 @@ test('on a phone, the Event and Discarded tables need no sideways scrolling', as
       expect(overflow, `${path} #${await table.getAttribute('id')}`).toBeLessThanOrEqual(0);
     }
   }
+});
+
+test('an address with a fragment lands on its section once the app has drawn the page', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('cranes/#events');
+  await expect(page.locator('.uc-root canvas').first()).toBeVisible();
+  await expect.poll(() => page.locator('#events').evaluate((e) => Math.round(e.getBoundingClientRect().top))).toBeLessThan(200);
+});
+
+test('on a phone the chart stays in view while a control under it moves, and the change is announced', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 800 });
+  await page.goto('manufacturing/');
+  const slider = page.getByRole('slider', { name: 'Fast heating above' });
+  await slider.focus();
+  await slider.press('ArrowRight');
+  const chart = await page.locator('.drawStage').boundingBox();
+  const control = await slider.boundingBox();
+  expect(chart.y).toBeGreaterThanOrEqual(56);
+  expect(control.y).toBeGreaterThan(chart.y + chart.height);
+  expect(control.y + control.height).toBeLessThanOrEqual(800);
+  await expect(page.getByRole('status')).toHaveText(/\d+ Events?/);
+});
+
+test('the first Tab stop skips to the content', async ({ page }) => {
+  await page.goto('cranes/');
+  await expect(page.locator('.uc-root canvas').first()).toBeVisible();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('link', { name: 'Skip to content' })).toBeFocused();
 });

@@ -116,11 +116,12 @@ public final class Bridge {
    *     Channel's own values
    * @return JSON object with the Samples, the Events (in the order they started), the Discarded Pending Events (with the
    *     timestamp they were Discarded), the timestamps time was advanced to without a Sample,
-   *     the timestamp of the restart if the Detector was restarted, and, for a Scenario that
-   *     plots an Expression, its name, unit (if it has one of its own), threshold, value per
-   *     Sample and, if time was advanced, value per advance (null where undefined); or {@code
-   *     {"error": message, "by": "rbed"}} if rbed rejected the Rules or the Samples, or
-   *     {@code {"error": message}} if the input was invalid
+   *     the timestamp of the restart if the Detector was restarted, each Expression the Scenario
+   *     plots (its name, unit if it has one of its own, threshold or null, value per Sample and,
+   *     if time was advanced, value per advance; null where undefined), the Channel thresholds
+   *     of its Rules and the windows their {@code within} opens; or {@code {"error": message,
+   *     "by": "rbed"}} if rbed rejected the Rules or the Samples, or {@code {"error": message}}
+   *     if the input was invalid
    */
   @JSExport
   public static String run(String scenarioId, String parameters, String drawnChannels) {
@@ -283,9 +284,12 @@ public final class Bridge {
     }
     out.append(']');
     if (lifecycle.restart != null) out.append(",\"restart\":").append(lifecycle.restart);
-    Scenario.Plot plot = scenario.plot(values);
-    if (plot != null) {
-      Json.string(out.append(",\"expression\":{\"name\":"), plot.name());
+    out.append(",\"expressions\":[");
+    List<Scenario.Plot> plots = scenario.plots(values);
+    for (int i = 0; i < plots.size(); i++) {
+      Scenario.Plot plot = plots.get(i);
+      if (i > 0) out.append(',');
+      Json.string(out.append("{\"name\":"), plot.name());
       if (plot.unit() != null) Json.string(out.append(",\"unit\":"), plot.unit());
       ExpressionValues.Values plotted =
           ExpressionValues.of(scenario, plot.expression(), values, samples);
@@ -296,6 +300,24 @@ public final class Bridge {
       }
       out.append('}');
     }
+    out.append("],\"thresholds\":[");
+    List<Scenario.Threshold> thresholds = scenario.thresholds(values);
+    for (int i = 0; i < thresholds.size(); i++) {
+      Scenario.Threshold t = thresholds.get(i);
+      if (i > 0) out.append(',');
+      Json.string(out.append("{\"channel\":"), t.channel().name());
+      Json.string(out.append(",\"rule\":"), t.rule());
+      Json.string(out.append(",\"condition\":"), t.condition());
+      Json.number(out.append(",\"value\":"), t.value()).append('}');
+    }
+    out.append("],\"windows\":[");
+    List<Scenario.Window> windows = scenario.windows(values);
+    for (int i = 0; i < windows.size(); i++) {
+      if (i > 0) out.append(',');
+      Json.string(out.append("{\"after\":"), windows.get(i).after())
+          .append(",\"millis\":").append(windows.get(i).millis()).append('}');
+    }
+    out.append(']');
     return out.append('}').toString();
   }
 

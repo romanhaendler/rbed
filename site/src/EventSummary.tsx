@@ -1,20 +1,32 @@
 // The chart's text alternative: its Events, Discarded Pending Events, plotted Expression, time
 // advances and restart in words, for a screen reader.
 import { VisuallyHidden } from '@umriss-ui/core';
-import type { PlottedExpression, Scenario } from './bridge';
+import type { PlottedExpression, Scenario, Threshold, Window } from './bridge';
 import { type Row, undefinedStretches } from './chartModel.ts';
 import { type Lifecycle, timeIn } from './events.ts';
 
-/** The plotted Expression in words: what it is compared to and where it is undefined; `rows` are
-    its expressionRows. */
-export function expressionSummary(expression: PlottedExpression | undefined, rows: Row[], unit: string): string {
-  if (!expression) return '';
-  const stretches = undefinedStretches(rows).map(([from, to]) => `from ${from} to ${to} ${unit}`);
-  const advances = (expression.atAdvances ?? []).length;
+/** The plotted Expressions in words: what each is compared to and where they are undefined;
+    `rows` are their expressionRows. */
+export function expressionSummary(expressions: PlottedExpression[], rows: Row[], unit: string): string {
+  if (expressions.length === 0) return '';
+  const stretches = undefinedStretches(rows, expressions.length).map(([from, to]) => `from ${from} to ${to} ${unit}`);
+  const advances = expressions.some((x) => (x.atAdvances ?? []).length > 0);
+  const lines = expressions.map(
+    (x) => x.name + (x.threshold === null ? '' : `, compared with the threshold ${x.threshold}${x.unit ? ` ${x.unit}` : ''}`),
+  );
   return (
-    ` The dashed line is ${expression.name}, compared with the threshold ${expression.threshold}${expression.unit ? ` ${expression.unit}` : ''}` +
-    (advances === 0 ? '' : `, read at every Sample and every time advance`) +
-    (stretches.length === 0 ? '.' : `; it is undefined ${stretches.join(' and ')}.`)
+    (lines.length === 1 ? ` The dashed line is ${lines[0]}` : ` The dashed lines are ${lines.join('; and ')}`) +
+    (advances ? `, read at every Sample and every time advance` : '') +
+    (stretches.length === 0 ? '.' : `; ${lines.length === 1 ? 'it is' : 'they are'} undefined ${stretches.join(' and ')}.`)
+  );
+}
+
+/** The thresholds and within(...) windows in words, for the text alternative. */
+export function limitsSummary(thresholds: Threshold[], windows: Window[], scenario: Scenario): string {
+  const at = timeIn(scenario.timeUnit);
+  return (
+    (thresholds.length === 0 ? '' : ` Lines mark the thresholds: ${thresholds.map((t) => `${t.rule} ${t.condition.replace(/^(\w+) /, `$1 ${t.channel} `)} ${t.value}`).join(', ')}.`) +
+    windows.map((w) => ` Shaded after each ${w.after} Event: the ${at(w.millis)} its within(...) counts.`).join('')
   );
 }
 
@@ -34,12 +46,12 @@ export function timeSummary({ advances, restart }: { advances: number[]; restart
 }
 
 /** The chart's text alternative: its Events and Discarded Pending Events in words. */
-export function EventSummary({ scenario, lifecycle, also = '' }: { scenario: Scenario; lifecycle: Lifecycle; also?: string }) {
+export function EventSummary({ id, scenario, lifecycle, also = '' }: { id: string; scenario: Scenario; lifecycle: Lifecycle; also?: string }) {
   const { events, discarded } = lifecycle;
   const at = timeIn(scenario.timeUnit);
   const count = (n: number, one: string, many: string) => (n === 1 ? `one ${one}` : `${n} ${many}`);
   return (
-    <VisuallyHidden as="p">
+    <VisuallyHidden as="p" id={id}>
       {events.length === 0 && discarded.length === 0
         ? 'The chart shows no Event.'
         : `The chart shows ${[

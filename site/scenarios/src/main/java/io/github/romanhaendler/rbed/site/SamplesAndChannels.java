@@ -71,4 +71,10 @@ final class SamplesAndChannels extends Scenario {
   Rule[] rules(Map<String, Double> values) {
     return new Rule[] {Rule.named("Muggy").when(TEMP.above(26).and(HUMIDITY.above(60)))};
   }
+
+  @Override
+  List<Threshold> thresholds(Map<String, Double> values) {
+    return List.of(new Threshold(TEMP, "Muggy", "when >", 26),
+        new Threshold(HUMIDITY, "Muggy", "when >", 60));
+  }
 }

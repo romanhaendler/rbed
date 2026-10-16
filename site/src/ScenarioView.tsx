@@ -2,45 +2,66 @@
 // one time axis with a hover readout (EventChart), a control per parameter, a reset, toggles for
 // each Rule and Channel (ScenarioControls), the Java source with the current values, and the
 // Event table with each Event's Aggregates, whose rows and the chart's bands select each other; a
-// selected Event's Aggregates are shown in full under the chart (EventTables). Non-default values
+// selected Event's Aggregates are shown in full above the table (EventTables). Non-default values
 // live in the address. Where the page asks for it, the reader can draw a Channel's values on the
-// chart (DrawLayer; not kept in the address). The Detector runs again on every change.
-import { Alert } from '@umriss-ui/core';
-import { useMemo, useRef, useState } from 'react';
-import { run, type Scenario, source } from './bridge';
-import {
-  type ChannelAxis,
-  type ChartModel,
-  channelAxisOf,
-  EXPRESSION,
-  expressionRows,
-  type Row,
-  timeDomain,
-  undefinedStretches,
-} from './chartModel.ts';
+// chart (DrawLayer; not kept in the address). The Detector runs again on every change, and a
+// screen reader hears what came of it.
+import { Alert, VisuallyHidden } from '@umriss-ui/core';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { type Result, run, type Scenario, source } from './bridge';
+import { type ChannelAxis, type ChartModel, channelAxesOf, expressionKey, expressionRows, type Row, timeDomain } from './chartModel.ts';
 import { CodeBlock } from './CodeBlock';
 import { drawnSource, drawTo } from './draw.ts';
 import { DrawLayer } from './DrawLayer';
-import { EventChart, LifecycleKey } from './EventChart';
-import { drawnSummary, EventSummary, expressionSummary, timeSummary } from './EventSummary';
+import { EventChart, LifecycleKey, useNarrow } from './EventChart';
+import { drawnSummary, EventSummary, expressionSummary, limitsSummary, timeSummary } from './EventSummary';
 import { AggregatesPanel, DiscardedTable, EventTable } from './EventTables';
 import { eventKey } from './events.ts';
 import { defaultsOf, fromQuery } from './parameters';
 import { ScenarioControls, useAddress } from './ScenarioControls';
+
+type Drawn = Record<string, (number | null)[]>;
+
+/** What came of a run, in a few words: "2 Events, 1 Discarded Pending Event", or the error. */
+function outcome(result: Result): string {
+  if ('error' in result) return result.error;
+  const count = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
+  return [count(result.events.length, 'Event'), ...(result.discarded.length > 0 ? [count(result.discarded.length, 'Discarded Pending Event')] : [])].join(', ');
+}
+
+/** The outcome of the latest change, for a screen reader, half a second after the last one; not
+    on the first run, which the page itself shows. */
+function useAnnouncement(result: Result): string {
+  const first = useRef(result);
+  const [said, say] = useState('');
+  useEffect(() => {
+    if (result === first.current) return;
+    const t = window.setTimeout(() => say(outcome(result)), 500);
+    return () => window.clearTimeout(t);
+  }, [result]);
+  return said;
+}
 
 /** `draw` lets the reader draw the values of the Scenario's Channels other than Pulse Channels. */
 export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; draw?: boolean }) {
   const [parameters, setParameters] = useState(() => fromQuery(window.location.search, scenario.parameters));
   const [hidden, setHidden] = useState<string[]>([]);
   const [selected, select] = useState<string>();
-  // Drawn values by Channel, one per Sample; the Channel the pointer draws ('' for none); the
-  // Channels' axis held still during a stroke; the stroke's previous point.
-  const [drawn, setDrawn] = useState<Record<string, (number | null)[]>>({});
+  // Drawn values by Channel, one per Sample (also in a ref, so two pointer moves before a render
+  // both build on the latest); the Channel the pointer draws ('' for none); the Channels' axes
+  // held still during a stroke; the stroke's previous point.
+  const [drawn, setDrawn] = useState<Drawn>({});
+  const latestDrawn = useRef<Drawn>({});
   const [pen, setPen] = useState('');
-  const [frozen, setFrozen] = useState<ChannelAxis>();
+  const [frozen, setFrozen] = useState<ChannelAxis[]>();
   const [hoveredLatest, hoverLatest] = useState<string>();
   const stroke = useRef<[number, number]>(undefined);
+  const narrow = useNarrow();
+  const summaryId = useId();
+  const stageRef = useRef<HTMLDivElement>(null);
+  const sticky = useRef<HTMLDivElement>(null);
   const result = useMemo(() => run(scenario.id, parameters, drawn), [scenario.id, parameters, drawn]);
+  const announcement = useAnnouncement(result);
   const rows = useMemo<Row[]>(
     () =>
       'error' in result
@@ -48,11 +69,31 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
         : result.samples.map((s, i) => ({
             t: s.timestamp / scenario.timeUnit.millis,
             ...s.values,
-            ...(result.expression && { [EXPRESSION]: result.expression.values[i] }),
+            ...Object.fromEntries(result.expressions.map((x, k) => [expressionKey(k), x.values[i]])),
           })),
     [result, scenario.timeUnit.millis],
   );
   useAddress(scenario, parameters);
+  // The chart describes itself (its series and ranges); the Events in words are ours, and its API
+  // has no way to add them, so they join its description here.
+  useEffect(() => {
+    const plot = stageRef.current?.querySelector('.uc-plot');
+    const described = plot?.getAttribute('aria-describedby') ?? '';
+    if (plot && !described.split(' ').includes(summaryId)) plot.setAttribute('aria-describedby', `${described} ${summaryId}`.trim());
+  });
+
+  // A control the keyboard reaches on a phone scrolls into view below the sticky stage, not under it.
+  useEffect(() => {
+    const stage = sticky.current!;
+    const observer = new ResizeObserver(() => stage.parentElement!.style.setProperty('--stage-height', `${stage.offsetHeight}px`));
+    observer.observe(stage);
+    return () => observer.disconnect();
+  }, []);
+
+  const setDrawnNow = (next: Drawn) => {
+    latestDrawn.current = next;
+    setDrawn(next);
+  };
 
   let stage;
   if ('error' in result) {
@@ -62,7 +103,7 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
       </Alert>
     );
   } else {
-    const plotted = expressionRows(rows, result.expression, result.advances, scenario.timeUnit.millis);
+    const plotted = expressionRows(rows, result.expressions, result.advances, scenario.timeUnit.millis);
     const model: ChartModel = {
       scenario,
       rows,
@@ -70,54 +111,50 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
       channels: scenario.channels.filter((c) => !hidden.includes(c)),
       rules: scenario.rules.filter((r) => !hidden.includes(r)),
       hoverLatest,
-      expression: result.expression,
+      expressions: result.expressions,
       expressionRows: plotted,
+      thresholds: result.thresholds,
+      windows: result.windows,
       advances: result.advances,
       restart: result.restart,
     };
     const event = result.events.find((e) => eventKey(e) === selected);
-    const channelAxis = frozen ?? channelAxisOf(model);
+    const channelAxes = frozen ?? channelAxesOf(model);
+    const penAxis = channelAxes.find((a) => a.channels.includes(pen)) ?? channelAxes[0];
     const times = rows.map((r) => r.t);
     const drawPoint = (t: number, value: number, first: boolean) => {
-      const previous = first ? undefined : stroke.current;
-      const scenarioValues = rows.map((r) => r[pen] ?? null);
-      setDrawn((d) => {
-        const next = drawTo(d[pen] ?? scenarioValues, times, t, value, previous);
-        stroke.current = next.last;
-        return { ...d, [pen]: next.values };
-      });
-      if (first) setFrozen(channelAxis);
+      const values = latestDrawn.current[pen] ?? rows.map((r) => r[pen] ?? null);
+      const next = drawTo(values, times, t, value, first ? undefined : stroke.current);
+      stroke.current = next.last;
+      setDrawnNow({ ...latestDrawn.current, [pen]: next.values });
+      if (first) setFrozen(channelAxes);
     };
     stage = (
       <>
-        <div className="drawStage">
+        <div className="drawStage" ref={stageRef}>
           <EventChart
-            key={`${scenario.id} ${model.rules.join(' ')}`}
+            key={`${scenario.id} ${model.rules.join(' ')} ${narrow}`}
             model={model}
-            channelAxis={channelAxis}
+            channelAxes={channelAxes}
+            narrow={narrow}
             selected={event}
             latest={result.events.find((e) => eventKey(e) === hoveredLatest)}
             select={select}
           />
-          {pen !== '' && (
-            <DrawLayer x={timeDomain(rows)} channelAxis={channelAxis} draw={drawPoint} end={() => setFrozen(undefined)} />
-          )}
+          {pen !== '' && <DrawLayer x={timeDomain(rows)} channelAxis={penAxis} draw={drawPoint} end={() => setFrozen(undefined)} />}
         </div>
-        <LifecycleKey
-          advances={result.advances.length > 0}
-          restart={result.restart !== undefined}
-          undefinedExpression={undefinedStretches(plotted).length > 0}
-        />
+        <LifecycleKey model={model} />
         <EventSummary
+          id={summaryId}
           scenario={scenario}
           lifecycle={result}
           also={
-            expressionSummary(result.expression, plotted, scenario.timeUnit.name) +
+            expressionSummary(result.expressions, plotted, scenario.timeUnit.name) +
+            limitsSummary(result.thresholds, result.windows, scenario) +
             timeSummary(result, scenario) +
             drawnSummary(Object.keys(drawn))
           }
         />
-        {event && <AggregatesPanel scenario={scenario} event={event} />}
       </>
     );
   }
@@ -125,32 +162,41 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
   return (
     <>
       <div className="configurator">
-        <div className="configuratorStage">{stage}</div>
-        <div className="configuratorPanel">
-          <ScenarioControls
-            scenario={scenario}
-            parameters={parameters}
-            setParameters={setParameters}
-            atDefaults={
-              scenario.parameters.every((p) => Object.is(parameters[p.id], p.default)) && Object.keys(drawn).length === 0
-            }
-            reset={() => {
-              setParameters(defaultsOf(scenario.parameters));
-              setDrawn({});
-            }}
-            drawable={draw ? scenario.channels.filter((c) => !scenario.pulse.includes(c)) : []}
-            pen={pen}
-            setPen={setPen}
-            hidden={hidden}
-            setHidden={setHidden}
-          />
+        {/* On a phone the stage stays in view while the reader works the controls under it. */}
+        <div className="configuratorLive">
+          <div className="configuratorStage" ref={sticky}>
+            {stage}
+          </div>
+          <div className="configuratorPanel">
+            <ScenarioControls
+              scenario={scenario}
+              parameters={parameters}
+              setParameters={setParameters}
+              atDefaults={
+                scenario.parameters.every((p) => Object.is(parameters[p.id], p.default)) && Object.keys(drawn).length === 0
+              }
+              reset={() => {
+                setParameters(defaultsOf(scenario.parameters));
+                setDrawnNow({});
+              }}
+              drawable={draw ? scenario.channels.filter((c) => !scenario.pulse.includes(c)) : []}
+              pen={pen}
+              setPen={setPen}
+              hidden={hidden}
+              setHidden={setHidden}
+            />
+          </div>
         </div>
         <div className="configuratorCode">
-          <CodeBlock language="Java" source={drawnSource(source(scenario, parameters), drawn)} />
+          <CodeBlock language="java" label="Java" source={drawnSource(source(scenario, parameters), drawn)} />
         </div>
       </div>
+      <VisuallyHidden role="status">{announcement}</VisuallyHidden>
       {!('error' in result) && (
         <>
+          {selected && result.events.some((e) => eventKey(e) === selected) && (
+            <AggregatesPanel scenario={scenario} event={result.events.find((e) => eventKey(e) === selected)!} />
+          )}
           <EventTable scenario={scenario} events={result.events} selected={selected} select={select} />
           <DiscardedTable scenario={scenario} discarded={result.discarded} />
         </>

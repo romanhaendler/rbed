@@ -60,4 +60,9 @@ final class DataGaps extends Scenario {
       Rule.named("Running").when(RPM.above(100)).maxGap(Math.round(values.get("maxGap") * 1_000))
     };
   }
+
+  @Override
+  List<Threshold> thresholds(Map<String, Double> values) {
+    return List.of(new Threshold(RPM, "Running", "when >", 100));
+  }
 }

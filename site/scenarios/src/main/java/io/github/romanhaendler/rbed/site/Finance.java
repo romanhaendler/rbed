@@ -60,4 +60,14 @@ final class Finance extends Scenario {
         PRICE.averageOverSamples(fast).above(PRICE.averageOverSamples(slow)));
     return new Rule[] {deathCross, goldenCross};
   }
+
+  /** The two moving averages, whose crossings the Events are. */
+  @Override
+  List<Plot> plots(Map<String, Double> values) {
+    int fast = (int) Math.round(values.get("fast"));
+    int slow = (int) Math.round(values.get("slow"));
+    return List.of(
+        new Plot("price.averageOverSamples(" + fast + ")", PRICE.averageOverSamples(fast)),
+        new Plot("price.averageOverSamples(" + slow + ")", PRICE.averageOverSamples(slow)));
+  }
 }

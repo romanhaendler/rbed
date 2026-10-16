@@ -97,4 +97,9 @@ final class SilentSensors extends Scenario {
     }
     detector.close();
   }
+
+  @Override
+  List<Threshold> thresholds(Map<String, Double> values) {
+    return List.of(new Threshold(HR, "HighHeartRate", "when >", 120));
+  }
 }

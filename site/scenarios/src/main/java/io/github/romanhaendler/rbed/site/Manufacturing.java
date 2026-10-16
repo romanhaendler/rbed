@@ -116,4 +116,12 @@ final class Manufacturing extends Scenario {
     for (Sample sample : samples) lifecycle.pushValues(detector, sample);  // round(i * 1000 / 1)
     detector.close();
   }
+
+  @Override
+  List<Threshold> thresholds(Map<String, Double> values) {
+    return List.of(new Threshold(LOAD, "HighLoad", "when >", values.get("highLoad")),
+        new Threshold(LOAD, "HighLoad", "endWhen <", 60),
+        new Threshold(TEMP, "Overheat", "when >", values.get("overheat")),
+        new Threshold(TEMP, "Overheat", "endWhen <", values.get("cooled")));
+  }
 }
