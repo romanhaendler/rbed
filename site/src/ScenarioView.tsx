@@ -38,6 +38,10 @@ const MARKS = [
   { name: 'Discarded', colour: 'var(--u-color-danger)', moments: (l: Lifecycle) => l.discarded.map((d) => d.discarded) },
   { name: 'Confirmed', colour: 'var(--u-color-success)', moments: (l: Lifecycle) => l.events.map((e) => e.confirmed) },
 ] as const;
+/** A Truncated start or end: a halo behind the edge's mark, so it reads as more than a colour. */
+const TRUNCATED = { name: 'Truncated', colour: 'color-mix(in srgb, var(--u-color-text) 30%, transparent)' };
+const truncatedEdges = (l: Lifecycle) =>
+  l.events.flatMap((e) => [...(e.truncatedStart ? [e.start] : []), ...(e.truncatedEnd ? [e.end] : [])]);
 /** The chart palette without the Events' colour, so a Channel never looks like a band. */
 const CHANNEL_COLOURS = [1, 3, 4, 5, 6].map((n) => `var(--uc-series-${n})`);
 const channelColour = (scenario: Scenario, channel: string) =>
@@ -223,6 +227,14 @@ function EventChart({
           name={rule}
         />
       ))}
+      <Scatter<MarkRow>
+        data={rules.flatMap((rule, i) => truncatedEdges(ofRule(lifecycle, rule)).map((t) => ({ t: t / millis, y: lanes - i - 0.5 })))}
+        value="y"
+        yAxisId="lanes"
+        name={TRUNCATED.name}
+        color={TRUNCATED.colour}
+        radius={9}
+      />
       {MARKS.map((m) => (
         <Scatter<MarkRow>
           key={m.name}
@@ -317,6 +329,10 @@ function LifecycleKey() {
       {EVENT_STATES.map((s) => item(s.label, s.color, false))}
       <span>Marks:</span>
       {MARKS.map((m) => item(m.name, m.colour, true))}
+      <span>
+        <span className="swatch mark halo" style={{ background: TRUNCATED.colour }} />
+        Truncated start or end
+      </span>
     </div>
   );
 }

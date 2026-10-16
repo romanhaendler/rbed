@@ -37,6 +37,11 @@ abstract class Scenario {
 
   abstract List<Sample> samples();
 
+  /** The Samples for the given parameter values; the same for every value unless overridden. */
+  List<Sample> samples(Map<String, Double> values) {
+    return samples();
+  }
+
   /** Those of its Channels that are Pulse Channels; rbed does not tell a Channel's kind. */
   List<Channel> pulseChannels() {
     return List.of();
@@ -46,7 +51,7 @@ abstract class Scenario {
   abstract Rule[] rules(Map<String, Double> values);
 
   /**
-   * Runs the Rules over the given Samples (its own, or with Channel values the reader drew) with
+   * Runs the Rules over {@code samples} (its own, with any Channel values the reader drew) with
    * {@code lifecycle} as the listener, setting {@code lifecycle.now} to each Sample's timestamp
    * before pushing it, and closes the Detector. A Scenario that feeds its Detector differently (a
    * sampling rate, time advances) overrides it and keeps {@code lifecycle.now} current the same way.

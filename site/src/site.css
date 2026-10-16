@@ -561,6 +561,13 @@ pre {
   border-radius: 50%;
 }
 
+/* A Truncated edge is a large halo behind its mark. */
+.swatch.halo {
+  width: 14px;
+  height: 14px;
+  vertical-align: middle;
+}
+
 /* Under the chart: what the bands' colours and the marks on them mean. */
 .lifecycleKey {
   display: flex;

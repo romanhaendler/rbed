@@ -20,6 +20,8 @@ public final class Bridge {
   private static final List<Scenario> SCENARIOS = List.of(
       new FirstRule(),
       new EventLifecycle(),
+      new EndConditions(),
+      new DataGaps(),
       new Expressions(),
       new AggregatesScenario(),
       new PulseChannels(),
@@ -104,8 +106,8 @@ public final class Bridge {
   public static String run(String scenarioId, String parameters, String drawnChannels) {
     try {
       Scenario scenario = scenario(scenarioId);
-      List<Sample> samples = drawn(scenario, drawnChannels);
       Map<String, Double> values = values(scenario, parameters);
+      List<Sample> samples = drawn(scenario, scenario.samples(values), drawnChannels);
       Lifecycle lifecycle = new Lifecycle();
       scenario.detect(scenario.rules(values), samples, lifecycle);
       return result(scenario, values, samples, lifecycle);
@@ -123,8 +125,7 @@ public final class Bridge {
   }
 
   /** The Scenario's Samples, with each drawn Channel's values in place of its own. */
-  private static List<Sample> drawn(Scenario scenario, String drawnChannels) {
-    List<Sample> samples = scenario.samples();
+  private static List<Sample> drawn(Scenario scenario, List<Sample> samples, String drawnChannels) {
     if (!(Json.parse(drawnChannels) instanceof Map<?, ?> drawn)) {
       throw new IllegalArgumentException("Drawn Channels are not a JSON object");
     }
