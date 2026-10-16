@@ -34,6 +34,11 @@ abstract class Scenario {
 
   abstract List<Sample> samples();
 
+  /** Those of its Channels that are Pulse Channels; rbed does not tell a Channel's kind. */
+  List<Channel> pulseChannels() {
+    return List.of();
+  }
+
   /** The Rules for the given value of every parameter, by parameter id. */
   abstract Rule[] rules(Map<String, Double> values);
 
