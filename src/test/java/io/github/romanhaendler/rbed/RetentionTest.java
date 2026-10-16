@@ -152,4 +152,18 @@ class RetentionTest {
     assertThrows(IllegalArgumentException.class, () -> Detector.builder().retentionLimit(0));
     assertThrows(IllegalArgumentException.class, () -> Detector.builder().retentionLimit(-5));
   }
+
+  @Test
+  void averageOverSamplesAboveTheRetentionLimitFailsInBuild() {
+    Rule rule = Rule.named("Big").when(X.averageOverSamples(11).above(0));
+    IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+        () -> Detector.builder().retentionLimit(10).rules(rule).build());
+    assertTrue(e.getMessage().contains("Big") && e.getMessage().contains("11"), e.getMessage());
+  }
+
+  @Test
+  void averageOverSamplesAtOrBelowTheLimitBuilds() {
+    Detector.builder().retentionLimit(10).rules(Rule.named("R").when(X.averageOverSamples(10).above(0))).build();
+    Detector.builder().retentionLimit(11).rules(Rule.named("Big").when(X.averageOverSamples(11).above(0))).build();
+  }
 }
