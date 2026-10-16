@@ -19,7 +19,7 @@ Rule roughRunning = Rule.named("RoughRunning").when(during(running).and(vibratio
 
 Each part keeps its own duration, End Condition and hysteresis, and the combination holds while both are Confirmed. A patient's heart rate `hr` is above 100 from 40 s to 200 s, and once more from 230 s to 250 s. Their oxygen saturation `spo2` dips below 90 for one Sample at 20 s, from 100 s to 160 s, and from 230 s to 260 s. `Tachycardia` needs 30 seconds, `Desaturation` 10, and `HypoxicTachycardia` holds while both are Confirmed. The three lanes share the time axis, so you can see the third band start and end where the other two overlap.
 
-<!-- scenario during -->
+<!-- scenario during draw -->
 
 At the default durations:
 

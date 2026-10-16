@@ -22,7 +22,7 @@ detector.push(13_000, Map.of(hr, 70.0));   // SensorLost Ended at 13000
 
 A heart rate is reported every second. From 12 s it is high, and from 25 to 44 s the sensor is silent. `HighHeartRate` trusts a high reading only while it is recent: `hr` above 120 and not older than the limit. `SensorLost` is the opposite, a reading older than the limit. The small marks just above the lanes are the moments a timer advanced time, once a second while no Sample arrived.
 
-<!-- scenario silent-sensors -->
+<!-- scenario silent-sensors draw -->
 
 With the timer, the last reading at 24 s grows older with every advance. At 30 s it is 6 s old, more than the limit of 5 s: `HighHeartRate` Ends there and `SensorLost` is Confirmed, both without a Sample. `SensorLost` Ends at 45 s, when the sensor reports again. Raise *Silent after*, and both move later.
 

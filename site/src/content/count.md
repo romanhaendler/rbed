@@ -15,7 +15,7 @@ An Event counts from the moment it is Confirmed, so a running Event is included.
 
 A machine's power is sampled once a minute. It runs for five minutes from minutes 10, 30, 45, 60, 150 and 200. A `Run` needs 30 seconds above 500 W, so each one is Confirmed at the next Sample, a minute after its start. `FrequentStarts` holds while more than the limit of Runs were Confirmed within the window. The chart under the Events plots `count(run).within(...)` at every Sample, as rbed computes it, with the limit as a line.
 
-<!-- scenario count -->
+<!-- scenario count draw -->
 
 With an hour's window and a limit of 3:
 

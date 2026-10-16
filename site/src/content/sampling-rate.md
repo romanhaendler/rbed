@@ -32,7 +32,7 @@ With a sampling rate, every duration is measured in Sample positions converted t
 
 Below, an accelerometer was logged at 10 Hz, but the logger lost the Samples from 2.1 to 2.9 s. `Vibration` requires `accel` above 3 for 1.5 s. Pushed with their timestamps, both vibrations last long enough: the first from 1.5 to 3.5 s, Confirmed at 3 s. Choose "Values at a sampling rate", and the same Samples are pushed as values with `detectValues` at a declared 10 Hz: every Sample after the loss now lies 0.9 s early. The first vibration seems to stop at 2.6 s, before its 1.5 s are reached, and is Discarded; the second is still Confirmed, but 0.9 s earlier than it happened.
 
-<!-- scenario sampling-rate -->
+<!-- scenario sampling-rate draw -->
 
 Declare a different rate, and every duration stretches or shrinks with it: at 5 Hz the Samples are 200 ms apart, so the first vibration lasts 2.2 s and is Confirmed again, at 4.6 s, although on the clock it lasted 2 s. `forSamples` counts Samples in either mode, so only `forDuration` and the other time-based parts of a Rule depend on the rate.
 

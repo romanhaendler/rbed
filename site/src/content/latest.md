@@ -11,7 +11,7 @@ Each is an Expression, undefined while there has been no Event of `a`. This rela
 
 A crane lifts a load of 800 kg from 10 s to 40 s and sets it down to 300 kg in between, from 25 s to 30 s. Then it lifts 600 kg from 60 s to 90 s and sets it down to 350 kg from 75 s to 80 s. `LoadLifted` has an End Condition, so a set-down does not End it. `PartialSetDown` holds while the weight is below a fraction of the latest lift's maximum. Hover over the chart: the readout names the `LoadLifted` Event that `latest` reads at that moment, and the chart highlights it.
 
-<!-- scenario latest -->
+<!-- scenario latest draw -->
 
 At the default fraction of 0.5:
 
