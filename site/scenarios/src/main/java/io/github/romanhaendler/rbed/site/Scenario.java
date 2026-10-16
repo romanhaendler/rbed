@@ -34,6 +34,11 @@ abstract class Scenario {
 
   abstract List<Sample> samples();
 
+  /** The Samples for the given parameter values; the same for every value unless overridden. */
+  List<Sample> samples(Map<String, Double> values) {
+    return samples();
+  }
+
   /** Those of its Channels that are Pulse Channels; rbed does not tell a Channel's kind. */
   List<Channel> pulseChannels() {
     return List.of();

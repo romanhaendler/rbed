@@ -20,6 +20,8 @@ public final class Bridge {
   private static final List<Scenario> SCENARIOS = List.of(
       new FirstRule(),
       new EventLifecycle(),
+      new EndConditions(),
+      new DataGaps(),
       new AggregatesScenario(),
       new PulseChannels());
 
@@ -85,10 +87,11 @@ public final class Bridge {
   public static String run(String scenarioId, String parameters, String drawnChannels) {
     try {
       Scenario scenario = scenario(scenarioId);
-      List<Sample> samples = scenario.samples();
+      Map<String, Double> values = values(scenario, parameters);
+      List<Sample> samples = scenario.samples(values);
       Lifecycle lifecycle = new Lifecycle();
       Detector detector = Detector.builder()
-          .rules(scenario.rules(values(scenario, parameters)))
+          .rules(scenario.rules(values))
           .listener(lifecycle)
           .build();
       for (Sample sample : samples) {
