@@ -12,6 +12,11 @@ test('a path below the base is the page path, with or without its trailing slash
   assert.equal(pathOf('/event-lifecycle/', '/'), '/event-lifecycle/');
 });
 
+test("a page's index.html, as GitHub Pages also serves it, is the page", () => {
+  assert.equal(pathOf('/rbed/cranes/index.html', '/rbed/'), '/cranes/');
+  assert.equal(pathOf('/rbed/index.html', '/rbed/'), '/');
+});
+
 test('a path outside the base is no page path', () => {
   assert.equal(pathOf('/other/', '/rbed/'), undefined);
   assert.equal(pathOf('/rbedx/', '/rbed/'), undefined);

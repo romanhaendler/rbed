@@ -4,7 +4,7 @@
 import { parse } from './markdown.ts';
 import { type Page, rubricOf } from './pages.ts';
 
-export type SearchItem = { id: string; label: string; group: string; keywords: string[] };
+type SearchItem = { id: string; label: string; group: string; keywords: string[] };
 
 export function searchItems(
   pages: Page[],

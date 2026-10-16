@@ -216,10 +216,11 @@ export const PAGES: Page[] = [
   },
 ];
 
-/** The page path an address names when the site is served below `base`, or undefined outside it. */
+/** The page path an address names when the site is served below `base`, or undefined outside it.
+ *  A page's index.html is the page. */
 export function pathOf(pathname: string, base: string): string | undefined {
   if (!(pathname + '/').startsWith(base)) return undefined;
-  return ('/' + pathname.slice(base.length)).replace(/\/?$/, '/');
+  return ('/' + pathname.slice(base.length)).replace(/index\.html$/, '').replace(/\/?$/, '/');
 }
 
 export function pageAt(pathname: string, base: string): Page | undefined {

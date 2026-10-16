@@ -5,8 +5,8 @@ import { test } from 'node:test';
 import { fillSource, fromQuery, toQuery, usedParameters } from '../src/parameters.ts';
 
 const PARAMETERS = [
-  { id: 'threshold', default: 80 },
-  { id: 'duration', default: 30 },
+  { id: 'threshold', default: 80, min: 60, max: 90, step: 0.5 },
+  { id: 'duration', default: 30, min: 0, max: 60, step: 0.05 },
 ];
 
 test('an address without parameters gives the defaults', () => {
@@ -17,10 +17,21 @@ test('a parameter in the address overrides its default, unknown ones are ignored
   assert.deepEqual(fromQuery('?threshold=72.5&x=1', PARAMETERS), { threshold: 72.5, duration: 30 });
 });
 
-test('a value that is no finite number is passed on as NaN, for rbed to reject', () => {
-  assert.ok(Number.isNaN(fromQuery('?threshold=abc', PARAMETERS).threshold));
-  assert.ok(Number.isNaN(fromQuery('?threshold=Infinity', PARAMETERS).threshold));
+test('a value that is no finite number gives the default', () => {
+  assert.equal(fromQuery('?threshold=abc', PARAMETERS).threshold, 80);
+  assert.equal(fromQuery('?threshold=Infinity', PARAMETERS).threshold, 80);
   assert.equal(fromQuery('?threshold=', PARAMETERS).threshold, 80);
+});
+
+test("a value is kept to its control's range and steps, so the source shows what runs", () => {
+  assert.equal(fromQuery('?threshold=1000', PARAMETERS).threshold, 90);
+  assert.equal(fromQuery('?threshold=-5', PARAMETERS).threshold, 60);
+  assert.equal(fromQuery('?threshold=72.3', PARAMETERS).threshold, 72.5);
+  assert.equal(fromQuery('?threshold=72.2', PARAMETERS).threshold, 72);
+  assert.equal(fromQuery('?duration=0.15000001', PARAMETERS).duration, 0.15, 'no binary noise');
+  const choice = [{ id: 'mode', default: 0, min: 0, max: 2, step: 1, options: [{ source: 'a' }, { source: 'b' }, { source: 'c' }] }];
+  assert.equal(fromQuery('?mode=1.4', choice).mode, 1);
+  assert.equal(fromQuery('?mode=7', choice).mode, 2);
 });
 
 test('only values that differ from the default go into the address, other keys stay', () => {
@@ -51,8 +62,8 @@ test('a choice stands for its option, whose placeholders are filled in too', () 
     'when(temp.rate().above(24))',
   );
   assert.equal(
-    fillSource(template, parameters, { expression: 1, samples: 7, threshold: NaN }),
-    'when(temp.averageOverSamples(7).above(Double.NaN))',
+    fillSource(template, parameters, { expression: 1, samples: 7, threshold: 24.5 }),
+    'when(temp.averageOverSamples(7).above(24.5))',
   );
 });
 

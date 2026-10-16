@@ -2,8 +2,14 @@ package io.github.romanhaendler.rbed.site;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.romanhaendler.rbed.Channel;
+import io.github.romanhaendler.rbed.Detector;
+import io.github.romanhaendler.rbed.Expression;
+import io.github.romanhaendler.rbed.Rule;
+import io.github.romanhaendler.rbed.Sample;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -12,6 +18,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
+import java.util.function.BiFunction;
+import java.util.function.BinaryOperator;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 
@@ -22,7 +31,9 @@ import org.junit.jupiter.api.Test;
  *
  * <p>The domain tests repeat the expected Event lists of rbed's example tests as literals: this
  * module cannot depend on rbed's test code, which is not in its jar. Each names the example test
- * it mirrors, so a change to an example is made in both places.
+ * it mirrors, so a change to an example is made in both places. The bridge returns Events in the
+ * order they started, so a list here may be in another order than the example's, which lists
+ * them as they Ended.
  */
 class BridgeTest {
   static final List<String> calls = new ArrayList<>();
@@ -131,9 +142,9 @@ class BridgeTest {
     }
     assertEquals(List.of(
             "LoadLifted 1500..6500 pallet",
+            "LoadLifted 8500..12500 container",
             "Overload 10500..11500",
-            "PartialSetDown 11500..12500",
-            "LoadLifted 8500..12500 container"),
+            "PartialSetDown 11500..12500"),
         described);
   }
 
@@ -142,10 +153,10 @@ class BridgeTest {
   @Test
   void manufacturingAtDefaultsYieldsTheMachineToolOverheatExamplesEvents() {
     assertEquals(List.of(
+            "HighLoad 100..400",
             "FastHeating 101..141",
             "Overheat 121..331",
-            "OverheatUnderLoad 151..391",
-            "HighLoad 100..400"),
+            "OverheatUnderLoad 151..391"),
         describe(run("manufacturing", "{}"), 1000));
   }
 
@@ -171,9 +182,9 @@ class BridgeTest {
   void healthcareAtDefaultsYieldsTheVitalSignsExamplesEvents() {
     assertEquals(List.of(
             "Tachycardia 60..159 truncatedEnd",
+            "Desaturation 120..200",
             "HypoxicTachycardia 130..160",
             "SensorLost 155..170",
-            "Desaturation 120..200",
             "Tachycardia 170..300 truncatedStart"),
         describe(run("healthcare", "{}"), 1000));
   }
@@ -185,12 +196,12 @@ class BridgeTest {
     Map<String, Object> result = run("automotive", "{}");
     assertEquals(List.of(
             "Idling 60..301",
-            "HarshBraking 901..905",
             "Trip 301..904",
+            "HarshBraking 901..905",
             "Idling 904..1499 truncatedEnd"),
         describe(result, 1000));
     // the example's km(trip): 11.94
-    assertEquals(Arrays.asList(null, null, "11.94 km", null), notes(result));
+    assertEquals(Arrays.asList(null, "11.94 km", null, null), notes(result));
   }
 
   // Mirrors the expected list of rbed's own test
@@ -231,7 +242,7 @@ class BridgeTest {
   // examples.FloodWarningExample#warnsWhileRisingAndLiftsWithHysteresis; change both together.
   @Test
   void environmentAtDefaultsYieldsTheFloodWarningExamplesEvents() {
-    assertEquals(List.of("Receding 12.25..26", "FloodWarning 5.25..31.25"),
+    assertEquals(List.of("FloodWarning 5.25..31.25", "Receding 12.25..26"),
         describe(run("environment", "{}"), 3_600_000));
   }
 
@@ -244,10 +255,10 @@ class BridgeTest {
     assertEquals(List.of(
             "Sprint 60..90", "Recovered 141..180",
             "Sprint 180..210", "Recovered 261..300",
-            "Sprint 300..330", "Recovered 381..419 truncatedEnd",
-            "SessionDone 305..419 truncatedEnd"),
+            "Sprint 300..330", "SessionDone 305..419 truncatedEnd",
+            "Recovered 381..419 truncatedEnd"),
         describe(result, 1000));
-    assertEquals(Arrays.asList(null, "51 s", null, "51 s", null, "51 s", null), notes(result));
+    assertEquals(Arrays.asList(null, "51 s", null, "51 s", null, null, "51 s"), notes(result));
   }
 
   // Mirrors the expected list of rbed's own test
@@ -310,9 +321,21 @@ class BridgeTest {
   }
 
   @Test
-  void invalidThresholdReturnsRbedsMessage() {
-    assertEquals(Map.of("error", "Limit is Infinity"), run("first-rule", "{\"threshold\": 1e999}"));
-    assertEquals(Map.of("error", "Limit is NaN"), run("first-rule", "{\"threshold\": null}"));
+  void aValueThatIsNoNumberInItsControlsRangeIsRejectedByTheBridge() {
+    // The page never sends one (parameters.ts falls back and clamps); this is the backstop.
+    assertEquals(Map.of("error", "Parameter threshold is not a number between 60 and 90"),
+        run("first-rule", "{\"threshold\": 1e999}"));
+    assertEquals(Map.of("error", "Parameter threshold is not a number between 60 and 90"),
+        run("first-rule", "{\"threshold\": null}"));
+    assertEquals(Map.of("error", "Parameter threshold is not a number between 60 and 90"),
+        run("first-rule", "{\"threshold\": 59}"));
+    // Scenarios that round a value: TeaVM's Math.round throws on NaN, where the JVM gives 0.
+    assertEquals(Map.of("error", "Parameter duration is not a number between 0 and 6"),
+        run("event-lifecycle", "{\"duration\": null}"));
+    assertEquals(Map.of("error", "Parameter restart is not a number between 20 and 180"),
+        run("history", "{\"restart\": null}"));
+    assertEquals(Map.of("error", "Parameter rate is not a number between 1 and 20"),
+        run("sampling-rate", "{\"mode\": 1, \"rate\": 0}"));
   }
 
   @Test
@@ -339,12 +362,6 @@ class BridgeTest {
         events(result));
     assertEquals(List.of("3000", "12000", "17000"), confirmed(result));
     assertEquals(List.of(), discarded(result));
-  }
-
-  @Test
-  void negativeLifecycleDurationReturnsRbedsMessage() {
-    assertEquals(Map.of("error", "forDuration must be >= 0: -1000"),
-        run("event-lifecycle", "{\"duration\": -1}"));
   }
 
   @Test
@@ -487,26 +504,26 @@ class BridgeTest {
   @Test
   void duringAtDefaultsHoldsOnlyWhileBothGatingEventsAreConfirmed() {
     Map<String, Object> result = run("during", "{}");
-    assertEquals(List.of("Desaturation 100000..160000", "HypoxicTachycardia 110000..160000",
-            "Tachycardia 40000..200000", "Desaturation 230000..260000"),
+    assertEquals(List.of("Tachycardia 40000..200000", "Desaturation 100000..160000",
+            "HypoxicTachycardia 110000..160000", "Desaturation 230000..260000"),
         events(result));
-    assertEquals(List.of("110000", "110000", "70000", "240000"), confirmed(result));
+    assertEquals(List.of("70000", "110000", "110000", "240000"), confirmed(result));
     assertEquals(List.of("Desaturation 20000..25000", "Tachycardia 230000..250000"),
         discarded(result));
   }
 
   @Test
   void aShorterTachycardiaDurationGatesTheLateDesaturationToo() {
-    assertEquals(List.of("Desaturation 100000..160000", "HypoxicTachycardia 110000..160000",
-            "Tachycardia 40000..200000", "Tachycardia 230000..250000",
-            "HypoxicTachycardia 245000..250000", "Desaturation 230000..260000"),
+    assertEquals(List.of("Tachycardia 40000..200000", "Desaturation 100000..160000",
+            "HypoxicTachycardia 110000..160000", "Desaturation 230000..260000",
+            "Tachycardia 230000..250000", "HypoxicTachycardia 245000..250000"),
         events(run("during", "{\"tachycardia\": 15}")));
   }
 
   @Test
   void withoutADesaturationDurationTheCombinationStartsWithTheDip() {
-    assertEquals(List.of("Desaturation 20000..25000", "Desaturation 100000..160000",
-            "HypoxicTachycardia 100000..160000", "Tachycardia 40000..200000",
+    assertEquals(List.of("Desaturation 20000..25000", "Tachycardia 40000..200000",
+            "Desaturation 100000..160000", "HypoxicTachycardia 100000..160000",
             "Desaturation 230000..260000"),
         events(run("during", "{\"desaturation\": 0}")));
   }
@@ -608,15 +625,15 @@ class BridgeTest {
 
   @Test
   void latestAtDefaultsComparesEachLiftWithItsOwnMaximum() {
-    assertEquals(List.of("PartialSetDown 25000..30000", "LoadLifted 10000..40000",
+    assertEquals(List.of("LoadLifted 10000..40000", "PartialSetDown 25000..30000",
             "LoadLifted 60000..90000"),
         events(run("latest", "{}")));
   }
 
   @Test
   void aHigherLatestFractionFindsTheSecondLiftsSetDownToo() {
-    assertEquals(List.of("PartialSetDown 25000..30000", "LoadLifted 10000..40000",
-            "PartialSetDown 75000..80000", "LoadLifted 60000..90000"),
+    assertEquals(List.of("LoadLifted 10000..40000", "PartialSetDown 25000..30000",
+            "LoadLifted 60000..90000", "PartialSetDown 75000..80000"),
         events(run("latest", "{\"fraction\": 0.6}")));
   }
 
@@ -725,33 +742,33 @@ class BridgeTest {
 
   @Test
   void validationAtDefaultsFindsTheWarmSpellAndTheHotPartOfIt() {
-    assertEquals(List.of("Hot 14000..30000", "Warm 12000..32000"), events(run("validation", "{}")));
+    assertEquals(List.of("Warm 12000..32000", "Hot 14000..30000"), events(run("validation", "{}")));
   }
 
   @Test
   void anAverageOverMoreSamplesThanTheRetentionLimitIsRejectedByBuild() {
     assertEquals(Map.of("error", "Rule Warm: averageOverSamples(12) exceeds the Retention Limit of"
-            + " 10. Raise it with Detector.builder().retentionLimit(...)."),
+            + " 10. Raise it with Detector.builder().retentionLimit(...).", "by", "rbed"),
         run("validation", "{\"window\": 12}"));
-    assertEquals(List.of("Hot 14000..30000", "Warm 12000..32000"),
+    assertEquals(List.of("Warm 12000..32000", "Hot 14000..30000"),
         events(run("validation", "{\"window\": 5, \"retention\": 5}")));
   }
 
   @Test
   void aRetentionLimitBelowOneIsRejected() {
-    assertEquals(Map.of("error", "Retention Limit must be >= 1: 0"),
+    assertEquals(Map.of("error", "Retention Limit must be >= 1: 0", "by", "rbed"),
         run("validation", "{\"retention\": 0}"));
   }
 
   @Test
   void aNegativeDurationIsRejected() {
-    assertEquals(Map.of("error", "forDuration must be >= 0: -1000"),
+    assertEquals(Map.of("error", "forDuration must be >= 0: -1000", "by", "rbed"),
         run("validation", "{\"duration\": -1}"));
   }
 
   @Test
   void aRuleAddedBeforeTheRuleItRefersToIsRejectedByBuild() {
-    assertEquals(Map.of("error", "Rule Hot references Warm, which is not added before it"),
+    assertEquals(Map.of("error", "Rule Hot references Warm, which is not added before it", "by", "rbed"),
         run("validation", "{\"order\": 1}"));
   }
 
@@ -760,24 +777,24 @@ class BridgeTest {
   @Test
   void withHistoryTheRestartedDetectorKnowsTheLastMaintenance() {
     Map<String, Object> result = run("history", "{}");
-    assertEquals(List.of("Maintenance 10..11", "OverdueService 0..11 truncatedStart",
-            "Maintenance 140..141", "OverdueService 102..141"),
+    assertEquals(List.of("OverdueService 0..11 truncatedStart", "Maintenance 10..11",
+            "OverdueService 102..141", "Maintenance 140..141"),
         describe(result, DAY));
     assertEquals(60.0 * DAY, result.get("restart"));
   }
 
   @Test
   void withoutHistoryTheRestartedDetectorFindsTheServiceOverdueAtOnce() {
-    assertEquals(List.of("Maintenance 10..11", "OverdueService 0..11 truncatedStart",
-            "Maintenance 140..141", "OverdueService 60..141 truncatedStart"),
+    assertEquals(List.of("OverdueService 0..11 truncatedStart", "Maintenance 10..11",
+            "OverdueService 60..141 truncatedStart", "Maintenance 140..141"),
         describe(run("history", "{\"history\": 1}"), DAY));
   }
 
   @Test
   void aRestartMoreThanNinetyDaysAfterTheMaintenanceNeedsNoHistory() {
-    List<String> expected = List.of("Maintenance 10..11", "OverdueService 0..11 truncatedStart",
-        "OverdueService 102..119 truncatedEnd", "Maintenance 140..141",
-        "OverdueService 120..141 truncatedStart");
+    List<String> expected = List.of("OverdueService 0..11 truncatedStart", "Maintenance 10..11",
+        "OverdueService 102..119 truncatedEnd", "OverdueService 120..141 truncatedStart",
+        "Maintenance 140..141");
     assertEquals(expected, describe(run("history", "{\"restart\": 120}"), DAY));
     assertEquals(expected, describe(run("history", "{\"restart\": 120, \"history\": 1}"), DAY));
   }
@@ -934,5 +951,118 @@ class BridgeTest {
         run("first-rule", "{}", "{\"temp\": [1, 2]}"));
     assertEquals(Map.of("error", "Drawn Channel temp has a value that is not a number"),
         run("first-rule", "{}", "{\"temp\": [1, \"x\", 3]}"));
+  }
+
+  @Test
+  void malformedJsonIsRejectedAsInvalidJson() {
+    for (String parameters : List.of("{\"threshold\": 1.2.3}", "{\"threshold\": 80} x",
+        "{\"thres", "{\"\\uZZZZ\": 1}", "{\"\\u+0ff\": 1}", "{\"\\u00", "{\"threshold\" 80}",
+        "[1, 2", "")) {
+      Object error = run("first-rule", parameters).get("error");
+      assertTrue(error instanceof String s && s.startsWith("Invalid JSON: expected "),
+          parameters + ": " + error);
+    }
+    assertEquals(Map.of("\u00e9", "\u20ac"), Json.parse("{\"\\u00E9\": \"\\u20ac\"}"));
+  }
+
+  /** A Scenario that plots its Channel {@code a} through a given Expression, for ExpressionValues. */
+  static Scenario plotting(String name, BiFunction<Channel, Channel, Expression>
+      expression, double[] a, double[] b) {
+    Channel ca = Channel.named("a");
+    Channel cb = Channel.named("b");
+    Expression plotted = expression.apply(ca, cb);
+    return new Scenario("plot " + name, name, "s", 1000, List.of(ca, cb), List.of(), "") {
+      @Override
+      List<Sample> samples(Map<String, Double> values) {
+        List<Sample> samples = new ArrayList<>();
+        for (int i = 0; i < a.length; i++) {
+          samples.add(new Sample(1000L * (i + 1), Map.of(ca, a[i], cb, b[i])));
+        }
+        return samples;
+      }
+
+      @Override
+      Rule[] rules(Map<String, Double> values) {
+        return new Rule[] {Rule.named("Any").when(ca.above(0))};
+      }
+
+      @Override
+      Plot plot(Map<String, Double> values) {
+        return new Plot(name, plotted, 0);
+      }
+    };
+  }
+
+  @Test
+  void aScenarioThatAdvancesTimeBeforeItsFirstSampleCannotBePlotted() {
+    Channel a = Channel.named("a");
+    Scenario early = new Scenario("early", "early", "s", 1000, List.of(a), List.of(), "") {
+      @Override
+      List<Sample> samples(Map<String, Double> values) {
+        return List.of(new Sample(2000, Map.of(a, 1.0)));
+      }
+
+      @Override
+      Rule[] rules(Map<String, Double> values) {
+        return new Rule[] {Rule.named("Any").when(a.above(0))};
+      }
+
+      @Override
+      void detect(Rule[] rules, List<Sample> samples, Map<String, Double> values,
+          Lifecycle lifecycle) {
+        Detector detector =
+            Detector.builder().rules(rules).listener(lifecycle).build();
+        lifecycle.advance(detector, 1000);
+        lifecycle.push(detector, samples.get(0));
+        detector.close();
+      }
+    };
+    IllegalStateException e = assertThrows(
+        IllegalStateException.class,
+        () -> ExpressionValues.of(early, a, Map.of(), early.samples(Map.of())));
+    assertEquals("Scenario early advances time before its first Sample", e.getMessage());
+  }
+
+  /**
+   * ExpressionValues finds rbed's value of an Expression by comparisons alone; it must give the
+   * double rbed computes bit for bit, for random and special values (negative, -0.0, subnormal,
+   * huge) and where the Expression is undefined (a division by zero).
+   */
+  @Test
+  void plottedValuesAreExactlyTheDoublesRbedComputes() {
+    Random random = new Random(42);
+    double[] special = {0.0, -0.0, Double.MIN_VALUE, -Double.MIN_VALUE, Double.MIN_NORMAL,
+        Double.MAX_VALUE, -Double.MAX_VALUE, 1e-300, -1e300, 0.1, -0.3, 1, -1, 3};
+    int n = 120;
+    double[] a = new double[n];
+    double[] b = new double[n];
+    for (int i = 0; i < n; i++) {
+      a[i] = i < special.length ? special[i] : (random.nextDouble() - 0.5) * Math.pow(10, random.nextInt(20) - 10);
+      b[i] = i < special.length ? special[special.length - 1 - i] : (random.nextDouble() - 0.5) * 1000;
+    }
+    b[5] = 0; // a / b undefined there
+    Map<String, BinaryOperator<Double>> expected = Map.of(
+        "a", (x, y) -> x,
+        "a-b", (x, y) -> x - y,
+        "a*b", (x, y) -> x * y,
+        "a/b", (x, y) -> y == 0 ? Double.NaN : x / y,
+        "-|a-b|", (x, y) -> -Math.abs(x - y));
+    Map<String, BiFunction<Channel, Channel, Expression>> expressions = Map.of(
+        "a", (x, y) -> x,
+        "a-b", Expression::minus,
+        "a*b", Expression::times,
+        "a/b", Expression::dividedBy,
+        "-|a-b|", (x, y) -> x.minus(y).abs().times(-1));
+    for (String name : expected.keySet()) {
+      Scenario scenario = plotting(name, expressions.get(name), a, b);
+      double[] values = ExpressionValues.of(scenario, scenario.plot(Map.of()).expression(),
+          Map.of(), scenario.samples(Map.of())).atSamples();
+      for (int i = 0; i < n; i++) {
+        double want = expected.get(name).apply(a[i], b[i]) + 0.0; // the site writes -0.0 as 0
+        if (!Double.isFinite(want)) want = Double.NaN; // rbed: undefined
+        assertEquals(Double.doubleToLongBits(want), Double.doubleToLongBits(values[i]),
+            name + " at " + i + ": " + a[i] + ", " + b[i] + " gives " + values[i]);
+      }
+    }
   }
 }

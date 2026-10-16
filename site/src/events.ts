@@ -8,7 +8,7 @@ import type { Discard, Event } from './bridge.ts';
 export type Lifecycle = { events: Event[]; discarded: Discard[] };
 
 /** A Scenario's time unit: its name and its length in milliseconds. */
-export type TimeUnit = { name: string; millis: number };
+type TimeUnit = { name: string; millis: number };
 
 export const ofRule = ({ events, discarded }: Lifecycle, rule: string): Lifecycle => ({
   events: events.filter((e) => e.name === rule),
@@ -25,7 +25,7 @@ export const timeIn =
     `${ms / millis} ${name}`;
 
 /** Which edges of the Event are Truncated: "start", "end", "start, end" or "". */
-export const truncatedText = (e: Event) => [e.truncatedStart && 'start', e.truncatedEnd && 'end'].filter(Boolean).join(', ');
+const truncatedText = (e: Event) => [e.truncatedStart && 'start', e.truncatedEnd && 'end'].filter(Boolean).join(', ');
 
 /** Whether the Event table has a Note column: only when the Scenario's listener notes something. */
 export const hasNotes = (events: Event[]) => events.some((e) => e.note !== undefined);

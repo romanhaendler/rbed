@@ -1,8 +1,9 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
-import { prerender, rbedVersion } from './prerender.mjs';
+import { prerender } from './prerender.mjs';
+import { rbedVersion } from './version.mjs';
 
-const root = (path: string) => fileURLToPath(new URL(path, import.meta.url));
+const root = (path) => fileURLToPath(new URL(path, import.meta.url));
 
 const version = rbedVersion();
 

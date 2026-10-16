@@ -1,18 +1,22 @@
 # The interactive documentation site (site/, ADR-0005) on GitHub Pages: https://romanhaendler.github.io/rbed/
-# Built from the rbed sources of the same commit; deployed on every push to main, or by hand.
-# The JUnit and Node parity tests run first, so a failing one stops the deployment.
+# Built from the rbed sources of the same commit, with its Javadoc at /rbed/api/; deployed on every
+# push to main, or by hand. On a pull request it is built and tested, not deployed, so a library
+# change the site cannot compile shows up before the merge.
+# rbed's own tests run first, then the JUnit, Node parity and browser tests of the site; a failing
+# one stops the deployment.
 name: Pages
 
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -33,17 +37,27 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: site/package-lock.json
+      - run: mvn -B -q verify
+        working-directory: .
       - run: npm ci
       - run: npm test
-      # npm test has already installed rbed and compiled the Scenarios with TeaVM
+      # npm test has already installed rbed, built its Javadoc and compiled the Scenarios with TeaVM
       - run: npm run build:web
-      - run: npx playwright install --with-deps chromium
+      # the browser itself is cached, keyed on the @playwright/test version of package.json; its
+      # system libraries come from apt on every run
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-1.63.0
+      - run: npx playwright install chromium && npx playwright install-deps chromium
       - run: npm run test:browser
-      - uses: actions/upload-pages-artifact@v5
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v5
         with:
           path: site/dist
 
   deploy:
+    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-24.04
     permissions:
