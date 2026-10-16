@@ -1,5 +1,6 @@
 // The two functions of the Scenario module (site/scenarios, Bridge.java), typed.
 import * as compiled from 'rbed-scenarios';
+import type { Aggregates } from './aggregates.ts';
 
 export type Parameter = {
   id: string;
@@ -16,6 +17,8 @@ export type Scenario = {
   title: string;
   timeUnit: { name: string; millis: number };
   channels: string[];
+  /** Those of the Channels that are Pulse Channels: a value only in the Samples that carry one. */
+  pulse: string[];
   /** Names of the Rules, which are the names of their Events. */
   rules: string[];
   parameters: Parameter[];
@@ -30,6 +33,8 @@ export type Event = {
   end: number;
   truncatedStart: boolean;
   truncatedEnd: boolean;
+  /** By Channel name, for each Channel the Rule aggregates. */
+  aggregates: Record<string, Aggregates>;
 };
 
 export type Result =

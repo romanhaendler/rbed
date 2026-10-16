@@ -1,5 +1,6 @@
 package io.github.romanhaendler.rbed.site;
 
+import io.github.romanhaendler.rbed.Aggregates;
 import io.github.romanhaendler.rbed.Channel;
 import io.github.romanhaendler.rbed.Detector;
 import io.github.romanhaendler.rbed.Event;
@@ -16,13 +17,16 @@ import org.teavm.jso.JSExport;
  * exports every reachable class that has such methods.
  */
 public final class Bridge {
-  private static final List<Scenario> SCENARIOS = List.of(new FirstRule());
+  private static final List<Scenario> SCENARIOS = List.of(
+      new FirstRule(),
+      new AggregatesScenario(),
+      new PulseChannels());
 
   private Bridge() {}
 
   /**
    * The catalogue: a JSON array with, for each Scenario, its id, title, time unit, Channel names,
-   * Rule names, parameters (with default and limits) and source template.
+   * the names of its Pulse Channels, Rule names, parameters (with default and limits) and source template.
    */
   @JSExport
   public static String scenarios() {
@@ -37,6 +41,11 @@ public final class Bridge {
       for (int i = 0; i < s.channels.size(); i++) {
         if (i > 0) out.append(',');
         Json.string(out, s.channels.get(i).name());
+      }
+      out.append("],\"pulse\":[");
+      for (int i = 0; i < s.pulseChannels().size(); i++) {
+        if (i > 0) out.append(',');
+        Json.string(out, s.pulseChannels().get(i).name());
       }
       out.append("],\"rules\":[");
       Rule[] rules = s.rules(values(s, "{}"));
@@ -135,9 +144,29 @@ public final class Bridge {
           .append(",\"confirmed\":").append(e.confirmed().getAsLong())
           .append(",\"end\":").append(e.end().getAsLong())
           .append(",\"truncatedStart\":").append(e.truncatedStart())
-          .append(",\"truncatedEnd\":").append(e.truncatedEnd())
-          .append('}');
+          .append(",\"truncatedEnd\":").append(e.truncatedEnd());
+      aggregates(out.append(",\"aggregates\":"), scenario, e).append('}');
     }
     return out.append("]}").toString();
+  }
+
+  /** The Event's Aggregates by Channel name, in the Scenario's Channel order; NaN becomes null. */
+  private static StringBuilder aggregates(StringBuilder out, Scenario scenario, Event e) {
+    out.append('{');
+    boolean first = true;
+    for (Channel channel : scenario.channels) {
+      Aggregates a = e.aggregates().get(channel);
+      if (a == null) continue;
+      if (!first) out.append(',');
+      first = false;
+      Json.string(out, channel.name()).append(':');
+      Json.number(out.append("{\"min\":"), a.min());
+      Json.number(out.append(",\"max\":"), a.max());
+      Json.number(out.append(",\"mean\":"), a.mean());
+      out.append(",\"count\":").append(a.count());
+      Json.number(out.append(",\"timeWeightedMean\":"), a.timeWeightedMean());
+      Json.number(out.append(",\"integral\":"), a.integral()).append('}');
+    }
+    return out.append('}');
   }
 }

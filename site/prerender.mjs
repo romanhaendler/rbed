@@ -9,6 +9,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { aggregatesLine } from './src/aggregates.ts';
 import { escape, parse, SCENARIO_MARKER } from './src/markdown.ts';
 import { markdownFile, PAGES, titleOf } from './src/pages.ts';
 
@@ -41,13 +42,14 @@ function eventRows({ unit, millis, result }) {
   if ('error' in result) return `rbed rejects the default parameters: ${result.error}`;
   if (result.events.length === 0) return 'No Event at the default parameters.';
   return [
-    ['Name', `Start (${unit})`, `Confirmed (${unit})`, `End (${unit})`, 'Truncated'],
+    ['Name', `Start (${unit})`, `Confirmed (${unit})`, `End (${unit})`, 'Truncated', 'Aggregates'],
     ...result.events.map((e) => [
       e.name,
       String(e.start / millis),
       String(e.confirmed / millis),
       String(e.end / millis),
       [e.truncatedStart && 'start', e.truncatedEnd && 'end'].filter(Boolean).join(', '),
+      Object.entries(e.aggregates).map(([channel, a]) => aggregatesLine(channel, a)).join('; '),
     ]),
   ];
 }
