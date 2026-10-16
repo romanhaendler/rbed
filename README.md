@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/romanhaendler/rbed/actions/workflows/ci.yml/badge.svg)](https://github.com/romanhaendler/rbed/actions/workflows/ci.yml) [![Maven Central](https://img.shields.io/maven-central/v/io.github.romanhaendler/rbed)](https://central.sonatype.com/artifact/io.github.romanhaendler/rbed)
 
+**Try it in the browser:** [romanhaendler.github.io/rbed](https://romanhaendler.github.io/rbed/), interactive documentation that runs rbed live.
+
 A small Java 17 library that finds **Events** in multi-channel time series by evaluating declarative **Rules**, on a live stream or over a recorded series. Zero runtime dependencies.
 
 You describe *what* an Event is ("the weight is above 500 kg for 2 seconds", "the temperature rises again within 10 minutes after the door was opened"), and rbed tells you *when* it happened: when it started, when it was confirmed, when it ended, and what the data looked like in between.
