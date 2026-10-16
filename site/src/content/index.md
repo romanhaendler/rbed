@@ -36,13 +36,13 @@ Three steps are always the same:
 
 ## Domain examples
 
-Runnable end-to-end examples from different domains, each a test with its expected Events.
+Runnable end-to-end examples from different domains, each a test with its expected Events; those with a page of their own run live here.
 
-- [**Cranes** `CraneScenarioTest` hysteresis, during, classifying a load, partial set-down via latest](https://github.com/romanhaendler/rbed/blob/main/src/test/java/io/github/romanhaendler/rbed/CraneScenarioTest.java)
-- [**Manufacturing** `MachineToolOverheatExample` sampling-rate mode, rate, combined durings](https://github.com/romanhaendler/rbed/blob/main/src/test/java/io/github/romanhaendler/rbed/examples/MachineToolOverheatExample.java)
-- [**Building services** `HvacShortCyclingExample` after().within(), count().within()](https://github.com/romanhaendler/rbed/blob/main/src/test/java/io/github/romanhaendler/rbed/examples/HvacShortCyclingExample.java)
-- [**Healthcare** `VitalSignsExample` advanceTo and age() for a silent sensor, maxGap](https://github.com/romanhaendler/rbed/blob/main/src/test/java/io/github/romanhaendler/rbed/examples/VitalSignsExample.java)
-- [**Automotive** `FleetTelematicsExample` deceleration via rate, distance via integral](https://github.com/romanhaendler/rbed/blob/main/src/test/java/io/github/romanhaendler/rbed/examples/FleetTelematicsExample.java)
+- [**Cranes** `CraneScenarioTest` hysteresis, during, classifying a load, partial set-down via latest](cranes/)
+- [**Manufacturing** `MachineToolOverheatExample` sampling-rate mode, rate, combined durings](manufacturing/)
+- [**Building services** `HvacShortCyclingExample` after().within(), count().within()](building-services/)
+- [**Healthcare** `VitalSignsExample` advanceTo and age() for a silent sensor, maxGap](healthcare/)
+- [**Automotive** `FleetTelematicsExample` deceleration via rate, distance via integral](automotive/)
 - [**Finance** `TradingSignalsExample` moving-average crosses, truncated start after warm-up](https://github.com/romanhaendler/rbed/blob/main/src/test/java/io/github/romanhaendler/rbed/examples/TradingSignalsExample.java)
 - [**Logistics** `ColdChainExample` attributing a cause with after, totalDuration limit](https://github.com/romanhaendler/rbed/blob/main/src/test/java/io/github/romanhaendler/rbed/examples/ColdChainExample.java)
 - [**Environment** `FloodWarningExample` smoothed rate of a moving average, hysteresis](https://github.com/romanhaendler/rbed/blob/main/src/test/java/io/github/romanhaendler/rbed/examples/FloodWarningExample.java)
