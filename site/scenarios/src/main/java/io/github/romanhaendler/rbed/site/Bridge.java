@@ -19,6 +19,8 @@ public final class Bridge {
   private static final List<Scenario> SCENARIOS = List.of(
       new FirstRule(),
       new EventLifecycle(),
+      new EndConditions(),
+      new DataGaps(),
       new Expressions(),
       new AggregatesScenario(),
       new PulseChannels(),
@@ -101,10 +103,10 @@ public final class Bridge {
   public static String run(String scenarioId, String parameters, String drawnChannels) {
     try {
       Scenario scenario = scenario(scenarioId);
-      List<Sample> samples = scenario.samples();
       Map<String, Double> values = values(scenario, parameters);
+      List<Sample> samples = scenario.samples(values);
       Lifecycle lifecycle = new Lifecycle();
-      scenario.detect(scenario.rules(values), lifecycle);
+      scenario.detect(scenario.rules(values), samples, lifecycle);
       return result(scenario, values, samples, lifecycle);
     } catch (RuntimeException e) {
       return Json.string(new StringBuilder("{\"error\":"), String.valueOf(e.getMessage()))

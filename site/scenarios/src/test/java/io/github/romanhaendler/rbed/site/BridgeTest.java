@@ -240,6 +240,65 @@ class BridgeTest {
   }
 
   @Test
+  void anEndConditionAtTheStartThresholdLetsTheNoisyWeightFlap() {
+    // With an End Condition, `when` is not evaluated while the Event runs: a new Event starts
+    // only after the weight has been seen at or below 500 again, so 508 at 6 s starts none.
+    assertEquals(List.of("LoadLifted 4000..5000", "LoadLifted 10000..12000",
+            "LoadLifted 15000..17000", "LoadLifted 21000..22000"),
+        events(run("end-conditions", "{}")));
+  }
+
+  @Test
+  void movingTheEndThresholdApartLeavesOnlyTheSwingAsASecondEvent() {
+    assertEquals(List.of("LoadLifted 4000..14000", "LoadLifted 18000..22000"),
+        events(run("end-conditions", "{\"end\": 450}")));
+  }
+
+  @Test
+  void anEndThresholdBelowTheSwingKeepsOneEvent() {
+    assertEquals(List.of("LoadLifted 4000..22000"),
+        events(run("end-conditions", "{\"end\": 440}")));
+    assertEquals(List.of("LoadLifted 4000..23000"),
+        events(run("end-conditions", "{\"end\": 50}")));
+  }
+
+  @Test
+  void anEndDurationKeepsTheEventAcrossTheSwingAndEndsItWhereTheWeightDropped() {
+    assertEquals(List.of("LoadLifted 4000..22000"),
+        events(run("end-conditions", "{\"end\": 450, \"endDuration\": 1}")));
+  }
+
+  @Test
+  void anEndConditionThatNeverHoldsEndsTheEventTruncatedAtClose() {
+    assertEquals(List.of("LoadLifted 4000..29000 truncatedEnd"),
+        events(run("end-conditions", "{\"end\": 0}")));
+  }
+
+  @Test
+  void aGapLongerThanMaxGapEndsTheEventAtTheGapAndTruncatesBothSides() {
+    assertEquals(List.of("Running 6000..12000 truncatedEnd", "Running 18000..32000 truncatedStart"),
+        events(run("data-gaps", "{}")));
+  }
+
+  @Test
+  void aMaxGapAsLongAsTheGapKeepsTheEventAcrossIt() {
+    assertEquals(List.of("Running 6000..32000"),
+        events(run("data-gaps", "{\"maxGap\": 6}")));
+  }
+
+  @Test
+  void aGapOutsideTheEventLeavesItComplete() {
+    assertEquals(List.of("Running 6000..32000"),
+        events(run("data-gaps", "{\"gap\": 33}")));
+  }
+
+  @Test
+  void anEventRightAfterAGapHasATruncatedStart() {
+    assertEquals(List.of("Running 8000..32000 truncatedStart"),
+        events(run("data-gaps", "{\"gap\": 2}")));
+  }
+
+  @Test
   void resultHasTheSamples() {
     assertEquals(List.of(
             Map.of("timestamp", 1000.0, "values", Map.of("temp", 75.0)),
