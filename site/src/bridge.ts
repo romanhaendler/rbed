@@ -37,10 +37,14 @@ export type Event = {
   aggregates: Record<string, Aggregates>;
 };
 
+/** A Pending Event that stopped holding before it was Confirmed, and when that was noticed. */
+export type Discard = { name: string; start: number; discarded: number };
+
 export type Result =
   | {
       samples: { timestamp: number; values: Record<string, number | null> }[];
       events: Event[];
+      discarded: Discard[];
     }
   | { error: string };
 

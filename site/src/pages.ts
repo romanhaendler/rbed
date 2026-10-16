@@ -23,6 +23,13 @@ export const PAGES: Page[] = [
       'Rule-based event detection in time series: a small Java library that finds Events in multi-channel data by evaluating declarative Rules.',
   },
   {
+    path: '/event-lifecycle/',
+    title: 'The Event lifecycle',
+    description:
+      'How an Event goes Pending, is Confirmed or Discarded, and Ends, and what forDuration has to do with it.',
+    rubric: 'Guide',
+  },
+  {
     path: '/aggregates/',
     title: 'Aggregates',
     description:
