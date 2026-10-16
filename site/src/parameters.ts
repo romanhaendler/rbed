@@ -7,6 +7,10 @@ type Parameter = { id: string; default: number; options?: { source: string }[] }
 
 const PLACEHOLDER = /\$\{(\w+)\}/g;
 
+/** Every parameter's default value, by id. */
+export const defaultsOf = (parameters: Parameter[]): Record<string, number> =>
+  Object.fromEntries(parameters.map((p) => [p.id, p.default]));
+
 /** The source with each ${id} replaced: a choice by its option's source (filled in the same way),
  *  a number by its value. */
 export function fillSource(template: string, parameters: Parameter[], values: Record<string, number>): string {
