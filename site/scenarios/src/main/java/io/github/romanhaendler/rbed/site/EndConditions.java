@@ -26,6 +26,10 @@ final class EndConditions extends Scenario {
             new Parameter("end", "End threshold", 500, 0, 500, 10, "kg"),
             new Parameter("endDuration", "End duration", 0, 0, 5, 1, "s")),
         """
+        import io.github.romanhaendler.rbed.*;
+        import java.time.Duration;
+        import java.util.Map;
+
         Channel weight = Channel.named("weight");
 
         Rule loadLifted = Rule.named("LoadLifted")

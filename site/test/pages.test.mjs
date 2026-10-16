@@ -27,11 +27,12 @@ test('a page reads its Markdown from the file named after its path, which is als
   assert.equal(markdownFile({ path: '/event-lifecycle/' }), 'event-lifecycle.md');
 });
 
-test("every link from one page to another names a page of the manifest", () => {
+test("every link from one page to another names a page of the manifest or the site's Javadoc", () => {
   for (const page of PAGES) {
     const markdown = readFileSync(new URL(`../src/content/${markdownFile(page)}`, import.meta.url), 'utf8');
     for (const [, link] of markdown.matchAll(/\]\(((?!https?:|mailto:|#)[^)\s]+)\)/g)) {
       const target = new URL(link, `https://site.example/rbed${page.path}`).pathname;
+      if (target.startsWith('/rbed/api/')) continue; // the build checks these against the Javadoc
       assert.ok(pageAt(target, '/rbed/') !== undefined, `${page.path} links ${link}`);
     }
   }

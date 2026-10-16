@@ -27,28 +27,40 @@ final class Healthcare extends Scenario {
             new Parameter("desaturation", "Desaturation below", 90, 85, 95, 1, "%"),
             new Parameter("lost", "Sensor lost after", 5, 1, 20, 1, "s")),
         """
+        import static io.github.romanhaendler.rbed.Conditions.*;
+
+        import io.github.romanhaendler.rbed.*;
+        import java.time.Duration;
+        import java.util.Map;
+
         Channel hr = Channel.named("hr");
         Channel spo2 = Channel.named("spo2");
-        long SECOND = 1_000;
 
         Rule tachycardia = Rule.named("Tachycardia")
-            .when(hr.above(${tachycardia})).forDuration(${tachycardiaSeconds} * SECOND)
-            .endWhen(hr.below(95)).forDuration(30 * SECOND)
-            .maxGap(${maxGap} * SECOND);
+            .when(hr.above(${tachycardia})).forDuration(Duration.ofSeconds(${tachycardiaSeconds}))
+            .endWhen(hr.below(95)).forDuration(Duration.ofSeconds(30))
+            .maxGap(Duration.ofSeconds(${maxGap}));
         Rule desaturation = Rule.named("Desaturation")
-            .when(spo2.below(${desaturation})).forDuration(10 * SECOND)
+            .when(spo2.below(${desaturation})).forDuration(Duration.ofSeconds(10))
             .endWhen(spo2.below(92).not());
         Rule hypoxicTachycardia = Rule.named("HypoxicTachycardia")
             .when(during(tachycardia).and(during(desaturation)));
-        Rule sensorLost = Rule.named("SensorLost").when(hr.age().above(${lost} * SECOND));
+        Rule sensorLost = Rule.named("SensorLost")
+            .when(hr.age().above(Duration.ofSeconds(${lost}).toMillis()));
         Detector detector = Detector.builder()
             .rules(tachycardia, desaturation, hypoxicTachycardia, sensorLost)
-            .listener(listener)
             .build();
 
-        // every second: a Sample, or, during the dropout from 150 to 170 s, a time advance
-        if (dropout) detector.advanceTo(timestamp);
-        else detector.push(timestamp, values);
+        for (long s = 0; s < 600; s++) {   // every second
+          if (s >= 150 && s < 170) {
+            detector.advanceTo(s * 1_000);   // the sensor drops out; the monitor's clock advances time
+          } else {
+            detector.push(s * 1_000, Map.of(
+                hr, s < 60 ? 80.0 : s < 300 ? 120.0 : 85.0,
+                spo2, s < 120 ? 97.0 : s < 200 ? 86.0 : 96.0));
+          }
+        }
+        detector.close();
         """);
   }
 

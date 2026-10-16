@@ -24,19 +24,31 @@ final class During extends Scenario {
             new Parameter("tachycardia", "Tachycardia duration", 30, 0, 60, 5, "s"),
             new Parameter("desaturation", "Desaturation duration", 10, 0, 30, 5, "s")),
         """
+        import static io.github.romanhaendler.rbed.Conditions.*;
+
+        import io.github.romanhaendler.rbed.*;
+        import java.time.Duration;
+        import java.util.Map;
+
         Channel hr = Channel.named("hr");
         Channel spo2 = Channel.named("spo2");
 
-        Rule tachycardia = Rule.named("Tachycardia").when(hr.above(100)).forDuration(${tachycardia} * 1_000);
-        Rule desaturation = Rule.named("Desaturation").when(spo2.below(90)).forDuration(${desaturation} * 1_000);
+        Rule tachycardia = Rule.named("Tachycardia")
+            .when(hr.above(100)).forDuration(Duration.ofSeconds(${tachycardia}));
+        Rule desaturation = Rule.named("Desaturation")
+            .when(spo2.below(90)).forDuration(Duration.ofSeconds(${desaturation}));
         Rule hypoxicTachycardia = Rule.named("HypoxicTachycardia")
             .when(during(tachycardia).and(during(desaturation)));
         Detector detector = Detector.builder()
             .rules(tachycardia, desaturation, hypoxicTachycardia)
             .build();
 
-        detector.push(0,     Map.of(hr, 75.0, spo2, 97.0));   // one Sample every 5 s
-        detector.push(5_000, Map.of(hr, 75.0, spo2, 97.0));
+        for (int s = 0; s <= 300; s += 5) {   // one Sample every 5 s
+          detector.push(s * 1_000L, Map.of(
+              hr, s >= 40 && s < 200 ? 115.0 : s >= 230 && s < 250 ? 110.0 : 75.0,
+              spo2, s == 20 ? 86.0 : s >= 100 && s < 160 ? 87.0 : s >= 230 && s < 260 ? 86.0 : 97.0));
+        }
+        detector.close();
         """);
   }
 

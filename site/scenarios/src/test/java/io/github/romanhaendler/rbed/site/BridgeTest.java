@@ -268,6 +268,24 @@ class BridgeTest {
     assertEquals(List.of("HighTemperature 2000..3000"), events(run("first-rule", "{}")));
   }
 
+  /** Between its reports, the humidity keeps its last value. */
+  @Test
+  void humidityReportedEveryTenSecondsStartsMuggyAtItsFirstReportAbove60() {
+    assertEquals(List.of("Muggy 30..40"), describe(run("samples-and-channels", "{}"), 1_000));
+  }
+
+  @Test
+  void humidityReportedEverySecondStartsMuggyWhereItRisesAbove60() {
+    assertEquals(List.of("Muggy 21..40"),
+        describe(run("samples-and-channels", "{\"every\": 1}"), 1_000));
+  }
+
+  @Test
+  void humidityReportedEverySevenSecondsKeepsMuggyUntilItsNextReport() {
+    assertEquals(List.of("Muggy 21..42"),
+        describe(run("samples-and-channels", "{\"every\": 7}"), 1_000));
+  }
+
   /**
    * The build prerenders every Scenario at its defaults with the compiled module; this puts
    * exactly those calls under the parity test.
