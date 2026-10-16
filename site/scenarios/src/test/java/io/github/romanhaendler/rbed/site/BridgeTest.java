@@ -865,7 +865,7 @@ class BridgeTest {
 
   @Test
   void windowsFollowTheParameters() {
-    assertEquals(List.of(Map.of("after", "DoorOpen", "millis", 45.0 * 60_000)),
+    assertEquals(List.of(Map.of("rule", "ExcursionAfterDoor", "after", "DoorOpen", "millis", 45.0 * 60_000)),
         run("after", "{\"window\": 45}").get("windows"));
     assertEquals(List.of(), run("first-rule", "{}").get("windows"));
   }

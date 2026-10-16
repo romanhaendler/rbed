@@ -7,7 +7,7 @@
 // The default Events come from the compiled Scenario module (scenarios/target/js/rbed.js) run in
 // Node, not from a second JVM step: the Node parity test, which runs before every build in the
 // Pages workflow, holds that module to the JVM's results for every Scenario at its defaults.
-import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { aggregatesText, discardedCells, discardedHead, eventCells, eventHead, hasNotes } from './src/events.ts';
@@ -285,6 +285,18 @@ export function sitemap(pages) {
   );
 }
 
+/** Gives the Javadoc copied to `dir` the site's look (api.css, appended to its stylesheet) and,
+ *  first in every page's top bar, a link back to the site. */
+export function siteJavadoc(dir) {
+  appendFileSync(`${dir}/stylesheet.css`, `\n${readFileSync(site('api.css'), 'utf8')}`);
+  const link = `<li class="site-link"><a href="${BASE}">rbed documentation</a></li>`;
+  for (const file of readdirSync(dir, { recursive: true })) {
+    if (!file.endsWith('.html')) continue;
+    const html = readFileSync(`${dir}/${file}`, 'utf8');
+    writeFileSync(`${dir}/${file}`, html.replace(/(<ul id="navbar-top-firstrow"[^>]*>)/, `$1\n${link}`));
+  }
+}
+
 /** Writes every page's HTML and twin, llms.txt, llms-full.txt, sitemap.xml and 404.html into dist,
  *  and rbed's Javadoc of this commit (built by npm run install:rbed) into dist/api. */
 export async function prerender(dist, version) {
@@ -296,6 +308,7 @@ export async function prerender(dist, version) {
   const broken = javadocLinkErrors(markdowns, apidocs);
   if (broken.length > 0) throw new Error(`Links to no page or member of the Javadoc:\n${broken.join('\n')}`);
   cpSync(apidocs, `${dist}/api`, { recursive: true });
+  siteJavadoc(`${dist}/api`);
   const bridge = await import('./scenarios/target/js/rbed.js');
   const facts = new Map(
     JSON.parse(bridge.scenarios()).map((s) => [

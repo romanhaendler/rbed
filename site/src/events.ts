@@ -50,11 +50,14 @@ export const eventCells = (e: Event, millis: number, notes: boolean) => [
   ...(notes ? [e.note ?? ''] : []),
 ];
 
-/** An Event's Aggregates, one line per Channel, joined by "; ". */
+/** An Event's Aggregates, one line per Channel, joined by "; "; a Rule that reads no Channel
+    (one that only refers to other Rules) has none. */
 export const aggregatesText = (e: Event) =>
-  Object.entries(e.aggregates)
-    .map(([channel, a]) => aggregatesLine(channel, a))
-    .join('; ');
+  Object.keys(e.aggregates).length === 0
+    ? 'none (the Rule reads no Channel)'
+    : Object.entries(e.aggregates)
+        .map(([channel, a]) => aggregatesLine(channel, a))
+        .join('; ');
 
 /** The table of Discarded Pending Events: its column heads, and a row's cells. */
 export const discardedHead = (unit: string) => ['Name', `Start (${unit})`, `Discarded (${unit})`];

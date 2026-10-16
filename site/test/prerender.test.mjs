@@ -2,9 +2,9 @@
 // for any list of pages: a page added to the manifest gets all of them.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { javadocLinkErrors, llmsFull, llmsTxt, notFoundHtml, pageHtml, sitemap, twin } from '../prerender.mjs';
+import { javadocLinkErrors, llmsFull, llmsTxt, notFoundHtml, pageHtml, siteJavadoc, sitemap, twin } from '../prerender.mjs';
 
 const pages = [
   { path: '/', title: 'rbed', description: 'Rule-based event detection.' },
@@ -99,7 +99,7 @@ test('the table has a Note column when the Scenario notes an Event, such as the 
   ]);
   const text = twin(markdown, noted, pages[1]);
   assert.ok(text.includes('| Name | Start (s) | Confirmed (s) | End (s) | Truncated | Note | Aggregates |\n'), text);
-  assert.ok(text.includes('| Run | 2 | 2 | 7.5 |  | pallet |  |\n| Stop | 8 | 8 | 9 |  |  |  |'), text);
+  assert.ok(text.includes('| Run | 2 | 2 | 7.5 |  | pallet | none (the Rule reads no Channel) |\n| Stop | 8 | 8 | 9 |  |  | none (the Rule reads no Channel) |'), text);
 });
 
 test("the twin's links to other pages are absolute, since it is read away from the page", () => {
@@ -240,4 +240,18 @@ test('the sitemap lists every page, without a date that would change on every bu
       '  <url><loc>https://romanhaendler.github.io/rbed/data-gaps/</loc></url>\n' +
       '</urlset>\n',
   );
+});
+
+test("the Javadoc gets the site's look and a link back to the site in every page's top bar", () => {
+  const dir = mkdtempSync(`${tmpdir()}/api-`);
+  mkdirSync(`${dir}/io`);
+  const page = '<div class="top-nav" id="navbar-top">\n<ul id="navbar-top-firstrow" class="nav-list" title="Navigation">\n<li>Module</li>';
+  writeFileSync(`${dir}/stylesheet.css`, ':root { --body-background-color: #ffffff; }\n');
+  writeFileSync(`${dir}/index.html`, page);
+  writeFileSync(`${dir}/io/Rule.html`, page);
+  siteJavadoc(dir);
+  for (const file of ['index.html', 'io/Rule.html']) {
+    assert.ok(readFileSync(`${dir}/${file}`, 'utf8').includes('title="Navigation">\n<li class="site-link"><a href="/rbed/">rbed documentation</a></li>\n<li>Module</li>'), file);
+  }
+  assert.match(readFileSync(`${dir}/stylesheet.css`, 'utf8'), /--body-background-color: light-dark\(/);
 });

@@ -124,13 +124,18 @@ abstract class Scenario {
   }
 
   /**
-   * A comparison of a Channel with a value in the Rules: the Rule (or Rules) it belongs to, the
-   * condition ({@code "when >"}, {@code "endWhen <"}) and the value.
+   * A comparison of a Channel with a value in the Rules: the Rule it belongs to (or several, as
+   * {@code "Run, QuickRestart"}), the condition, a part of the Rule and a comparison ({@code
+   * "when >"}, {@code "endWhen <"}), and the value. The chart draws thresholds of one value on one
+   * line.
    */
   record Threshold(Channel channel, String rule, String condition, double value) {}
 
-  /** The time in milliseconds after each Event of {@code after} that a Rule's {@code within} counts. */
-  record Window(String after, long millis) {}
+  /**
+   * The time in milliseconds after each Event of {@code after} that the {@code within} of the
+   * Rule {@code rule} counts.
+   */
+  record Window(String rule, String after, long millis) {}
 
   /**
    * A number the reader can change, with its default and the limits of its control. A choice has

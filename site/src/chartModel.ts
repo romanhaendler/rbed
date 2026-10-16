@@ -74,6 +74,8 @@ export const channelColor = (scenario: Scenario, channel: string) =>
 export const LATEST_COLOR = 'var(--u-color-warning)';
 /** The time a within(...) counts after an Event. */
 export const WINDOW_COLOR = 'var(--uc-series-4)';
+/** A threshold line: the color charts gives a LimitLine of severity alarm. */
+export const THRESHOLD_COLOR = 'var(--u-color-danger)';
 
 /** The row key of the k-th plotted Expression's values, and its color: the next ones after the Channels'. */
 export const expressionKey = (k: number) => `expression ${k}`;
@@ -242,12 +244,21 @@ export function separateAxisOf({ rules, expressions, expressionRows }: ChartMode
 }
 
 /** The time axis' domain: the Samples' span with a little room at both ends, so a mark at the
-    first or last Sample does not reach into the axes' labels. */
-export function timeDomain(rows: Row[]): [number, number] {
+    first or last Sample does not reach into the axes' labels; and `labels`, a share of the span
+    more on the right for threshold labels (labelRoom). */
+export function timeDomain(rows: Row[], labels = 0): [number, number] {
   const first = rows[0].t;
   const last = rows[rows.length - 1].t;
   const room = (last - first) * 0.04;
-  return [first - room, last + room];
+  return [first - room, last + room + (last - first) * labels];
+}
+
+/** The share of the time span to leave right of the last Sample for the threshold labels of the
+    first band's axis: on a phone, charts puts a label wider than the axis' column (even "> 100")
+    into the plot at its right end, where it would hide the data. */
+export function labelRoom(model: ChartModel, axes: ChannelAxis[], narrow: boolean): number {
+  const widest = Math.max(0, ...thresholdLines(model.thresholds, axes, model.channels, narrow).filter((l) => l.axis === axes[0].id).map((l) => l.label.length));
+  return narrow && widest > 0 ? (widest * 6.5 + 12) / 250 : 0;
 }
 
 /** The time axis' ticks: at the Samples where there are few, each at a whole unit (so no tick
@@ -329,9 +340,9 @@ const LABEL_SPACING = 0.04;
 
 /** The lines of the thresholds of the shown Channels: one per axis and value, labelled with
     the comparison alone ("> 100"; the key says the rest), or with the Channel too where the
-    axis has several shown Channels ("temp > 26"); from the top, a line too close to a
-    labelled one has no label. */
-export function thresholdLines(thresholds: Threshold[], axes: ChannelAxis[], channels: string[]): ThresholdLine[] {
+    axis has several shown Channels ("temp > 26"), but on a phone (`narrow`), where the column
+    is narrow; from the top, a line too close to a labelled one has no label. */
+export function thresholdLines(thresholds: Threshold[], axes: ChannelAxis[], channels: string[], narrow = false): ThresholdLine[] {
   const lines: ThresholdLine[] = [];
   for (const t of thresholds) {
     if (!channels.includes(t.channel)) continue;
@@ -345,7 +356,7 @@ export function thresholdLines(thresholds: Threshold[], axes: ChannelAxis[], cha
     const axis = axes.find((a) => a.id === line.axis)!;
     const span = axis.ticks[axis.ticks.length - 1] - axis.ticks[0] || 1;
     if (labelled.some((l) => l.axis === line.axis && Math.abs(l.value - line.value) <= span * LABEL_SPACING)) continue;
-    const several = axis.channels.filter((c) => channels.includes(c)).length > 1;
+    const several = !narrow && axis.channels.filter((c) => channels.includes(c)).length > 1;
     const parts = line.thresholds.map((t) => `${several ? `${t.channel} ` : ''}${t.condition.match(COMPARISON)?.[0] ?? t.condition} ${t.value}`);
     line.label = [...new Set(parts)].join(', ');
     labelled.push(line);

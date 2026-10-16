@@ -1,4 +1,5 @@
 // A code block with a copy button, after the umriss-ui demo's CodeBlock and CopyButton (MIT).
+import { VisuallyHidden } from '@umriss-ui/core';
 import { useEffect, useRef, useState } from 'react';
 import { javaTokens } from './java';
 
@@ -27,9 +28,13 @@ export function CopyButton({ text, label = 'Copy' }: { text: string | (() => Pro
   };
 
   return (
-    <button type="button" className="codeCopy" onClick={() => void copy()} data-state={state}>
-      {state === 'settle' ? label : state === 'copied' ? 'Copied' : 'Failed'}
-    </button>
+    <>
+      <button type="button" className="codeCopy" onClick={() => void copy()} data-state={state}>
+        {state === 'settle' ? label : state === 'copied' ? 'Copied' : 'Failed'}
+      </button>
+      {/* A changed button text is not announced; a status is. */}
+      <VisuallyHidden role="status">{state === 'copied' ? 'Copied' : state === 'failed' ? 'Copying failed' : ''}</VisuallyHidden>
+    </>
   );
 }
 

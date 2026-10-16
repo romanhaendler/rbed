@@ -108,6 +108,6 @@ final class BuildingServices extends Scenario {
 
   @Override
   List<Window> windows(Map<String, Double> values) {
-    return List.of(new Window("Run", Math.round(values.get("restartMinutes") * MINUTE)));
+    return List.of(new Window("QuickRestart", "Run", Math.round(values.get("restartMinutes") * MINUTE)));
   }
 }

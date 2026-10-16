@@ -1,0 +1,47 @@
+/* The site's look for rbed's Javadoc under /api/: prerender.mjs appends this to the doclet's
+   stylesheet.css (JDK 21), which reads its colors and fonts from these variables. The colors are
+   @umriss-ui/core's tokens, light and dark; the fonts the system's, since the site's own are
+   bundled by Vite. */
+
+:root {
+  color-scheme: light dark;
+  --body-font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --block-font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --code-font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --body-text-color: light-dark(#171717, #ededed);
+  --block-text-color: light-dark(#171717, #ededed);
+  --body-background-color: light-dark(#fafafa, #0f0f10);
+  --section-background-color: light-dark(#ffffff, #161618);
+  --detail-background-color: light-dark(#ffffff, #161618);
+  --navbar-background-color: light-dark(#ffffff, #161618);
+  --navbar-text-color: light-dark(#171717, #ededed);
+  --subnav-background-color: light-dark(#f4f4f5, #1e1e21);
+  --selected-background-color: light-dark(#0e7d72, #17a292);
+  --selected-text-color: light-dark(#ffffff, #072522);
+  --selected-link-color: light-dark(#ffffff, #072522);
+  --even-row-color: light-dark(#ffffff, #161618);
+  --odd-row-color: light-dark(#f4f4f5, #1e1e21);
+  --title-color: light-dark(#171717, #ededed);
+  --link-color: light-dark(#0b6a61, #4cc4b5);
+  --link-color-active: light-dark(#0a685f, #1cb5a3);
+  --snippet-background-color: light-dark(#f4f4f5, #1e1e21);
+  --snippet-text-color: light-dark(#171717, #ededed);
+  --snippet-highlight-color: light-dark(#f7efdb, #2b2415);
+  --border-color: light-dark(#e9e9eb, #28282c);
+  --table-border-color: light-dark(#e9e9eb, #28282c);
+  --search-input-background-color: light-dark(#ffffff, #1e1e21);
+  --search-input-text-color: light-dark(#171717, #ededed);
+  --search-input-placeholder-color: light-dark(#565656, #a5a5ab);
+  --search-tag-highlight-color: light-dark(#f7efdb, #2b2415);
+  --invalid-tag-background-color: light-dark(#f8eaea, #2f1b1d);
+  --invalid-tag-text-color: light-dark(#171717, #ededed);
+}
+
+.top-nav {
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* The link back to the site, first in the top bar. */
+.top-nav .site-link a {
+  font-weight: 600;
+}

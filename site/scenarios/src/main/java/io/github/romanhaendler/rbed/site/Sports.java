@@ -145,6 +145,6 @@ final class Sports extends Scenario {
 
   @Override
   List<Window> windows(Map<String, Double> values) {
-    return List.of(new Window("Sprint", Math.round(values.get("recoveryMinutes") * 60 * SECOND)));
+    return List.of(new Window("Recovered", "Sprint", Math.round(values.get("recoveryMinutes") * 60 * SECOND)));
   }
 }

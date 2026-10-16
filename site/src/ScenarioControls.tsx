@@ -72,7 +72,17 @@ export function ScenarioControls({
     <>
       <div className="configuratorHead">
         <span>Parameters</span>
-        <Button variant="ghost" size="sm" disabled={atDefaults} onClick={reset}>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={atDefaults}
+          onClick={(event) => {
+            // Reset disables itself, so the focus moves on to the first control rather than to the page.
+            const panel = event.currentTarget.closest('.configuratorPanel');
+            reset();
+            requestAnimationFrame(() => panel?.querySelector<HTMLElement>('input')?.focus());
+          }}
+        >
           Reset
         </Button>
       </div>

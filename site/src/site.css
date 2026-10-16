@@ -6,6 +6,10 @@
 
 :root {
   color-scheme: light dark;
+  /* An Event's bands (chartModel.ts): Pending a lighter tone of Confirmed in light, a darker one
+     in dark; each at least 3:1 against the surface (WCAG 1.4.11), about 2:1 against each other. */
+  --event-confirmed: light-dark(#be185d, #f9a8d4);
+  --event-pending: light-dark(#e668a0, #db2777);
 }
 
 /* An element scrolled or tabbed to stops below the sticky header, not under it. */
@@ -682,6 +686,13 @@ dialog[aria-label='Search the documentation'] [role='option'] > [class*='_group_
   padding: 0;
   border: none;
   min-width: 0;
+}
+
+/* The Checkbox's own focus ring is the color of a checked box; this one shows on either. */
+.configuratorShow label:has(:focus-visible) {
+  outline: 2px solid var(--u-color-text);
+  outline-offset: 2px;
+  border-radius: var(--u-radius-sm);
 }
 
 .configuratorShow legend {

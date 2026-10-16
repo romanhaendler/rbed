@@ -86,6 +86,6 @@ final class PulseChannels extends Scenario {
 
   @Override
   List<Window> windows(Map<String, Double> values) {
-    return List.of(new Window("Deployment", (long) (values.get("window") * MINUTE)));
+    return List.of(new Window("Regression", "Deployment", (long) (values.get("window") * MINUTE)));
   }
 }

@@ -1,9 +1,9 @@
 // The tables under a Scenario's chart: its Events with their Aggregates (a row selects its
 // Event), the Discarded Pending Events, and every Aggregate of the selected Event. Their columns
 // are those of the prerendered tables (src/events.ts).
-import { type Aggregates, aggregatesLine, formatNumber } from './aggregates.ts';
+import { type Aggregates, formatNumber } from './aggregates.ts';
 import type { Discard, Event, Scenario } from './bridge';
-import { discardedCells, discardedHead, eventCells, eventHead, eventKey, hasNotes } from './events.ts';
+import { aggregatesText, discardedCells, discardedHead, eventCells, eventHead, eventKey, hasNotes } from './events.ts';
 
 /** The Pending Events that were Discarded; no table while there is none. */
 export function DiscardedTable({ scenario, discarded }: { scenario: Scenario; discarded: Discard[] }) {
@@ -144,11 +144,7 @@ export function EventTable({
               // The Aggregates under their Event, as a line of their own.
               <tr key={`${key} aggregates`} className="aggregateRow" data-selected={key === selected || undefined}>
                 <td colSpan={head.length}>
-                  <span className="aggregateLabel">Aggregates</span>{' '}
-                  {Object.entries(e.aggregates).map(([channel, a], i) => [
-                    i > 0 && '; ',
-                    <span key={channel}>{aggregatesLine(channel, a)}</span>,
-                  ])}
+                  <span className="aggregateLabel">Aggregates</span> {aggregatesText(e)}
                 </td>
               </tr>,
             ];

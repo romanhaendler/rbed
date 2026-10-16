@@ -106,6 +106,6 @@ final class History extends Scenario {
 
   @Override
   List<Window> windows(Map<String, Double> values) {
-    return List.of(new Window("Maintenance", 90 * DAY));
+    return List.of(new Window("OverdueService", "Maintenance", 90 * DAY));
   }
 }

@@ -108,7 +108,8 @@ final class Automotive extends Scenario {
   @Override
   List<Threshold> thresholds(Map<String, Double> values) {
     return List.of(new Threshold(SPEED, "Trip", "when >", values.get("moving")),
-        new Threshold(SPEED, "Trip endWhen, Idling when", "<", 0.5),
+        new Threshold(SPEED, "Trip", "endWhen <", 0.5),
+        new Threshold(SPEED, "Idling", "when <", 0.5),
         new Threshold(RPM, "Idling", "when >", values.get("idlingRpm")));
   }
 }
