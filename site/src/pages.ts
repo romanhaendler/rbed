@@ -51,6 +51,41 @@ export const PAGES: Page[] = [
     rubric: 'Guide',
   },
   {
+    path: '/during/',
+    title: 'During another Event',
+    description:
+      "during(a) holds while an Event of Rule a is Confirmed, so one Rule's Events gate another's: a phase, or a combination of Events with their own timing.",
+    rubric: 'Guide',
+  },
+  {
+    path: '/after/',
+    title: 'After another Event',
+    description:
+      'Sequences with after(a): within(...) limits how long after an Event of Rule a has Ended it still counts, unless(...) names what interrupts it.',
+    rubric: 'Guide',
+  },
+  {
+    path: '/count/',
+    title: 'Counting Events',
+    description:
+      'count(a) is the number of Events of Rule a Confirmed so far, or within a sliding window, plotted here against its limit.',
+    rubric: 'Guide',
+  },
+  {
+    path: '/total-duration/',
+    title: 'Time spent in Events',
+    description:
+      'totalDuration(a) sums the durations of the Events of Rule a and grows while one runs, so a cumulative limit is detected the moment it is crossed.',
+    rubric: 'Guide',
+  },
+  {
+    path: '/latest/',
+    title: 'The latest Event',
+    description:
+      'latest(a) reads the Aggregates and the duration of the most recent Confirmed Event of Rule a, so a Rule can relate the present to it.',
+    rubric: 'Guide',
+  },
+  {
     path: '/aggregates/',
     title: 'Aggregates',
     description:

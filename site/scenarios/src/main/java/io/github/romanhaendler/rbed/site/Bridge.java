@@ -27,6 +27,11 @@ public final class Bridge {
       new SamplingRate(),
       new SilentSensors(),
       new PulseChannels(),
+      new During(),
+      new AfterScenario(),
+      new CountScenario(),
+      new TotalDuration(),
+      new Latest(),
       new History(),
       new Cranes(),
       new Manufacturing(),
@@ -64,7 +69,9 @@ public final class Bridge {
         if (i > 0) out.append(',');
         Json.string(out, s.pulseChannels().get(i).name());
       }
-      out.append("],\"rules\":[");
+      out.append(']');
+      if (s.readsLatest() != null) Json.string(out.append(",\"latest\":"), s.readsLatest());
+      out.append(",\"rules\":[");
       Rule[] rules = s.rules(values(s, "{}"));
       for (int i = 0; i < rules.length; i++) {
         if (i > 0) out.append(',');
@@ -108,7 +115,7 @@ public final class Bridge {
    * @return JSON object with the Samples, the Events, the Discarded Pending Events (with the
    *     timestamp they were Discarded), the timestamps time was advanced to without a Sample,
    *     the timestamp of the restart if the Detector was restarted, and, for a Scenario that
-   *     plots an Expression, its name,
+   *     plots an Expression, its name, unit (if it has one of its own),
    *     threshold and value per Sample (null where undefined); or {@code {"error": message}} if
    *     rbed rejected the Rules or the input was invalid
    */
@@ -247,8 +254,10 @@ public final class Bridge {
     Scenario.Plot plot = scenario.plot(values);
     if (plot != null) {
       Json.string(out.append(",\"expression\":{\"name\":"), plot.name());
+      if (plot.unit() != null) Json.string(out.append(",\"unit\":"), plot.unit());
       Json.number(out.append(",\"threshold\":"), plot.threshold()).append(",\"values\":[");
-      double[] plotted = ExpressionValues.of(plot.expression(), samples);
+      double[] plotted =
+          ExpressionValues.of(plot.expression(), scenario.rules(values), samples);
       for (int i = 0; i < plotted.length; i++) {
         if (i > 0) out.append(',');
         Json.number(out, plotted[i]);

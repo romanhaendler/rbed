@@ -5,7 +5,10 @@
 // are shown in full under the chart. Non-default values live in the address. Where the page asks
 // for it, the reader can draw a Channel's values on the chart (not kept in the address). The
 // Detector runs again on every change. A Scenario that plots an Expression adds it as a dashed
-// line, with the threshold its Rule compares it to and the stretches where it is undefined.
+// line, with the threshold its Rule compares it to and the stretches where it is undefined; on an
+// axis and a band of the plot of its own if it has a unit of its own (a count of Events, a
+// duration). On a Scenario whose Rules read latest(...), hovering highlights the Event
+// latest(...) reads at that time.
 import { LimitBand, LimitLine, Tooltip, type TooltipHit, useChart } from '@umriss-ui/charts';
 import { Alert, Button, Checkbox, FormField, RadioGroup, SegmentedControl, Slider, VisuallyHidden } from '@umriss-ui/core';
 import { type PointerEvent, useEffect, useMemo, useRef, useState } from 'react';
@@ -23,8 +26,10 @@ type BandRow = { t: number; s: number | null; key?: string };
 /** A lifecycle mark, on its Rule's lane. */
 type MarkRow = { t: number; y: number };
 
-/** The Event lanes take the bottom of the plot, one unit each; the Channels the top three units. */
+/** The Event lanes take the bottom of the plot, one unit each; the Channels the top three units.
+    An Expression with a unit of its own takes two units between them. */
 const COURSE_UNITS = 3;
+const OWN_UNITS = 2;
 const EVENT_COLOUR = 'var(--uc-series-2)';
 const EVENT_STATES = [
   { label: 'Pending', color: `color-mix(in srgb, ${EVENT_COLOUR} 35%, transparent)` },
@@ -51,6 +56,8 @@ const channelColour = (scenario: Scenario, channel: string) =>
   CHANNEL_COLOURS[scenario.channels.indexOf(channel) % CHANNEL_COLOURS.length];
 
 const eventKey = (e: Event) => `${e.name} ${e.start}`;
+/** The highlight of the Event latest(...) reads at the hovered time. */
+const LATEST_COLOUR = 'var(--u-color-warning)';
 
 /** The row key of the plotted Expression's values, and its colour: the next one after the Channels'. */
 const EXPRESSION = 'expression';
@@ -76,8 +83,9 @@ function niceStep(rough: number): number {
   return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * power;
 }
 
-/** The Channels' axis: ticks over the values only, and a domain stretched below them for the lanes. */
-function courseAxis(rows: Row[], channels: string[], lanes: number, also: number[] = []) {
+/** An axis with ticks over the values only, and a domain that puts them into the band from `below`
+    to `below + units` of the plot's `total` units, counted from its bottom. */
+function bandAxis(rows: Row[], channels: string[], also: number[], below: number, units: number, total: number) {
   const values = [...rows.flatMap((r) => channels.map((c) => r[c])), ...also].filter(Number.isFinite) as number[];
   const lo = Math.min(...values);
   const hi = Math.max(...values);
@@ -88,10 +96,12 @@ function courseAxis(rows: Row[], channels: string[], lanes: number, also: number
   for (let k = first; k <= last; k++) ticks.push(Number((k * step).toPrecision(12)));
   const top = last * step + step / 2;
   const bottom = first * step - step / 2;
-  const domain: [number, number] = [top - ((top - bottom) * (COURSE_UNITS + lanes)) / COURSE_UNITS, top];
+  const span = ((top - bottom) * total) / units;
+  const from = bottom - (span * below) / total;
+  const domain: [number, number] = [from, from + span];
   return { ticks, domain };
 }
-type Course = ReturnType<typeof courseAxis>;
+type Course = ReturnType<typeof bandAxis>;
 
 /** Events and Discarded Pending Events, of every Rule or of one. */
 type Lifecycle = { events: Event[]; discarded: Discard[] };
@@ -127,12 +137,18 @@ function ruleState(lifecycle: Lifecycle, t: number, millis: number): string {
   return 'no Event';
 }
 
+/** The Event latest(...) reads at time t: the most recently Confirmed one, running or Ended. */
+const latestEvent = (events: Event[], t: number, millis: number) => events.findLast((e) => e.confirmed / millis <= t);
+
 type Shown = {
   scenario: Scenario;
   rows: Row[];
   lifecycle: Lifecycle;
   channels: string[];
   rules: string[];
+  /** Told the key of the Event latest(...) reads at the hovered time; undefined when there is
+      none. A state setter, so it stays the same function across renders. */
+  hoverLatest: (key: string | undefined) => void;
   expression?: PlottedExpression;
   /** Timestamps time was advanced to without a Sample, and the restart, if any (ms). */
   advances: number[];
@@ -141,15 +157,24 @@ type Shown = {
 
 /** The Channels' axis of what is shown (with the plotted Expression and its threshold); it keeps
     its scale while Channels are hidden. */
-const courseOf = ({ scenario, rows, rules, expression }: Shown): Course =>
-  expression
-    ? courseAxis(rows, [...scenario.channels, EXPRESSION], rules.length, [expression.threshold])
-    : courseAxis(rows, scenario.channels, rules.length);
+const courseOf = ({ scenario, rows, rules, expression }: Shown): Course => {
+  const below = rules.length + (expression?.unit !== undefined ? OWN_UNITS : 0);
+  return expression && expression.unit === undefined
+    ? bandAxis(rows, [...scenario.channels, EXPRESSION], [expression.threshold], below, COURSE_UNITS, COURSE_UNITS + below)
+    : bandAxis(rows, scenario.channels, [], below, COURSE_UNITS, COURSE_UNITS + below);
+};
 
 /** The tooltip: every shown Channel's value and Rule's state at the hovered time. */
 function Readout({ shown, t }: { shown: Shown; t: number }) {
   const { scenario, rows, lifecycle, channels, rules, expression } = shown;
   const row = rows.findLast((r) => r.t <= t) ?? rows[0];
+  const { millis } = scenario.timeUnit;
+  const latest = scenario.latest && latestEvent(ofRule(lifecycle, scenario.latest).events, t, millis);
+  const latestKey = latest ? eventKey(latest) : undefined;
+  // The chart highlights that Event; there is no hover callback, so the readout reports it.
+  const { hoverLatest } = shown;
+  useEffect(() => hoverLatest(latestKey), [hoverLatest, latestKey]);
+  useEffect(() => () => hoverLatest(undefined), [hoverLatest]);
   const line = (name: string, colour: string, value: string) => (
     <div className="uc-tooltip-row" key={name}>
       <span className="uc-tooltip-chip" style={{ background: colour }} />
@@ -164,8 +189,19 @@ function Readout({ shown, t }: { shown: Shown; t: number }) {
       </div>
       <div className="uc-tooltip-list">
         {channels.map((c) => line(c, channelColour(scenario, c), String(row[c] ?? '–')))}
-        {expression && line(expression.name, expressionColour(scenario), expressionValue(row[EXPRESSION]))}
-        {rules.map((r) => line(r, EVENT_COLOUR, ruleState(ofRule(lifecycle, r), t, scenario.timeUnit.millis)))}
+        {expression &&
+          line(
+            expression.name,
+            expressionColour(scenario),
+            expressionValue(row[EXPRESSION]) + (expression.unit ? ` ${expression.unit}` : ''),
+          )}
+        {rules.map((r) => line(r, EVENT_COLOUR, ruleState(ofRule(lifecycle, r), t, millis)))}
+        {scenario.latest &&
+          line(
+            `latest(${scenario.latest}) reads`,
+            LATEST_COLOUR,
+            latest ? `${latest.start / millis} to ${latest.end / millis} ${scenario.timeUnit.name}` : 'no Event yet',
+          )}
       </div>
     </>
   );
@@ -175,16 +211,23 @@ function EventChart({
   shown,
   course,
   selected,
+  latest,
   select,
 }: {
   shown: Shown;
-  /** The Channels' axis, from courseAxis; it keeps its scale while Channels are hidden. */
+  /** The Channels' axis, from courseOf; it keeps its scale while Channels are hidden. */
   course: Course;
   selected?: Event;
+  /** The Event latest(...) reads at the hovered time. */
+  latest?: Event;
   select: (key: string | undefined) => void;
 }) {
   const { scenario, rows, lifecycle, channels, rules, expression } = shown;
   const { name: unit, millis } = scenario.timeUnit;
+  // An Expression with a unit of its own (a count of Events, a duration) is not on the Channels'
+  // scale: it gets a band of the plot and an axis of its own, between the Channels and the lanes.
+  const own = expression?.unit !== undefined ? expression : undefined;
+  const onCourse = own ? undefined : expression;
   // A click (or Enter) on the chart selects the Event under it, if any.
   const { Chart, XAxis, YAxis, Line, Scatter, StateBand } = useChart(rows, {
     onSelect: (hit) => {
@@ -196,20 +239,23 @@ function EventChart({
   const live = useRef(shown);
   live.current = shown;
   const lanes = rules.length;
+  const total = COURSE_UNITS + lanes + (own ? OWN_UNITS : 0);
+  const ownAxis = own && bandAxis(rows, [EXPRESSION], [own.threshold], lanes, OWN_UNITS, total);
   return (
     <Chart
-      height={300}
+      height={own ? 380 : 300}
       ariaLabel={`${scenario.channels.join(', ')} over time in ${unit}, with the Events of ${scenario.rules.join(', ')} as bands, Pending then Confirmed, and their lifecycle marked`}
     >
       <XAxis value="t" domain={[rows[0].t, rows[rows.length - 1].t]} label={`Time (${unit})`} />
       <YAxis domain={course.domain} ticks={course.ticks} label={channels.join(', ')} />
+      {own && ownAxis && <YAxis id="own" grid={false} domain={ownAxis.domain} ticks={ownAxis.ticks} />}
       {/* Lane i (first Rule on top) spans lanes - i - 1 .. lanes - i. The lane names change with
           the shown Rules; the chart's key remounts it then, since tickFormat is compared by text. */}
       <YAxis
         id="lanes"
         position="right"
         grid={false}
-        domain={[0, COURSE_UNITS + lanes]}
+        domain={[0, total]}
         ticks={rules.map((_, i) => lanes - i - 0.5)}
         tickFormat={(v) => rules[Math.round(lanes - 0.5 - v)] ?? ''}
       />
@@ -217,10 +263,12 @@ function EventChart({
         undefinedStretches(rows).map(([from, to]) => (
           <LimitBand key={from} orientation="x" from={from} to={to} color="var(--u-color-text-muted)" label="undefined" />
         ))}
-      {expression && <LimitLine value={expression.threshold} label={`threshold ${expression.threshold}`} />}
+      {onCourse && <LimitLine value={onCourse.threshold} label={`threshold ${onCourse.threshold}`} />}
+      {own && <LimitLine axisId="own" value={own.threshold} label={`threshold ${own.threshold} ${own.unit}`} />}
       {selected && (
         <LimitBand orientation="x" from={selected.start / millis} to={selected.end / millis} color="var(--u-color-accent)" />
       )}
+      {latest && <LimitBand orientation="x" from={latest.start / millis} to={latest.end / millis} color={LATEST_COLOUR} />}
       {shown.restart !== undefined && (
         <LimitLine orientation="x" value={shown.restart / millis} label="Restart" color={RESTART_COLOUR} />
       )}
@@ -273,9 +321,10 @@ function EventChart({
           <Line key={c} value={c} name={c} color={channelColour(scenario, c)} markers="always" />
         ),
       )}
-      {expression && (
-        <Line value={EXPRESSION} name={expression.name} color={expressionColour(scenario)} dash={[6, 4]} markers="always" />
+      {onCourse && (
+        <Line value={EXPRESSION} name={onCourse.name} color={expressionColour(scenario)} dash={[6, 4]} markers="always" />
       )}
+      {own && <Line value={EXPRESSION} name={own.name} color={expressionColour(scenario)} dash={[6, 4]} yAxisId="own" />}
       <Tooltip mode="x" render={(hit: TooltipHit<Row>) => <Readout shown={live.current} t={hit.xValue} />} />
     </Chart>
   );
@@ -560,6 +609,7 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
   const [drawn, setDrawn] = useState<Record<string, (number | null)[]>>({});
   const [pen, setPen] = useState('');
   const [frozen, setFrozen] = useState<Course>();
+  const [hoveredLatest, hoverLatest] = useState<string>();
   const stroke = useRef<[number, number]>(undefined);
   const result = useMemo(() => run(scenario.id, parameters, drawn), [scenario.id, parameters, drawn]);
   const rows = useMemo<Row[]>(
@@ -621,6 +671,7 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
       lifecycle: result,
       channels: scenario.channels.filter((c) => !hidden.includes(c)),
       rules: scenario.rules.filter((r) => !hidden.includes(r)),
+      hoverLatest,
       expression: result.expression,
       advances: result.advances,
       restart: result.restart,
@@ -646,6 +697,7 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
             shown={shown}
             course={course}
             selected={event}
+            latest={result.events.find((e) => eventKey(e) === hoveredLatest)}
             select={select}
           />
           {pen !== '' && (

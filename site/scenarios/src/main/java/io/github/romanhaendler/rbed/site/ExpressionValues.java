@@ -28,12 +28,15 @@ final class ExpressionValues {
 
   private ExpressionValues() {}
 
-  /** One value per Sample, NaN where the Expression is undefined. */
-  static double[] of(Expression expression, List<Sample> samples) {
+  /**
+   * One value per Sample, NaN where the Expression is undefined. {@code rules} run before the
+   * probing Rule, so the Expression may refer to them ({@code count(run)}).
+   */
+  static double[] of(Expression expression, Rule[] rules, List<Sample> samples) {
     int n = samples.size();
     double[] probes = new double[n];
-    boolean[] defined =
-        holds(expression.between(-Double.MAX_VALUE, Double.MAX_VALUE), samples, probes);
+    boolean[] defined = holds(expression.between(-Double.MAX_VALUE, Double.MAX_VALUE), rules,
+        samples, probes);
     long[] low = new long[n];
     long[] high = new long[n];
     Arrays.fill(low, key(-Double.MAX_VALUE));
@@ -46,7 +49,7 @@ final class ExpressionValues {
         probes[i] = value(low[i] + ((high[i] - low[i]) >>> 1));
       }
       if (!open) break;
-      boolean[] greater = holds(expression.above(PROBE), samples, probes);
+      boolean[] greater = holds(expression.above(PROBE), rules, samples, probes);
       for (int i = 0; i < n; i++) {
         long middle = low[i] + ((high[i] - low[i]) >>> 1);
         if (greater[i]) low[i] = middle + 1;
@@ -59,18 +62,21 @@ final class ExpressionValues {
   }
 
   /** Whether the Condition holds at each Sample, with the probe Channel set per Sample. */
-  private static boolean[] holds(Condition condition, List<Sample> samples, double[] probes) {
+  private static boolean[] holds(Condition condition, Rule[] rules, List<Sample> samples,
+      double[] probes) {
     boolean[] holds = new boolean[samples.size()];
     boolean[] running = new boolean[1];
+    Rule probing = Rule.named("Holds").when(condition);
     Detector detector = Detector.builder()
-        .rules(Rule.named("Holds").when(condition))
+        .rules(rules)
+        .rules(probing)
         .listener(new EventListener() {
           @Override public void onConfirmed(Event e) {
-            running[0] = true;
+            if (e.is(probing)) running[0] = true;
           }
 
           @Override public void onEnded(Event e) {
-            running[0] = false;
+            if (e.is(probing)) running[0] = false;
           }
         })
         .build();

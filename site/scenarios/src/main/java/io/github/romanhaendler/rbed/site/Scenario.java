@@ -47,6 +47,11 @@ abstract class Scenario {
     return List.of();
   }
 
+  /** The name of the Rule whose latest Event the Scenario's Rules read, or null for none. */
+  String readsLatest() {
+    return null;
+  }
+
   /** The Rules for the given value of every parameter, by parameter id. */
   abstract Rule[] rules(Map<String, Double> values);
 
@@ -88,8 +93,16 @@ abstract class Scenario {
     return null;
   }
 
-  /** An Expression plotted next to the Channels, with the threshold its Condition compares to. */
-  record Plot(String name, Expression expression, double threshold) {}
+  /**
+   * An Expression plotted next to the Channels, with the threshold its Condition compares to. One
+   * with a {@code unit} of its own (a count of Events, a duration) is plotted on its own axis,
+   * under the Events. The Expression may refer to the Scenario's Rules.
+   */
+  record Plot(String name, Expression expression, double threshold, String unit) {
+    Plot(String name, Expression expression, double threshold) {
+      this(name, expression, threshold, null);
+    }
+  }
 
   /**
    * A number the reader can change, with its default and the limits of its control. A choice has

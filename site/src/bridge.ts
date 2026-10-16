@@ -22,6 +22,8 @@ export type Scenario = {
   channels: string[];
   /** Those of the Channels that are Pulse Channels: a value only in the Samples that carry one. */
   pulse: string[];
+  /** The Rule whose latest Event the Rules read with latest(...), if any. */
+  latest?: string;
   /** Names of the Rules, which are the names of their Events. */
   rules: string[];
   parameters: Parameter[];
@@ -46,8 +48,9 @@ export type Event = {
 export type Discard = { name: string; start: number; discarded: number };
 
 /** For a Scenario that plots one: an Expression's value per Sample, null where it is undefined,
- *  and the threshold its Rule's Condition compares it to. */
-export type PlottedExpression = { name: string; threshold: number; values: (number | null)[] };
+ *  and the threshold its Rule's Condition compares it to. One with a `unit` of its own (a count of
+ *  Events, a duration) is not on the Channels' scale. */
+export type PlottedExpression = { name: string; unit?: string; threshold: number; values: (number | null)[] };
 
 export type Result =
   | {

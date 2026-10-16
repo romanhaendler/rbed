@@ -4,10 +4,20 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The `after` page: moving the window changes which second-Rule Events occur
-- [ ] The `during` page: the gating Rule's bands and the gated Rule's bands line up visibly
-- [ ] The `count`/`totalDuration` page: the running count or duration is plotted with its limit
-- [ ] The `latest` page: the Event that `latest` reads at a hovered timestamp is highlighted
-- [ ] JUnit pins one parameter change per page, and the Node parity test covers them
+- [x] The `after` page: moving the window changes which second-Rule Events occur
+- [x] The `during` page: the gating Rule's bands and the gated Rule's bands line up visibly
+- [x] The `count`/`totalDuration` page: the running count or duration is plotted with its limit
+- [x] The `latest` page: the Event that `latest` reads at a hovered timestamp is highlighted
+- [x] JUnit pins one parameter change per page, and the Node parity test covers them
+
+## Comments
+
+**Done.** Five pages, one per construct, each with its own Scenario, in README order between Conditions and Expressions and Aggregates: `/during/` (`During`, the README's HypoxicTachycardia on a short recording; parameters `tachycardia` and `desaturation`, the two durations), `/after/` (`AfterScenario`, the README's ExcursionAfterDoor; `window`), `/count/` (`CountScenario`, FrequentStarts; `window`, `limit`), `/total-duration/` (`TotalDuration`, CumulativeLimit; `limit`) and `/latest/` (`Latest`, PartialSetDown; `fraction`). `count` and `totalDuration` got a page each instead of a shared one, so every page shows one Scenario and parameter ids in the address cannot collide. Checked in headless Chromium (Playwright from a scratch directory) at 1280 and 375 px, light and dark: no horizontal scroll, no page errors; `?window=45` and `?window=5` on `/after/` and `?window=30` on `/count/` change the Events; hovering `/latest/` at 5, 30, 50 and 77 s names no Event, the first lift (also between the lifts) and the second lift, and highlights it.
+
+- **The running count and duration come from rbed:** they reuse 07's `plot(values)` and `ExpressionValues` (bisection over comparisons), so the plotted values are rbed's own. Two extensions: `ExpressionValues.of(expression, rules, samples)` now adds the Scenario's Rules before the probing Rule (an Expression may refer to them, as `count(run)` does), and its listener follows only the probing Rule's Events. `Scenario.Plot` has an optional `unit` (`new Plot(name, expression, threshold, unit)`; the three-argument form keeps `null`), and the bridge writes `"unit"` when it is set. An Expression with a unit is not on the Channels' scale: `EventChart` gives it two units of the plot between the Channels and the lanes and a left axis of its own (`id="own"`), with the unit in the threshold line's label; the plot grows to 380 px. `courseAxis` became `bandAxis(rows, channels, also, below, units, total)`, which puts values into any horizontal band of the plot. `totalDuration` is plotted in minutes through rbed's own `dividedBy(60_000)`.
+- **JUnit** checks for both plots that the value is above its threshold at exactly the Samples where the comparing Rule's Event runs (`assertPlotAboveLimitExactlyDuring`; the end counts only for a Truncated end), at three parameter sets each.
+- **`latest` highlight:** the catalogue has `latest` (the Rule's name, from `Scenario.readsLatest()`; absent otherwise). The readout adds "latest(LoadLifted) reads 60 to 90 s" (or "no Event yet"); the Event is the last one Confirmed at or before the hovered time, taken from the reported Events. Since umriss has no hover callback, `Readout` reports the Event's key from a `useEffect` into `ScenarioView` state (`hoverLatest`, a state setter, so it is stable), and `EventChart` draws a `LimitBand` in `--u-color-warning` over it; unmounting the readout clears it.
+- **README claims** that no Scenario shows (`unless`, `build()` rejecting a later or missing Rule, `latest` undefined before the first Event, `latest(...).duration()` growing while the Event runs, `latest` aggregating a Channel its Rule does not use) were checked once against rbed 0.2.0 with a throwaway program; the pages state them as the README does and link it. No wrong example found in this chapter.
+- **umriss-ui gaps:** two charts with `syncId` do not line up their plots when their axes differ (the lane axis on the right, a threshold label in the left gutter), which is why the running value is a band of the main chart rather than a chart of its own; a fixed axis width or a shared plot rect would allow stacked charts. No hover callback (known), worked around as above.
