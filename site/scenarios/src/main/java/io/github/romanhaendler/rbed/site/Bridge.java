@@ -25,7 +25,12 @@ public final class Bridge {
       new Manufacturing(),
       new BuildingServices(),
       new Healthcare(),
-      new Automotive());
+      new Automotive(),
+      new Finance(),
+      new Logistics(),
+      new Environment(),
+      new Sports(),
+      new ItOperations());
 
   private Bridge() {}
 
