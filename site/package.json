@@ -1,0 +1,24 @@
+{
+  "name": "rbed-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "npm run build:java && tsc --noEmit && vite build",
+    "build:java": "npm run install:rbed && mvn -q -f scenarios/pom.xml package -DskipTests -Drbed.version=$(npm run -s rbed:version)",
+    "install:rbed": "mvn -q -f ../pom.xml install -DskipTests",
+    "rbed:version": "mvn -q -f ../pom.xml help:evaluate -Dexpression=project.version -DforceStdout",
+    "test": "npm run install:rbed && mvn -q -f scenarios/pom.xml verify -Drbed.version=$(npm run -s rbed:version) && node --test test/*.test.mjs",
+    "dev": "vite",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4"
+  }
+}
