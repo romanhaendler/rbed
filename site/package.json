@@ -9,7 +9,8 @@
     "rbed:version": "mvn -q -f ../pom.xml help:evaluate -Dexpression=project.version -DforceStdout",
     "test": "npm run install:rbed && mvn -q -f scenarios/pom.xml verify -Drbed.version=$(npm run -s rbed:version) && node --test test/*.test.mjs",
     "dev": "vite",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:browser": "playwright test"
   },
   "dependencies": {
     "@fontsource/geist-mono": "^5.3.0",
@@ -20,6 +21,7 @@
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "typescript": "^7.0.2",

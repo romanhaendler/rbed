@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { aggregatesLine } from './src/aggregates.ts';
 import { escape, parse, SCENARIO_MARKER } from './src/markdown.ts';
 import { markdownFile, PAGES, titleOf } from './src/pages.ts';
+import { fillSource } from './src/parameters.ts';
 
 export const SITE = 'https://romanhaendler.github.io/rbed/';
 const REPOSITORY = 'https://github.com/romanhaendler/rbed';
@@ -41,14 +42,17 @@ function factOf(facts, id) {
 function eventRows({ unit, millis, result }) {
   if ('error' in result) return `rbed rejects the default parameters: ${result.error}`;
   if (result.events.length === 0) return 'No Event at the default parameters.';
+  // A Note column only for a Scenario whose listener notes something, as in the live table.
+  const notes = result.events.some((e) => e.note !== undefined);
   return [
-    ['Name', `Start (${unit})`, `Confirmed (${unit})`, `End (${unit})`, 'Truncated', 'Aggregates'],
+    ['Name', `Start (${unit})`, `Confirmed (${unit})`, `End (${unit})`, 'Truncated', ...(notes ? ['Note'] : []), 'Aggregates'],
     ...result.events.map((e) => [
       e.name,
       String(e.start / millis),
       String(e.confirmed / millis),
       String(e.end / millis),
       [e.truncatedStart && 'start', e.truncatedEnd && 'end'].filter(Boolean).join(', '),
+      ...(notes ? [e.note ?? ''] : []),
       Object.entries(e.aggregates).map(([channel, a]) => aggregatesLine(channel, a)).join('; '),
     ]),
   ];
@@ -193,7 +197,7 @@ export async function prerender(dist, version) {
     JSON.parse(bridge.scenarios()).map((s) => [
       s.id,
       {
-        source: s.source.replace(/\$\{(\w+)\}/g, (_, id) => String(s.parameters.find((p) => p.id === id).default)).trimEnd(),
+        source: fillSource(s.source, s.parameters, Object.fromEntries(s.parameters.map((p) => [p.id, p.default]))).trimEnd(),
         unit: s.timeUnit.name,
         millis: s.timeUnit.millis,
         result: JSON.parse(bridge.run(s.id, '{}', '{}')),

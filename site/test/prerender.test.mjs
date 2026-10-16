@@ -76,6 +76,28 @@ test('Discarded Pending Events at the defaults get a table of their own, after t
   assert.ok(!twin(markdown, facts).includes('Discarded'), 'no table while there is none');
 });
 
+test('the table has a Note column when the Scenario notes an Event, such as the load a crane lifted', () => {
+  const noted = new Map([
+    [
+      'gaps',
+      {
+        ...facts.get('gaps'),
+        result: {
+          samples: [],
+          events: [
+            { name: 'Run', start: 2000, confirmed: 2000, end: 7500, truncatedStart: false, truncatedEnd: false, aggregates: {}, note: 'pallet' },
+            { name: 'Stop', start: 8000, confirmed: 8000, end: 9000, truncatedStart: false, truncatedEnd: false, aggregates: {} },
+          ],
+          discarded: [],
+        },
+      },
+    ],
+  ]);
+  const text = twin(markdown, noted);
+  assert.ok(text.includes('| Name | Start (s) | Confirmed (s) | End (s) | Truncated | Note | Aggregates |\n'), text);
+  assert.ok(text.includes('| Run | 2 | 2 | 7.5 |  | pallet |  |\n| Stop | 8 | 8 | 9 |  |  |  |'), text);
+});
+
 test("a page's HTML holds its head, its text, its Java source and its default Events before any script", () => {
   const html = pageHtml(template, pages[1], markdown, facts);
   for (const part of [
