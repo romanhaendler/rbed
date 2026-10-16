@@ -102,4 +102,11 @@ class BridgeTest {
     assertTrue(((String) first.get("source"))
         .contains("Rule.named(\"HighTemperature\").when(temp.above(${threshold}))"));
   }
+
+  @Test
+  void catalogueNamesTheRulesAndShowsTheFirstRuleInSeconds() {
+    Map<String, Object> first = scenarios().get(0);
+    assertEquals(List.of("HighTemperature"), first.get("rules"));
+    assertEquals(Map.of("name", "s", "millis", 1000.0), first.get("timeUnit"));
+  }
 }

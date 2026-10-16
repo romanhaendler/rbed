@@ -16,6 +16,8 @@ export type Scenario = {
   title: string;
   timeUnit: { name: string; millis: number };
   channels: string[];
+  /** Names of the Rules, which are the names of their Events. */
+  rules: string[];
   parameters: Parameter[];
   /** Java source with a placeholder such as ${threshold} per parameter. */
   source: string;

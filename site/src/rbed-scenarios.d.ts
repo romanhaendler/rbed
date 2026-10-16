@@ -3,3 +3,6 @@ declare module 'rbed-scenarios' {
   export function scenarios(): string;
   export function run(scenarioId: string, parameters: string, drawnChannels: string): string;
 }
+
+/** The rbed version of the build (vite.config.ts). */
+declare const __RBED_VERSION__: string;

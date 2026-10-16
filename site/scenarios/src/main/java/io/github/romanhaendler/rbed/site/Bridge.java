@@ -3,6 +3,7 @@ package io.github.romanhaendler.rbed.site;
 import io.github.romanhaendler.rbed.Channel;
 import io.github.romanhaendler.rbed.Detector;
 import io.github.romanhaendler.rbed.Event;
+import io.github.romanhaendler.rbed.Rule;
 import io.github.romanhaendler.rbed.Sample;
 import java.util.HashMap;
 import java.util.List;
@@ -21,7 +22,7 @@ public final class Bridge {
 
   /**
    * The catalogue: a JSON array with, for each Scenario, its id, title, time unit, Channel names,
-   * parameters (with default and limits) and source template.
+   * Rule names, parameters (with default and limits) and source template.
    */
   @JSExport
   public static String scenarios() {
@@ -36,6 +37,12 @@ public final class Bridge {
       for (int i = 0; i < s.channels.size(); i++) {
         if (i > 0) out.append(',');
         Json.string(out, s.channels.get(i).name());
+      }
+      out.append("],\"rules\":[");
+      Rule[] rules = s.rules(values(s, "{}"));
+      for (int i = 0; i < rules.length; i++) {
+        if (i > 0) out.append(',');
+        Json.string(out, rules[i].name());
       }
       out.append("],\"parameters\":[");
       for (int i = 0; i < s.parameters.size(); i++) {
