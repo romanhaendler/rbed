@@ -42,7 +42,7 @@ const template =
 
 test('the twin is the Markdown with each Scenario as its Java source and its default Events', () => {
   assert.equal(
-    twin(markdown, facts),
+    twin(markdown, facts, pages[1]),
     '# Data gaps\n\nA gap <ends> an Event.\n\n' +
       '```java\nRule.named("Run").when(speed.above(5)).maxGap(Duration.ofSeconds(10));\n```\n\n' +
       'Events at the default parameters:\n\n' +
@@ -54,17 +54,17 @@ test('the twin is the Markdown with each Scenario as its Java source and its def
 
 test('a Scenario that rbed rejects at its defaults, or that has no Event, says so', () => {
   const error = new Map([['gaps', { ...facts.get('gaps'), result: { error: 'Limit is NaN' } }]]);
-  assert.match(twin(markdown, error), /rbed rejects the default parameters: Limit is NaN/);
+  assert.match(twin(markdown, error, pages[1]), /rbed rejects the default parameters: Limit is NaN/);
   const none = new Map([['gaps', { ...facts.get('gaps'), result: { samples: [], events: [], discarded: [] } }]]);
-  assert.match(twin(markdown, none), /No Event at the default parameters\./);
-  assert.throws(() => twin('<!-- scenario nope -->', facts), /nope/);
+  assert.match(twin(markdown, none, pages[1]), /No Event at the default parameters\./);
+  assert.throws(() => twin('<!-- scenario nope -->', facts, pages[1]), /nope/);
 });
 
 test('Discarded Pending Events at the defaults get a table of their own, after the Events', () => {
   const result = { ...facts.get('gaps').result, discarded: [{ name: 'Run', start: 9000, discarded: 9500 }] };
   const discarded = new Map([['gaps', { ...facts.get('gaps'), result }]]);
   assert.ok(
-    twin(markdown, discarded).includes(
+    twin(markdown, discarded, pages[1]).includes(
       '| Run | 2 | 2 | 7.5 | end | speed: min 5.5, max 9, mean 7.12; load: no value |\n\n' +
         'Discarded Pending Events at the default parameters:\n\n' +
         '| Name | Start (s) | Discarded (s) |\n| --- | --- | --- |\n| Run | 9 | 9.5 |\n\nThat is all.',
@@ -73,7 +73,7 @@ test('Discarded Pending Events at the defaults get a table of their own, after t
   const html = pageHtml(template, pages[1], markdown, discarded);
   assert.ok(html.includes('<caption>Discarded Pending Events at the default parameters</caption>'));
   assert.ok(html.includes('<td>Run</td><td>9</td><td>9.5</td>'));
-  assert.ok(!twin(markdown, facts).includes('Discarded'), 'no table while there is none');
+  assert.ok(!twin(markdown, facts, pages[1]).includes('Discarded'), 'no table while there is none');
 });
 
 test('the table has a Note column when the Scenario notes an Event, such as the load a crane lifted', () => {
@@ -93,9 +93,23 @@ test('the table has a Note column when the Scenario notes an Event, such as the 
       },
     ],
   ]);
-  const text = twin(markdown, noted);
+  const text = twin(markdown, noted, pages[1]);
   assert.ok(text.includes('| Name | Start (s) | Confirmed (s) | End (s) | Truncated | Note | Aggregates |\n'), text);
   assert.ok(text.includes('| Run | 2 | 2 | 7.5 |  | pallet |  |\n| Stop | 8 | 8 | 9 |  |  |  |'), text);
+});
+
+test("the twin's links to other pages are absolute, since it is read away from the page", () => {
+  const links =
+    'See [Pulse Channels](../pulse-channels/), [Cranes](cranes/), [below](#below), ' +
+    '[README](https://github.com/romanhaendler/rbed#pulse-channels) and `[not](a link)`.\n';
+  assert.equal(
+    twin(links, facts, pages[1]),
+    'See [Pulse Channels](https://romanhaendler.github.io/rbed/pulse-channels/), ' +
+      '[Cranes](https://romanhaendler.github.io/rbed/data-gaps/cranes/), ' +
+      '[below](https://romanhaendler.github.io/rbed/data-gaps/#below), ' +
+      '[README](https://github.com/romanhaendler/rbed#pulse-channels) and `[not](a link)`.\n',
+  );
+  assert.equal(twin('[Cranes](cranes/)', facts, pages[0]), '[Cranes](https://romanhaendler.github.io/rbed/cranes/)');
 });
 
 test("a page's HTML holds its head, its text, its Java source and its default Events before any script", () => {

@@ -63,9 +63,27 @@ function tables(fact) {
   ];
 }
 
-/** The Markdown twin: the page's Markdown, each Scenario marker replaced by its source and Events. */
-export function twin(markdown, facts) {
-  return markdown.replace(new RegExp(SCENARIO_MARKER.source, 'gm'), (_, id) => {
+/** The page's links made absolute, outside fenced and inline code: a twin is read away from its
+ *  page (at <name>.md, in llms-full.txt), where a link relative to the page would go wrong. */
+function absolutePageLinks(markdown, page) {
+  const base = SITE + page.path.slice(1);
+  let fenced = false;
+  return markdown
+    .split('\n')
+    .map((line) => {
+      if (line.startsWith('```')) fenced = !fenced;
+      if (fenced) return line;
+      return line.replace(/`[^`]*`|(\[(?:[^\]`]|`[^`]*`)+\]\()([^)\s]+)\)/g, (all, text, link) =>
+        text === undefined ? all : `${text}${new URL(link, base).href})`,
+      );
+    })
+    .join('\n');
+}
+
+/** The Markdown twin: the page's Markdown, each Scenario marker replaced by its source and Events,
+ *  and its links absolute. */
+export function twin(markdown, facts, page) {
+  return absolutePageLinks(markdown, page).replace(new RegExp(SCENARIO_MARKER.source, 'gm'), (_, id) => {
     const fact = factOf(facts, id);
     const text = tables(fact).map((t) =>
       typeof t === 'string'
@@ -200,7 +218,7 @@ export async function prerender(dist, version) {
   const twins = PAGES.map((page) => {
     const markdown = markdownOf(page, version);
     write(`${page.path.slice(1)}index.html`, pageHtml(template, page, markdown, facts));
-    const text = twin(markdown, facts);
+    const text = twin(markdown, facts, page);
     write(markdownFile(page), text);
     return text;
   });
