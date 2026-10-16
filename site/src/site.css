@@ -1,7 +1,7 @@
 /* The site's own styles: header bar, sidebar, content column and what stands on a page.
 
    Trimmed from the umriss-ui demo shell (packages/demo/src/shell.css, page.css and
-   scripts/front-page.html, MIT). Every colour, spacing and radius is a token of
+   scripts/front-page.html, MIT). Every color, spacing and radius is a token of
    @umriss-ui/core, so both themes hold; the library styles nothing global, so the base is here. */
 
 :root {
@@ -568,7 +568,7 @@ pre {
   vertical-align: middle;
 }
 
-/* Under the chart: what the bands' colours and the marks on them mean. */
+/* Under the chart: what the bands' colors and the marks on them mean. */
 .lifecycleKey {
   display: flex;
   flex-wrap: wrap;

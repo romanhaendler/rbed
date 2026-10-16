@@ -28,40 +28,40 @@ type MarkRow = { t: number; y: number };
 
 /** The Event lanes take the bottom of the plot, one unit each; the Channels the top three units.
     An Expression with a unit of its own takes two units between them. */
-const COURSE_UNITS = 3;
-const OWN_UNITS = 2;
-const EVENT_COLOUR = 'var(--uc-series-2)';
+const CHANNEL_UNITS = 3;
+const SEPARATE_UNITS = 2;
+const EVENT_COLOR = 'var(--uc-series-2)';
 const EVENT_STATES = [
-  { label: 'Pending', color: `color-mix(in srgb, ${EVENT_COLOUR} 35%, transparent)` },
-  { label: 'Confirmed', color: EVENT_COLOUR },
+  { label: 'Pending', color: `color-mix(in srgb, ${EVENT_COLOR} 35%, transparent)` },
+  { label: 'Confirmed', color: EVENT_COLOR },
 ] as const;
 /** The four lifecycle moments, marked on each Rule's lane; Confirmed last, on top of a Pending
     start at the same moment. */
 const MARKS = [
-  { name: 'Pending start', colour: 'var(--u-color-warning)', moments: (l: Lifecycle) => [...l.events, ...l.discarded].map((e) => e.start) },
-  { name: 'Ended', colour: 'var(--u-color-text)', moments: (l: Lifecycle) => l.events.map((e) => e.end) },
-  { name: 'Discarded', colour: 'var(--u-color-danger)', moments: (l: Lifecycle) => l.discarded.map((d) => d.discarded) },
-  { name: 'Confirmed', colour: 'var(--u-color-success)', moments: (l: Lifecycle) => l.events.map((e) => e.confirmed) },
+  { name: 'Pending start', color: 'var(--u-color-warning)', moments: (l: Lifecycle) => [...l.events, ...l.discarded].map((e) => e.start) },
+  { name: 'Ended', color: 'var(--u-color-text)', moments: (l: Lifecycle) => l.events.map((e) => e.end) },
+  { name: 'Discarded', color: 'var(--u-color-danger)', moments: (l: Lifecycle) => l.discarded.map((d) => d.discarded) },
+  { name: 'Confirmed', color: 'var(--u-color-success)', moments: (l: Lifecycle) => l.events.map((e) => e.confirmed) },
 ] as const;
 /** Time advanced without a Sample (advanceTo), marked just above the lanes; a restart is a line. */
-const ADVANCE_COLOUR = 'var(--u-color-text-muted)';
-const RESTART_COLOUR = 'var(--u-color-text-secondary)';
-/** A Truncated start or end: a halo behind the edge's mark, so it reads as more than a colour. */
-const TRUNCATED = { name: 'Truncated', colour: 'color-mix(in srgb, var(--u-color-text) 30%, transparent)' };
+const ADVANCE_COLOR = 'var(--u-color-text-muted)';
+const RESTART_COLOR = 'var(--u-color-text-secondary)';
+/** A Truncated start or end: a halo behind the edge's mark, so it reads as more than a color. */
+const TRUNCATED = { name: 'Truncated', color: 'color-mix(in srgb, var(--u-color-text) 30%, transparent)' };
 const truncatedEdges = (l: Lifecycle) =>
   l.events.flatMap((e) => [...(e.truncatedStart ? [e.start] : []), ...(e.truncatedEnd ? [e.end] : [])]);
-/** The chart palette without the Events' colour, so a Channel never looks like a band. */
-const CHANNEL_COLOURS = [1, 3, 4, 5, 6].map((n) => `var(--uc-series-${n})`);
-const channelColour = (scenario: Scenario, channel: string) =>
-  CHANNEL_COLOURS[scenario.channels.indexOf(channel) % CHANNEL_COLOURS.length];
+/** The chart palette without the Events' color, so a Channel never looks like a band. */
+const CHANNEL_COLORS = [1, 3, 4, 5, 6].map((n) => `var(--uc-series-${n})`);
+const channelColor = (scenario: Scenario, channel: string) =>
+  CHANNEL_COLORS[scenario.channels.indexOf(channel) % CHANNEL_COLORS.length];
 
 const eventKey = (e: Event) => `${e.name} ${e.start}`;
 /** The highlight of the Event latest(...) reads at the hovered time. */
-const LATEST_COLOUR = 'var(--u-color-warning)';
+const LATEST_COLOR = 'var(--u-color-warning)';
 
-/** The row key of the plotted Expression's values, and its colour: the next one after the Channels'. */
+/** The row key of the plotted Expression's values, and its color: the next one after the Channels'. */
 const EXPRESSION = 'expression';
-const expressionColour = (scenario: Scenario) => CHANNEL_COLOURS[scenario.channels.length % CHANNEL_COLOURS.length];
+const expressionColor = (scenario: Scenario) => CHANNEL_COLORS[scenario.channels.length % CHANNEL_COLORS.length];
 const expressionValue = (v: number | null | undefined) => (v == null ? 'undefined' : String(Number(v.toPrecision(6))));
 
 /** Where the plotted Expression is undefined, in the Scenario's unit: from each undefined Sample to the next one. */
@@ -101,7 +101,7 @@ function bandAxis(rows: Row[], channels: string[], also: number[], below: number
   const domain: [number, number] = [from, from + span];
   return { ticks, domain };
 }
-type Course = ReturnType<typeof bandAxis>;
+type ChannelAxis = ReturnType<typeof bandAxis>;
 
 /** Events and Discarded Pending Events, of every Rule or of one. */
 type Lifecycle = { events: Event[]; discarded: Discard[] };
@@ -140,7 +140,7 @@ function ruleState(lifecycle: Lifecycle, t: number, millis: number): string {
 /** The Event latest(...) reads at time t: the most recently Confirmed one, running or Ended. */
 const latestEvent = (events: Event[], t: number, millis: number) => events.findLast((e) => e.confirmed / millis <= t);
 
-type Shown = {
+type ChartModel = {
   scenario: Scenario;
   rows: Row[];
   lifecycle: Lifecycle;
@@ -157,27 +157,27 @@ type Shown = {
 
 /** The Channels' axis of what is shown (with the plotted Expression and its threshold); it keeps
     its scale while Channels are hidden. */
-const courseOf = ({ scenario, rows, rules, expression }: Shown): Course => {
-  const below = rules.length + (expression?.unit !== undefined ? OWN_UNITS : 0);
+const channelAxisOf = ({ scenario, rows, rules, expression }: ChartModel): ChannelAxis => {
+  const below = rules.length + (expression?.unit !== undefined ? SEPARATE_UNITS : 0);
   return expression && expression.unit === undefined
-    ? bandAxis(rows, [...scenario.channels, EXPRESSION], [expression.threshold], below, COURSE_UNITS, COURSE_UNITS + below)
-    : bandAxis(rows, scenario.channels, [], below, COURSE_UNITS, COURSE_UNITS + below);
+    ? bandAxis(rows, [...scenario.channels, EXPRESSION], [expression.threshold], below, CHANNEL_UNITS, CHANNEL_UNITS + below)
+    : bandAxis(rows, scenario.channels, [], below, CHANNEL_UNITS, CHANNEL_UNITS + below);
 };
 
 /** The tooltip: every shown Channel's value and Rule's state at the hovered time. */
-function Readout({ shown, t }: { shown: Shown; t: number }) {
-  const { scenario, rows, lifecycle, channels, rules, expression } = shown;
+function Readout({ model, t }: { model: ChartModel; t: number }) {
+  const { scenario, rows, lifecycle, channels, rules, expression } = model;
   const row = rows.findLast((r) => r.t <= t) ?? rows[0];
   const { millis } = scenario.timeUnit;
   const latest = scenario.latest && latestEvent(ofRule(lifecycle, scenario.latest).events, t, millis);
   const latestKey = latest ? eventKey(latest) : undefined;
   // The chart highlights that Event; there is no hover callback, so the readout reports it.
-  const { hoverLatest } = shown;
+  const { hoverLatest } = model;
   useEffect(() => hoverLatest(latestKey), [hoverLatest, latestKey]);
   useEffect(() => () => hoverLatest(undefined), [hoverLatest]);
-  const line = (name: string, colour: string, value: string) => (
+  const line = (name: string, color: string, value: string) => (
     <div className="uc-tooltip-row" key={name}>
-      <span className="uc-tooltip-chip" style={{ background: colour }} />
+      <span className="uc-tooltip-chip" style={{ background: color }} />
       <span className="uc-tooltip-name">{name}</span>
       <span className="uc-tooltip-value">{value}</span>
     </div>
@@ -188,18 +188,18 @@ function Readout({ shown, t }: { shown: Shown; t: number }) {
         {t} {scenario.timeUnit.name}
       </div>
       <div className="uc-tooltip-list">
-        {channels.map((c) => line(c, channelColour(scenario, c), String(row[c] ?? '–')))}
+        {channels.map((c) => line(c, channelColor(scenario, c), String(row[c] ?? '–')))}
         {expression &&
           line(
             expression.name,
-            expressionColour(scenario),
+            expressionColor(scenario),
             expressionValue(row[EXPRESSION]) + (expression.unit ? ` ${expression.unit}` : ''),
           )}
-        {rules.map((r) => line(r, EVENT_COLOUR, ruleState(ofRule(lifecycle, r), t, millis)))}
+        {rules.map((r) => line(r, EVENT_COLOR, ruleState(ofRule(lifecycle, r), t, millis)))}
         {scenario.latest &&
           line(
             `latest(${scenario.latest}) reads`,
-            LATEST_COLOUR,
+            LATEST_COLOR,
             latest ? `${latest.start / millis} to ${latest.end / millis} ${scenario.timeUnit.name}` : 'no Event yet',
           )}
       </div>
@@ -208,26 +208,26 @@ function Readout({ shown, t }: { shown: Shown; t: number }) {
 }
 
 function EventChart({
-  shown,
-  course,
+  model,
+  channelAxis,
   selected,
   latest,
   select,
 }: {
-  shown: Shown;
-  /** The Channels' axis, from courseOf; it keeps its scale while Channels are hidden. */
-  course: Course;
+  model: ChartModel;
+  /** The Channels' axis, from channelAxisOf; it keeps its scale while Channels are hidden. */
+  channelAxis: ChannelAxis;
   selected?: Event;
   /** The Event latest(...) reads at the hovered time. */
   latest?: Event;
   select: (key: string | undefined) => void;
 }) {
-  const { scenario, rows, lifecycle, channels, rules, expression } = shown;
+  const { scenario, rows, lifecycle, channels, rules, expression } = model;
   const { name: unit, millis } = scenario.timeUnit;
   // An Expression with a unit of its own (a count of Events, a duration) is not on the Channels'
   // scale: it gets a band of the plot and an axis of its own, between the Channels and the lanes.
-  const own = expression?.unit !== undefined ? expression : undefined;
-  const onCourse = own ? undefined : expression;
+  const separate = expression?.unit !== undefined ? expression : undefined;
+  const onChannels = separate ? undefined : expression;
   // A click (or Enter) on the chart selects the Event under it, if any.
   const { Chart, XAxis, YAxis, Line, Scatter, StateBand } = useChart(rows, {
     onSelect: (hit) => {
@@ -236,19 +236,19 @@ function EventChart({
     },
   });
   // The tooltip's render is compared by its source text, so it reads the data through a ref.
-  const live = useRef(shown);
-  live.current = shown;
+  const live = useRef(model);
+  live.current = model;
   const lanes = rules.length;
-  const total = COURSE_UNITS + lanes + (own ? OWN_UNITS : 0);
-  const ownAxis = own && bandAxis(rows, [EXPRESSION], [own.threshold], lanes, OWN_UNITS, total);
+  const total = CHANNEL_UNITS + lanes + (separate ? SEPARATE_UNITS : 0);
+  const separateAxis = separate && bandAxis(rows, [EXPRESSION], [separate.threshold], lanes, SEPARATE_UNITS, total);
   return (
     <Chart
-      height={own ? 380 : 300}
+      height={separate ? 380 : 300}
       ariaLabel={`${scenario.channels.join(', ')} over time in ${unit}, with the Events of ${scenario.rules.join(', ')} as bands, Pending then Confirmed, and their lifecycle marked`}
     >
       <XAxis value="t" domain={[rows[0].t, rows[rows.length - 1].t]} label={`Time (${unit})`} />
-      <YAxis domain={course.domain} ticks={course.ticks} label={channels.join(', ')} />
-      {own && ownAxis && <YAxis id="own" grid={false} domain={ownAxis.domain} ticks={ownAxis.ticks} />}
+      <YAxis domain={channelAxis.domain} ticks={channelAxis.ticks} label={channels.join(', ')} />
+      {separate && separateAxis && <YAxis id="separate" grid={false} domain={separateAxis.domain} ticks={separateAxis.ticks} />}
       {/* Lane i (first Rule on top) spans lanes - i - 1 .. lanes - i. The lane names change with
           the shown Rules; the chart's key remounts it then, since tickFormat is compared by text. */}
       <YAxis
@@ -263,14 +263,14 @@ function EventChart({
         undefinedStretches(rows).map(([from, to]) => (
           <LimitBand key={from} orientation="x" from={from} to={to} color="var(--u-color-text-muted)" label="undefined" />
         ))}
-      {onCourse && <LimitLine value={onCourse.threshold} label={`threshold ${onCourse.threshold}`} />}
-      {own && <LimitLine axisId="own" value={own.threshold} label={`threshold ${own.threshold} ${own.unit}`} />}
+      {onChannels && <LimitLine value={onChannels.threshold} label={`threshold ${onChannels.threshold}`} />}
+      {separate && <LimitLine axisId="separate" value={separate.threshold} label={`threshold ${separate.threshold} ${separate.unit}`} />}
       {selected && (
         <LimitBand orientation="x" from={selected.start / millis} to={selected.end / millis} color="var(--u-color-accent)" />
       )}
-      {latest && <LimitBand orientation="x" from={latest.start / millis} to={latest.end / millis} color={LATEST_COLOUR} />}
-      {shown.restart !== undefined && (
-        <LimitLine orientation="x" value={shown.restart / millis} label="Restart" color={RESTART_COLOUR} />
+      {latest && <LimitBand orientation="x" from={latest.start / millis} to={latest.end / millis} color={LATEST_COLOR} />}
+      {model.restart !== undefined && (
+        <LimitLine orientation="x" value={model.restart / millis} label="Restart" color={RESTART_COLOR} />
       )}
       {rules.map((rule, i) => (
         <StateBand<BandRow>
@@ -289,7 +289,7 @@ function EventChart({
         value="y"
         yAxisId="lanes"
         name={TRUNCATED.name}
-        color={TRUNCATED.colour}
+        color={TRUNCATED.color}
         radius={9}
       />
       {MARKS.map((m) => (
@@ -299,33 +299,33 @@ function EventChart({
           value="y"
           yAxisId="lanes"
           name={m.name}
-          color={m.colour}
+          color={m.color}
           radius={4}
         />
       ))}
-      {shown.advances.length > 0 && (
+      {model.advances.length > 0 && (
         <Scatter<MarkRow>
-          data={shown.advances.map((t) => ({ t: t / millis, y: lanes + 0.15 }))}
+          data={model.advances.map((t) => ({ t: t / millis, y: lanes + 0.15 }))}
           value="y"
           yAxisId="lanes"
           name="Time advance"
-          color={ADVANCE_COLOUR}
+          color={ADVANCE_COLOR}
           radius={3}
         />
       )}
       {/* A Pulse Channel has no value between its Samples, so it is drawn as marks, not a line. */}
       {channels.map((c) =>
         scenario.pulse.includes(c) ? (
-          <Scatter key={c} value={c} name={c} color={channelColour(scenario, c)} radius={5} />
+          <Scatter key={c} value={c} name={c} color={channelColor(scenario, c)} radius={5} />
         ) : (
-          <Line key={c} value={c} name={c} color={channelColour(scenario, c)} markers="always" />
+          <Line key={c} value={c} name={c} color={channelColor(scenario, c)} markers="always" />
         ),
       )}
-      {onCourse && (
-        <Line value={EXPRESSION} name={onCourse.name} color={expressionColour(scenario)} dash={[6, 4]} markers="always" />
+      {onChannels && (
+        <Line value={EXPRESSION} name={onChannels.name} color={expressionColor(scenario)} dash={[6, 4]} markers="always" />
       )}
-      {own && <Line value={EXPRESSION} name={own.name} color={expressionColour(scenario)} dash={[6, 4]} yAxisId="own" />}
-      <Tooltip mode="x" render={(hit: TooltipHit<Row>) => <Readout shown={live.current} t={hit.xValue} />} />
+      {separate && <Line value={EXPRESSION} name={separate.name} color={expressionColor(scenario)} dash={[6, 4]} yAxisId="separate" />}
+      <Tooltip mode="x" render={(hit: TooltipHit<Row>) => <Readout model={live.current} t={hit.xValue} />} />
     </Chart>
   );
 }
@@ -336,21 +336,21 @@ function EventChart({
     users keep the chart and the controls; drawing itself needs a pointer. */
 function DrawLayer({
   x,
-  course,
+  channelAxis,
   draw,
   end,
 }: {
   x: [number, number];
-  course: Course;
+  channelAxis: ChannelAxis;
   draw: (t: number, value: number, first: boolean) => void;
   end: () => void;
 }) {
   const drawing = useRef(false);
   const point = (e: PointerEvent<HTMLDivElement>, first: boolean) => {
-    const p = valueAt(e.currentTarget.parentElement!, e.clientX, e.clientY, x, course.domain);
+    const p = valueAt(e.currentTarget.parentElement!, e.clientX, e.clientY, x, channelAxis.domain);
     if (p === undefined) return;
-    const step = course.ticks[1] - course.ticks[0];
-    const value = Math.round(Math.max(p.y, course.ticks[0] - step / 2) / (step / 10)) * (step / 10);
+    const step = channelAxis.ticks[1] - channelAxis.ticks[0];
+    const value = Math.round(Math.max(p.y, channelAxis.ticks[0] - step / 2) / (step / 10)) * (step / 10);
     draw(p.x, Number(value.toPrecision(12)), first);
   };
   const stop = () => {
@@ -395,11 +395,11 @@ function timeSummary({ advances, restart }: { advances: number[]; restart?: numb
   );
 }
 
-/** What the bands' colours and the marks mean; the text alternative says it in words. */
+/** What the bands' colors and the marks mean; the text alternative says it in words. */
 function LifecycleKey({ advances }: { advances: boolean }) {
-  const item = (label: string, colour: string, mark: boolean) => (
+  const item = (label: string, color: string, mark: boolean) => (
     <span key={label}>
-      <span className={mark ? 'swatch mark' : 'swatch'} style={{ background: colour }} />
+      <span className={mark ? 'swatch mark' : 'swatch'} style={{ background: color }} />
       {label}
     </span>
   );
@@ -408,12 +408,12 @@ function LifecycleKey({ advances }: { advances: boolean }) {
       <span>Bands:</span>
       {EVENT_STATES.map((s) => item(s.label, s.color, false))}
       <span>Marks:</span>
-      {MARKS.map((m) => item(m.name, m.colour, true))}
+      {MARKS.map((m) => item(m.name, m.color, true))}
       <span>
-        <span className="swatch mark halo" style={{ background: TRUNCATED.colour }} />
+        <span className="swatch mark halo" style={{ background: TRUNCATED.color }} />
         Truncated start or end
       </span>
-      {advances && item('Time advance', ADVANCE_COLOUR, true)}
+      {advances && item('Time advance', ADVANCE_COLOR, true)}
     </div>
   );
 }
@@ -608,7 +608,7 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
   // Channels' axis held still during a stroke; the stroke's previous point.
   const [drawn, setDrawn] = useState<Record<string, (number | null)[]>>({});
   const [pen, setPen] = useState('');
-  const [frozen, setFrozen] = useState<Course>();
+  const [frozen, setFrozen] = useState<ChannelAxis>();
   const [hoveredLatest, hoverLatest] = useState<string>();
   const stroke = useRef<[number, number]>(undefined);
   const result = useMemo(() => run(scenario.id, parameters, drawn), [scenario.id, parameters, drawn]);
@@ -642,7 +642,7 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
   const drawable = scenario.channels.filter((c) => !scenario.pulse.includes(c));
   const toggle = (name: string) =>
     setHidden(hidden.includes(name) ? hidden.filter((n) => n !== name) : [...hidden, name]);
-  const visibility = (names: string[], colour: (name: string) => string) =>
+  const visibility = (names: string[], color: (name: string) => string) =>
     names.map((name) => (
       <Checkbox
         key={name}
@@ -650,7 +650,7 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
         onChange={() => toggle(name)}
         label={
           <>
-            <span className="swatch" style={{ background: colour(name) }} />
+            <span className="swatch" style={{ background: color(name) }} />
             {name}
           </>
         }
@@ -665,7 +665,7 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
       </Alert>
     );
   } else {
-    const shown: Shown = {
+    const model: ChartModel = {
       scenario,
       rows,
       lifecycle: result,
@@ -677,31 +677,31 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
       restart: result.restart,
     };
     const event = result.events.find((e) => eventKey(e) === selected);
-    const course = frozen ?? courseOf(shown);
+    const channelAxis = frozen ?? channelAxisOf(model);
     const times = rows.map((r) => r.t);
     const drawPoint = (t: number, value: number, first: boolean) => {
       const previous = first ? undefined : stroke.current;
-      const own = rows.map((r) => r[pen] ?? null);
+      const scenarioValues = rows.map((r) => r[pen] ?? null);
       setDrawn((d) => {
-        const next = drawTo(d[pen] ?? own, times, t, value, previous);
+        const next = drawTo(d[pen] ?? scenarioValues, times, t, value, previous);
         stroke.current = next.last;
         return { ...d, [pen]: next.values };
       });
-      if (first) setFrozen(course);
+      if (first) setFrozen(channelAxis);
     };
     stage = (
       <>
         <div className="drawStage">
           <EventChart
-            key={`${scenario.id} ${shown.rules.join(' ')}`}
-            shown={shown}
-            course={course}
+            key={`${scenario.id} ${model.rules.join(' ')}`}
+            model={model}
+            channelAxis={channelAxis}
             selected={event}
             latest={result.events.find((e) => eventKey(e) === hoveredLatest)}
             select={select}
           />
           {pen !== '' && (
-            <DrawLayer x={[times[0], times[times.length - 1]]} course={course} draw={drawPoint} end={() => setFrozen(undefined)} />
+            <DrawLayer x={[times[0], times[times.length - 1]]} channelAxis={channelAxis} draw={drawPoint} end={() => setFrozen(undefined)} />
           )}
         </div>
         <LifecycleKey advances={result.advances.length > 0} />
@@ -775,8 +775,8 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
           )}
           <fieldset className="configuratorShow">
             <legend>Show</legend>
-            {visibility(scenario.rules, () => EVENT_COLOUR)}
-            {visibility(scenario.channels, (c) => channelColour(scenario, c))}
+            {visibility(scenario.rules, () => EVENT_COLOR)}
+            {visibility(scenario.channels, (c) => channelColor(scenario, c))}
           </fieldset>
         </div>
         <div className="configuratorCode">

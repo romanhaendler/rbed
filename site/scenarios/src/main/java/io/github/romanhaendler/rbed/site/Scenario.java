@@ -13,6 +13,10 @@ import java.util.Map;
  * A parameterised example shown on the site: its Channels, its Samples, and Rules built from
  * parameter values. {@code source} is the Java source of the Rules, with a placeholder such as
  * {@code ${threshold}} for each parameter, which the site replaces by the current value.
+ *
+ * <p>A Scenario class is named after its page ({@code Cranes}, {@code During}, {@code Count}),
+ * with the suffix {@code Scenario} only where that name is a public rbed type
+ * ({@code AfterScenario}, {@code AggregatesScenario}).
  */
 abstract class Scenario {
   final String id;

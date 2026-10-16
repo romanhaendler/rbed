@@ -1,4 +1,4 @@
-// Java source split into the pieces the code block colours.
+// Java source split into the pieces the code block colors.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { javaTokens } from '../src/java.ts';

@@ -29,7 +29,7 @@ public final class Bridge {
       new PulseChannels(),
       new During(),
       new AfterScenario(),
-      new CountScenario(),
+      new Count(),
       new TotalDuration(),
       new Latest(),
       new History(),
