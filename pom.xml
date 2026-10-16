@@ -85,6 +85,13 @@
           <argLine>--add-modules jdk.management,java.logging --add-reads io.github.romanhaendler.rbed=jdk.management,java.management,java.logging</argLine>
         </configuration>
       </plugin>
+      <plugin>
+        <!-- pinned: with install 3.2.0 central-publishing 0.11.0 leaves maven-metadata in the
+             bundle, which Central rejects ("content that does NOT have a .pom file") -->
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-install-plugin</artifactId>
+        <version>3.1.4</version>
+      </plugin>
     </plugins>
   </build>
 
