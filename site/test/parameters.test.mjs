@@ -1,8 +1,8 @@
 // Parameter values in the page address: only those that differ from the default are written,
-// and reading an address gives back exactly what was written.
+// and reading an address gives back exactly what was written. And the source shown for them.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { fromQuery, toQuery } from '../src/parameters.ts';
+import { fillSource, fromQuery, toQuery, usedParameters } from '../src/parameters.ts';
 
 const PARAMETERS = [
   { id: 'threshold', default: 80 },
@@ -31,4 +31,33 @@ test('only values that differ from the default go into the address, other keys s
 test('reading back what was written gives the same values', () => {
   const values = { threshold: 61, duration: 0.25 };
   assert.deepEqual(fromQuery(toQuery('', values, PARAMETERS), PARAMETERS), values);
+});
+
+const CHOICE = [
+  {
+    id: 'expression',
+    default: 0,
+    options: [{ source: 'temp.rate()' }, { source: 'temp.averageOverSamples(${samples})' }],
+  },
+  { id: 'samples', default: 5 },
+  { id: 'window', default: 10 },
+];
+
+test('a choice stands for its option, whose placeholders are filled in too', () => {
+  const template = 'when(${expression}.above(${threshold}))';
+  const parameters = [...CHOICE, { id: 'threshold', default: 24 }];
+  assert.equal(
+    fillSource(template, parameters, { expression: 0, samples: 5, threshold: 24 }),
+    'when(temp.rate().above(24))',
+  );
+  assert.equal(
+    fillSource(template, parameters, { expression: 1, samples: 7, threshold: NaN }),
+    'when(temp.averageOverSamples(7).above(Double.NaN))',
+  );
+});
+
+test('the parameters in use are every choice and those the source for the current values names', () => {
+  const template = 'when(${expression})';
+  assert.deepEqual(usedParameters(template, CHOICE, { expression: 0 }), ['expression']);
+  assert.deepEqual(usedParameters(template, CHOICE, { expression: 1 }), ['expression', 'samples']);
 });

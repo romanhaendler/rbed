@@ -22,6 +22,13 @@ export const PAGES: Page[] = [
     description:
       'Rule-based event detection in time series: a small Java library that finds Events in multi-channel data by evaluating declarative Rules.',
   },
+  {
+    path: '/conditions-and-expressions/',
+    title: 'Conditions and Expressions',
+    description:
+      'What a Rule compares: rates, moving averages and arithmetic between Channels, plotted per Sample, and why no Event starts where an Expression is undefined.',
+    rubric: 'Guide',
+  },
 ];
 
 /** The page path an address names when the site is served below `base`, or undefined outside it. */

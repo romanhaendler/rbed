@@ -11,6 +11,7 @@ import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { escape, parse, SCENARIO_MARKER } from './src/markdown.ts';
 import { markdownFile, PAGES, titleOf } from './src/pages.ts';
+import { fillSource } from './src/parameters.ts';
 
 export const SITE = 'https://romanhaendler.github.io/rbed/';
 const REPOSITORY = 'https://github.com/romanhaendler/rbed';
@@ -172,7 +173,7 @@ export async function prerender(dist, version) {
     JSON.parse(bridge.scenarios()).map((s) => [
       s.id,
       {
-        source: s.source.replace(/\$\{(\w+)\}/g, (_, id) => String(s.parameters.find((p) => p.id === id).default)).trimEnd(),
+        source: fillSource(s.source, s.parameters, Object.fromEntries(s.parameters.map((p) => [p.id, p.default]))).trimEnd(),
         unit: s.timeUnit.name,
         millis: s.timeUnit.millis,
         result: JSON.parse(bridge.run(s.id, '{}', '{}')),

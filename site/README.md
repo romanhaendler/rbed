@@ -17,7 +17,7 @@ npm run preview   # serves dist/ at http://localhost:4173/rbed/
 
 A page is three things; the build does the rest.
 
-1. **A Scenario** (if the page shows one): a class in `scenarios/src/main/java/.../site/` extending `Scenario`, added to `Bridge.SCENARIOS`, with JUnit tests through the bridge in `BridgeTest` (the parity test repeats them against the compiled JavaScript).
+1. **A Scenario** (if the page shows one): a class in `scenarios/src/main/java/.../site/` extending `Scenario`, added to `Bridge.SCENARIOS`, with JUnit tests through the bridge in `BridgeTest` (the parity test repeats them against the compiled JavaScript). A parameter is a number with a slider, or a choice (`Parameter.choice`, shown as radio buttons) whose value is the index of an option; its `${id}` in the source stands for that option's source, and a number only unchosen options name gets no control. A Scenario that overrides `plot` gets an Expression drawn as a dashed line with its threshold, from values rbed computes (`ExpressionValues`).
 2. **A manifest entry** in `src/pages.ts` at its README position: `path` (`/event-lifecycle/`), `title`, a one-sentence `description`, and `rubric` (`Guide` for a README chapter, `Examples` for a domain example).
 3. **Its text** in `src/content/<name>.md`, named after the path (`/event-lifecycle/` reads `event-lifecycle.md`; the front page is `index.md`). It starts with `# Title`. The live Scenario stands where a line `<!-- scenario <id> -->` stands. `{{version}}` is the rbed version of the build.
 

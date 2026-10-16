@@ -1,12 +1,14 @@
 package io.github.romanhaendler.rbed.site;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterAll;
@@ -120,5 +122,80 @@ class BridgeTest {
     Map<String, Object> first = scenarios().get(0);
     assertEquals(List.of("HighTemperature"), first.get("rules"));
     assertEquals(Map.of("name", "s", "millis", 1000.0), first.get("timeUnit"));
+  }
+
+  /** The Expression's values in a result, null where it is undefined. */
+  @SuppressWarnings("unchecked")
+  static List<Double> expressionValues(Map<String, Object> result) {
+    return (List<Double>) ((Map<String, Object>) result.get("expression")).get("values");
+  }
+
+  @Test
+  void movingAverageOverFiveSamplesIsUndefinedForTheFirstFour() {
+    List<Double> values =
+        expressionValues(run("expressions", "{\"expression\": 1, \"samples\": 5}"));
+    assertEquals(Arrays.asList(null, null, null, null), values.subList(0, 4));
+    assertEquals(26.0, values.get(4), 1e-12); // mean of 26, 26.2, 25.9, 26.1, 25.8
+  }
+
+  @Test
+  void noEventStartsWhileTheMovingAverageWarmsUp() {
+    // temp is above 24 from the first Sample, but the average is undefined until 4 s.
+    assertEquals(
+        List.of("AboveLimit 4000..7000 truncatedStart", "AboveLimit 37000..59000 truncatedEnd"),
+        events(run("expressions", "{}")));
+  }
+
+  /** The number of Samples before the Expression is first defined. */
+  static long warmUp(Map<String, Object> result) {
+    return expressionValues(result).stream().takeWhile(v -> v == null).count();
+  }
+
+  @Test
+  void rateIsDefinedFromTheSecondValueAndSeesTheOutlier() {
+    Map<String, Object> result = run("expressions", "{\"expression\": 0}");
+    assertEquals(1, warmUp(result));
+    assertEquals(8.2, expressionValues(result).get(15), 1e-12); // 28 after 19.8, one second apart
+    assertEquals(List.of("AboveLimit 15000..16000", "AboveLimit 31000..39000"), events(result));
+  }
+
+  @Test
+  void movingAverageOverADurationIsUndefinedUntilItsValuesSpanTheWindow() {
+    assertEquals(10, warmUp(run("expressions", "{\"expression\": 2}")));
+    assertEquals(5, warmUp(run("expressions", "{\"expression\": 2, \"window\": 5}")));
+  }
+
+  @Test
+  void differenceOfTwoChannelsIsUndefinedUntilBothHaveAValue() {
+    Map<String, Object> result = run("expressions", "{\"expression\": 3}");
+    assertEquals(5, warmUp(result));
+    assertEquals(4.1, expressionValues(result).get(5), 1e-12); // 26.1 - 22
+    assertEquals(List.of("AboveLimit 15000..16000", "AboveLimit 38000..59000 truncatedEnd"),
+        events(result));
+  }
+
+  @Test
+  void anExpressionThatIsNoOptionReturnsAnError() {
+    assertEquals(Map.of("error", "Parameter expression has no option 4.0"),
+        run("expressions", "{\"expression\": 4}"));
+    assertEquals(Map.of("error", "Parameter expression has no option 0.5"),
+        run("expressions", "{\"expression\": 0.5}"));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void catalogueListsTheExpressionsAsOptionsWithTheirSource() {
+    Map<String, Object> expression =
+        ((List<Map<String, Object>>) scenarios().get(1).get("parameters")).get(0);
+    assertEquals("expression", expression.get("id"));
+    assertEquals(1.0, expression.get("default"));
+    assertEquals(Map.of("label", "Moving average over Samples",
+            "source", "temp.averageOverSamples(${samples}).above(24)"),
+        ((List<Object>) expression.get("options")).get(1));
+  }
+
+  @Test
+  void aScenarioWithoutAnExpressionHasNoneInItsResult() {
+    assertFalse(run("first-rule", "{}").containsKey("expression"));
   }
 }

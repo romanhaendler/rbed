@@ -16,7 +16,7 @@ import org.teavm.jso.JSExport;
  * exports every reachable class that has such methods.
  */
 public final class Bridge {
-  private static final List<Scenario> SCENARIOS = List.of(new FirstRule());
+  private static final List<Scenario> SCENARIOS = List.of(new FirstRule(), new Expressions());
 
   private Bridge() {}
 
@@ -54,7 +54,17 @@ public final class Bridge {
         Json.number(out.append(",\"min\":"), p.min());
         Json.number(out.append(",\"max\":"), p.max());
         Json.number(out.append(",\"step\":"), p.step());
-        Json.string(out.append(",\"unit\":"), p.unit()).append('}');
+        Json.string(out.append(",\"unit\":"), p.unit());
+        if (!p.options().isEmpty()) {
+          out.append(",\"options\":[");
+          for (int j = 0; j < p.options().size(); j++) {
+            if (j > 0) out.append(',');
+            Json.string(out.append("{\"label\":"), p.options().get(j).label());
+            Json.string(out.append(",\"source\":"), p.options().get(j).source()).append('}');
+          }
+          out.append(']');
+        }
+        out.append('}');
       }
       Json.string(out.append("],\"source\":"), s.source).append('}');
     }
@@ -67,19 +77,21 @@ public final class Bridge {
    * @param parameters JSON object of parameter values by id; missing ones take their default,
    *     null stands for NaN
    * @param drawnChannels JSON object reserved for Channel values the reader drew; ignored for now
-   * @return JSON object with the Samples and the Events, or {@code {"error": message}} if rbed
-   *     rejected the Rules or the input was invalid
+   * @return JSON object with the Samples, the Events and, for a Scenario that plots an
+   *     Expression, its name, threshold and value per Sample (null where undefined), or
+   *     {@code {"error": message}} if rbed rejected the Rules or the input was invalid
    */
   @JSExport
   public static String run(String scenarioId, String parameters, String drawnChannels) {
     try {
       Scenario scenario = scenario(scenarioId);
       List<Sample> samples = scenario.samples();
+      Map<String, Double> values = values(scenario, parameters);
       List<Event> events = Detector.builder()
-          .rules(scenario.rules(values(scenario, parameters)))
+          .rules(scenario.rules(values))
           .build()
           .detect(samples);
-      return result(scenario, samples, events);
+      return result(scenario, samples, events, scenario.plot(values));
     } catch (RuntimeException e) {
       return Json.string(new StringBuilder("{\"error\":"), String.valueOf(e.getMessage()))
           .append('}').toString();
@@ -105,12 +117,16 @@ public final class Bridge {
       if (!(value instanceof Double d)) {
         throw new IllegalArgumentException("Parameter " + p.id() + " is not a number");
       }
+      if (!p.options().isEmpty() && !(d >= 0 && d < p.options().size() && d == Math.rint(d))) {
+        throw new IllegalArgumentException("Parameter " + p.id() + " has no option " + d);
+      }
       values.put(p.id(), d);
     }
     return values;
   }
 
-  private static String result(Scenario scenario, List<Sample> samples, List<Event> events) {
+  private static String result(Scenario scenario, List<Sample> samples, List<Event> events,
+      Scenario.Plot plot) {
     StringBuilder out = new StringBuilder("{\"samples\":[");
     for (int i = 0; i < samples.size(); i++) {
       Sample sample = samples.get(i);
@@ -138,6 +154,17 @@ public final class Bridge {
           .append(",\"truncatedEnd\":").append(e.truncatedEnd())
           .append('}');
     }
-    return out.append("]}").toString();
+    out.append(']');
+    if (plot != null) {
+      Json.string(out.append(",\"expression\":{\"name\":"), plot.name());
+      Json.number(out.append(",\"threshold\":"), plot.threshold()).append(",\"values\":[");
+      double[] values = ExpressionValues.of(plot.expression(), samples);
+      for (int i = 0; i < values.length; i++) {
+        if (i > 0) out.append(',');
+        Json.number(out, values[i]);
+      }
+      out.append("]}");
+    }
+    return out.append('}').toString();
   }
 }
