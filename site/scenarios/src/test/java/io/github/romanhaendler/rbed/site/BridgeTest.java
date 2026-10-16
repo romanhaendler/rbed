@@ -180,6 +180,66 @@ class BridgeTest {
   }
 
   @Test
+  void financeAtDefaultsYieldsTheTradingSignalsExamplesEvents() {
+    // the example finds the golden cross by brute force over the two averages: day 366
+    assertEquals(List.of("DeathCross 199..366 truncatedStart", "GoldenCross 366..599 truncatedEnd"),
+        describe(run("finance", "{}"), 86_400_000));
+  }
+
+  @Test
+  void aLongerSlowAverageStartsTheDeathCrossLater() {
+    assertEquals("DeathCross 249..",
+        describe(run("finance", "{\"slow\": 250}"), 86_400_000).get(0).substring(0, 16));
+  }
+
+  @Test
+  void environmentGapShorterThanTheMissingReportInterruptsTheWarning() {
+    assertEquals(List.of("FloodWarning 5.25..19.75 truncatedEnd", "Receding 12.25..26"),
+        describe(run("environment", "{\"gapMinutes\": 15}"), 3_600_000));
+  }
+
+  @Test
+  void logisticsAtDefaultsYieldsTheColdChainExamplesEvents() {
+    assertEquals(List.of(
+            "DoorOpen 60..65",
+            "Excursion 62..90",
+            "ExcursionAfterDoor 65..90",
+            "Excursion 300..330",
+            "CumulativeLimit 318..479 truncatedEnd"),
+        describe(run("logistics", "{}"), 60_000));
+  }
+
+  @Test
+  void environmentAtDefaultsYieldsTheFloodWarningExamplesEvents() {
+    assertEquals(List.of("Receding 12.25..26", "FloodWarning 5.25..31.25"),
+        describe(run("environment", "{}"), 3_600_000));
+  }
+
+  /** IntervalTrainingExample's Events, and its listener's recovery times as notes. */
+  @Test
+  void sportsAtDefaultsYieldsTheIntervalTrainingExamplesEvents() {
+    Map<String, Object> result = run("sports", "{}");
+    assertEquals(List.of(
+            "Sprint 60..90", "Recovered 141..180",
+            "Sprint 180..210", "Recovered 261..300",
+            "Sprint 300..330", "Recovered 381..419 truncatedEnd",
+            "SessionDone 305..419 truncatedEnd"),
+        describe(result, 1000));
+    assertEquals(Arrays.asList(null, "51 s", null, "51 s", null, "51 s", null), notes(result));
+  }
+
+  @Test
+  void itOperationsAtDefaultsYieldsTheDeploymentRegressionExamplesEvents() {
+    assertEquals(List.of(
+            "Deployment 10..11",
+            "ErrorSpike 25..35",
+            "Regression 25..35",
+            "ErrorSpike 80..85",
+            "HighCpu 90..100"),
+        describe(run("it-operations", "{}"), 60_000));
+  }
+
+  @Test
   void firstRuleAtDefaultsYieldsTheReadmesEvent() {
     assertEquals(List.of("HighTemperature 2000..3000"), events(run("first-rule", "{}")));
   }
