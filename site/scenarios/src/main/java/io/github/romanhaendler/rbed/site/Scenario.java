@@ -1,6 +1,8 @@
 package io.github.romanhaendler.rbed.site;
 
 import io.github.romanhaendler.rbed.Channel;
+import io.github.romanhaendler.rbed.Detector;
+import io.github.romanhaendler.rbed.Event;
 import io.github.romanhaendler.rbed.Rule;
 import io.github.romanhaendler.rbed.Sample;
 import java.util.List;
@@ -36,6 +38,22 @@ abstract class Scenario {
 
   /** The Rules for the given value of every parameter, by parameter id. */
   abstract Rule[] rules(Map<String, Double> values);
+
+  /**
+   * Runs the Rules over the Samples and returns the Ended Events in the order they Ended. A
+   * Scenario that feeds its Detector differently (a sampling rate, time advances) overrides it.
+   */
+  List<Event> detect(Rule[] rules) {
+    return Detector.builder().rules(rules).build().detect(samples());
+  }
+
+  /**
+   * What the Scenario's listener makes of an Event at the given parameter values, such as the
+   * class of a lifted load; or null.
+   */
+  String note(Event event, Map<String, Double> values) {
+    return null;
+  }
 
   /** A number the reader can change, with its default and the limits of its control. */
   record Parameter(String id, String label, double defaultValue, double min, double max,

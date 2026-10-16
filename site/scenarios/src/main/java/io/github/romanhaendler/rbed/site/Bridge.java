@@ -1,7 +1,6 @@
 package io.github.romanhaendler.rbed.site;
 
 import io.github.romanhaendler.rbed.Channel;
-import io.github.romanhaendler.rbed.Detector;
 import io.github.romanhaendler.rbed.Event;
 import io.github.romanhaendler.rbed.Rule;
 import io.github.romanhaendler.rbed.Sample;
@@ -16,7 +15,8 @@ import org.teavm.jso.JSExport;
  * exports every reachable class that has such methods.
  */
 public final class Bridge {
-  private static final List<Scenario> SCENARIOS = List.of(new FirstRule());
+  private static final List<Scenario> SCENARIOS = List.of(new FirstRule(), new Cranes(), new Manufacturing(),
+      new BuildingServices(), new Healthcare(), new Automotive());
 
   private Bridge() {}
 
@@ -75,11 +75,9 @@ public final class Bridge {
     try {
       Scenario scenario = scenario(scenarioId);
       List<Sample> samples = scenario.samples();
-      List<Event> events = Detector.builder()
-          .rules(scenario.rules(values(scenario, parameters)))
-          .build()
-          .detect(samples);
-      return result(scenario, samples, events);
+      Map<String, Double> values = values(scenario, parameters);
+      List<Event> events = scenario.detect(scenario.rules(values));
+      return result(scenario, values, samples, events);
     } catch (RuntimeException e) {
       return Json.string(new StringBuilder("{\"error\":"), String.valueOf(e.getMessage()))
           .append('}').toString();
@@ -110,7 +108,8 @@ public final class Bridge {
     return values;
   }
 
-  private static String result(Scenario scenario, List<Sample> samples, List<Event> events) {
+  private static String result(Scenario scenario, Map<String, Double> values,
+      List<Sample> samples, List<Event> events) {
     StringBuilder out = new StringBuilder("{\"samples\":[");
     for (int i = 0; i < samples.size(); i++) {
       Sample sample = samples.get(i);
@@ -135,8 +134,10 @@ public final class Bridge {
           .append(",\"confirmed\":").append(e.confirmed().getAsLong())
           .append(",\"end\":").append(e.end().getAsLong())
           .append(",\"truncatedStart\":").append(e.truncatedStart())
-          .append(",\"truncatedEnd\":").append(e.truncatedEnd())
-          .append('}');
+          .append(",\"truncatedEnd\":").append(e.truncatedEnd());
+      String note = scenario.note(e, values);
+      if (note != null) Json.string(out.append(",\"note\":"), note);
+      out.append('}');
     }
     return out.append("]}").toString();
   }

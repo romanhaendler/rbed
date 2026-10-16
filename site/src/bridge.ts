@@ -30,6 +30,8 @@ export type Event = {
   end: number;
   truncatedStart: boolean;
   truncatedEnd: boolean;
+  /** What the Scenario's listener makes of the Event, such as the load a crane lifted. */
+  note?: string;
 };
 
 export type Result =

@@ -40,14 +40,17 @@ function factOf(facts, id) {
 function eventRows({ unit, millis, result }) {
   if ('error' in result) return `rbed rejects the default parameters: ${result.error}`;
   if (result.events.length === 0) return 'No Event at the default parameters.';
+  // A Note column only for a Scenario whose listener notes something, as in the live table.
+  const notes = result.events.some((e) => e.note !== undefined);
   return [
-    ['Name', `Start (${unit})`, `Confirmed (${unit})`, `End (${unit})`, 'Truncated'],
+    ['Name', `Start (${unit})`, `Confirmed (${unit})`, `End (${unit})`, 'Truncated', ...(notes ? ['Note'] : [])],
     ...result.events.map((e) => [
       e.name,
       String(e.start / millis),
       String(e.confirmed / millis),
       String(e.end / millis),
       [e.truncatedStart && 'start', e.truncatedEnd && 'end'].filter(Boolean).join(', '),
+      ...(notes ? [e.note ?? ''] : []),
     ]),
   ];
 }

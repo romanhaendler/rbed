@@ -46,6 +46,27 @@ test('a Scenario that rbed rejects at its defaults, or that has no Event, says s
   assert.throws(() => twin('<!-- scenario nope -->', facts), /nope/);
 });
 
+test('the table has a Note column when the Scenario notes an Event, such as the load a crane lifted', () => {
+  const noted = new Map([
+    [
+      'gaps',
+      {
+        ...facts.get('gaps'),
+        result: {
+          samples: [],
+          events: [
+            { name: 'Run', start: 2000, confirmed: 2000, end: 7500, truncatedStart: false, truncatedEnd: false, note: 'pallet' },
+            { name: 'Stop', start: 8000, confirmed: 8000, end: 9000, truncatedStart: false, truncatedEnd: false },
+          ],
+        },
+      },
+    ],
+  ]);
+  const text = twin(markdown, noted);
+  assert.ok(text.includes('| Name | Start (s) | Confirmed (s) | End (s) | Truncated | Note |\n'), text);
+  assert.ok(text.includes('| Run | 2 | 2 | 7.5 |  | pallet |\n| Stop | 8 | 8 | 9 |  |  |'), text);
+});
+
 test("a page's HTML holds its head, its text, its Java source and its default Events before any script", () => {
   const html = pageHtml(template, pages[1], markdown, facts);
   for (const part of [
