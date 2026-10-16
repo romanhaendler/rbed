@@ -1,5 +1,6 @@
 // A code block with a copy button, after the umriss-ui demo's CodeBlock and CopyButton (MIT).
 import { useEffect, useState } from 'react';
+import { javaTokens } from './java';
 
 type CopyState = 'settle' | 'copied' | 'failed';
 
@@ -38,7 +39,13 @@ export function CodeBlock({ language, source }: { language: string; source: stri
       </div>
       {/* A long line scrolls the block sideways, so the keyboard has to reach it too. */}
       <pre className="code" tabIndex={0} aria-label={`${language} source`}>
-        <code>{source}</code>
+        <code>
+          {language.toLowerCase() === 'java'
+            ? javaTokens(source).map(([kind, text], i) =>
+                kind === '' ? text : <span key={i} className={`java-${kind}`}>{text}</span>,
+              )
+            : source}
+        </code>
       </pre>
     </div>
   );

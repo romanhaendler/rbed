@@ -447,6 +447,23 @@ pre {
   tab-size: 2;
 }
 
+.code .java-keyword,
+.code .java-annotation {
+  color: var(--u-color-accent-text);
+}
+
+.code .java-string {
+  color: var(--u-color-success);
+}
+
+.code .java-comment {
+  color: var(--u-color-text-secondary);
+}
+
+.code .java-number {
+  color: var(--u-color-warning);
+}
+
 /* ---------------- A Scenario: chart, controls, source ---------------- */
 
 /* The umriss configurator: the panel beside the stage from 900 px and under it below that, the
@@ -479,6 +496,50 @@ pre {
   grid-area: code;
   min-width: 0;
   border-top: 1px solid var(--u-edge-color);
+}
+
+.configuratorHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--u-text-sm);
+  font-weight: var(--u-weight-medium);
+}
+
+.configuratorShow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--u-space-2);
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.configuratorShow legend {
+  padding: 0 0 var(--u-space-2);
+  font-size: var(--u-text-sm);
+  font-weight: var(--u-weight-medium);
+}
+
+/* The chart's palette outside the chart, for the swatches: @umriss-ui/charts 0.40.0 defines it
+   on its own root only. */
+.configuratorPanel {
+  --uc-series-1: var(--u-chart-1, #2563eb);
+  --uc-series-2: var(--u-chart-2, #db2777);
+  --uc-series-3: var(--u-chart-3, #059669);
+  --uc-series-4: var(--u-chart-4, #d97706);
+  --uc-series-5: var(--u-chart-5, #7c3aed);
+  --uc-series-6: var(--u-chart-6, #0891b2);
+}
+
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: var(--u-space-2);
+  border-radius: 2px;
+  vertical-align: baseline;
 }
 
 @media (min-width: 900px) {
@@ -515,6 +576,33 @@ pre {
 .eventTable th {
   font-weight: var(--u-weight-medium);
   color: var(--u-color-text-secondary);
+}
+
+.eventTable tr[data-selected] td {
+  background: color-mix(in srgb, var(--u-color-accent) 12%, transparent);
+}
+
+/* The name is the button that selects the Event's band. */
+.eventPick {
+  padding: 0;
+  border: none;
+  border-radius: var(--u-radius-xs);
+  background: none;
+  font: inherit;
+  color: var(--u-color-accent-text);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.eventPick[aria-pressed='true'] {
+  font-weight: var(--u-weight-medium);
+  text-decoration-style: solid;
+}
+
+.eventPick:focus-visible {
+  outline: none;
+  box-shadow: var(--u-focus-ring);
 }
 
 .tableScroll {
