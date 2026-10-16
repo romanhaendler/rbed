@@ -3,7 +3,7 @@
 // nothing, so Node (tests and prerender.mjs) can use it.
 
 /** A choice's value is the index of its option; the source names the option's source. */
-type Parameter = { id: string; default: number; options?: { source: string }[] };
+type Parameter = { id: string; default: number; min: number; max: number; step: number; options?: { source: string }[] };
 
 const PLACEHOLDER = /\$\{(\w+)\}/g;
 
@@ -17,7 +17,7 @@ export function fillSource(template: string, parameters: Parameter[], values: Re
   return template.replace(PLACEHOLDER, (_, id: string) => {
     const option = parameters.find((p) => p.id === id)?.options?.[values[id]];
     if (option !== undefined) return fillSource(option.source, parameters, values);
-    return Number.isNaN(values[id]) ? 'Double.NaN' : String(values[id]);
+    return String(values[id]);
   });
 }
 
@@ -37,15 +37,19 @@ export function usedParameters(template: string, parameters: Parameter[], values
 }
 
 /** The values an address names, the default for each parameter it does not name. A value that
- *  is no finite number becomes NaN (JSON knows no other), which rbed rejects with its own message. */
+ *  is no finite number gives the default, and one off its control is moved into its range and
+ *  onto its steps, so the control, the source and the run show the same value. (The bridge
+ *  rejects a value outside the range as well: TeaVM's Math.round throws on NaN.) */
 export function fromQuery(search: string, parameters: Parameter[]): Record<string, number> {
   const query = new URLSearchParams(search);
   return Object.fromEntries(
     parameters.map((p) => {
-      const given = query.get(p.id);
-      if (given === null || given === '') return [p.id, p.default];
-      const value = Number(given);
-      return [p.id, Number.isFinite(value) ? value : NaN];
+      const given = Number(query.get(p.id) || NaN);
+      if (!Number.isFinite(given)) return [p.id, p.default];
+      const inRange = Math.min(Math.max(given, p.min), p.max);
+      const stepped = p.min + Math.round((inRange - p.min) / p.step) * p.step;
+      // toPrecision drops the binary noise of the steps (0.05 * 3)
+      return [p.id, Math.min(Number(stepped.toPrecision(12)), p.max)];
     }),
   );
 }

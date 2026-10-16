@@ -37,7 +37,9 @@ function factOf(facts, id) {
 
 /** The Event table at the default parameters as rows of text, the header first; or a sentence. */
 function eventRows({ unit, millis, result }) {
-  if ('error' in result) return `rbed rejects the default parameters: ${result.error}`;
+  if ('error' in result) {
+    return `${result.by === 'rbed' ? 'rbed rejects' : 'The site cannot run'} the default parameters: ${result.error}`;
+  }
   if (result.events.length === 0) return 'No Event at the default parameters.';
   // The live table's columns (src/events.ts), with the Aggregates as a column of their own.
   const notes = hasNotes(result.events);

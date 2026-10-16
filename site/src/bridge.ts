@@ -71,7 +71,9 @@ export type Result =
       /** Timestamp of the first Sample after the Detector was restarted, if it was. */
       restart?: number;
     }
-  | { error: string };
+  /** `by` is 'rbed' when rbed rejected the Rules or the Samples; otherwise the site cannot run
+   *  the input. */
+  | { error: string; by?: 'rbed' };
 
 export function scenarios(): Scenario[] {
   return JSON.parse(compiled.scenarios());

@@ -53,8 +53,10 @@ test('the twin is the Markdown with each Scenario as its Java source and its def
 });
 
 test('a Scenario that rbed rejects at its defaults, or that has no Event, says so', () => {
-  const error = new Map([['gaps', { ...facts.get('gaps'), result: { error: 'Limit is NaN' } }]]);
+  const error = new Map([['gaps', { ...facts.get('gaps'), result: { error: 'Limit is NaN', by: 'rbed' } }]]);
   assert.match(twin(markdown, error, pages[1]), /rbed rejects the default parameters: Limit is NaN/);
+  const site = new Map([['gaps', { ...facts.get('gaps'), result: { error: 'Invalid JSON' } }]]);
+  assert.match(twin(markdown, site, pages[1]), /The site cannot run the default parameters: Invalid JSON/);
   const none = new Map([['gaps', { ...facts.get('gaps'), result: { samples: [], events: [], discarded: [] } }]]);
   assert.match(twin(markdown, none, pages[1]), /No Event at the default parameters\./);
   assert.throws(() => twin('<!-- scenario nope -->', facts, pages[1]), /nope/);
