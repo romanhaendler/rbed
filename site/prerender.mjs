@@ -9,6 +9,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { aggregatesLine } from './src/aggregates.ts';
 import { escape, parse, SCENARIO_MARKER } from './src/markdown.ts';
 import { markdownFile, PAGES, titleOf } from './src/pages.ts';
 import { fillSource } from './src/parameters.ts';
@@ -41,15 +42,38 @@ function factOf(facts, id) {
 function eventRows({ unit, millis, result }) {
   if ('error' in result) return `rbed rejects the default parameters: ${result.error}`;
   if (result.events.length === 0) return 'No Event at the default parameters.';
+  // A Note column only for a Scenario whose listener notes something, as in the live table.
+  const notes = result.events.some((e) => e.note !== undefined);
   return [
-    ['Name', `Start (${unit})`, `Confirmed (${unit})`, `End (${unit})`, 'Truncated'],
+    ['Name', `Start (${unit})`, `Confirmed (${unit})`, `End (${unit})`, 'Truncated', ...(notes ? ['Note'] : []), 'Aggregates'],
     ...result.events.map((e) => [
       e.name,
       String(e.start / millis),
       String(e.confirmed / millis),
       String(e.end / millis),
       [e.truncatedStart && 'start', e.truncatedEnd && 'end'].filter(Boolean).join(', '),
+      ...(notes ? [e.note ?? ''] : []),
+      Object.entries(e.aggregates).map(([channel, a]) => aggregatesLine(channel, a)).join('; '),
     ]),
+  ];
+}
+
+/** The Discarded Pending Events at the default parameters, like eventRows; none, no rows. */
+function discardedRows({ unit, millis, result }) {
+  if ('error' in result || result.discarded.length === 0) return [];
+  return [
+    ['Name', `Start (${unit})`, `Discarded (${unit})`],
+    ...result.discarded.map((d) => [d.name, String(d.start / millis), String(d.discarded / millis)]),
+  ];
+}
+
+/** The tables of a Scenario at its defaults: a caption with its rows, or a sentence. */
+function tables(fact) {
+  const events = eventRows(fact);
+  const discarded = discardedRows(fact);
+  return [
+    typeof events === 'string' ? events : { caption: 'Events at the default parameters', rows: events },
+    ...(discarded.length === 0 ? [] : [{ caption: 'Discarded Pending Events at the default parameters', rows: discarded }]),
   ];
 }
 
@@ -57,29 +81,29 @@ function eventRows({ unit, millis, result }) {
 export function twin(markdown, facts) {
   return markdown.replace(new RegExp(SCENARIO_MARKER.source, 'gm'), (_, id) => {
     const fact = factOf(facts, id);
-    const rows = eventRows(fact);
-    const events =
-      typeof rows === 'string'
-        ? rows
-        : 'Events at the default parameters:\n\n' +
-          [rows[0], rows[0].map(() => '---'), ...rows.slice(1)].map((r) => `| ${r.join(' | ')} |`).join('\n');
-    return '```java\n' + fact.source + '\n```\n\n' + events;
+    const text = tables(fact).map((t) =>
+      typeof t === 'string'
+        ? t
+        : `${t.caption}:\n\n` +
+          [t.rows[0], t.rows[0].map(() => '---'), ...t.rows.slice(1)].map((r) => `| ${r.join(' | ')} |`).join('\n'),
+    );
+    return '```java\n' + fact.source + '\n```\n\n' + text.join('\n\n');
   });
 }
 
 function scenarioHtml(fact) {
-  const rows = eventRows(fact);
-  const table =
-    typeof rows === 'string'
-      ? `<p>${escape(rows)}</p>`
-      : '<table class="eventTable"><caption>Events at the default parameters</caption>' +
-        `<thead><tr>${rows[0].map((h) => `<th>${escape(h)}</th>`).join('')}</tr></thead><tbody>` +
-        rows
+  const html = tables(fact).map((t) =>
+    typeof t === 'string'
+      ? `<p>${escape(t)}</p>`
+      : `<table class="eventTable"><caption>${escape(t.caption)}</caption>` +
+        `<thead><tr>${t.rows[0].map((h) => `<th>${escape(h)}</th>`).join('')}</tr></thead><tbody>` +
+        t.rows
           .slice(1)
           .map((r) => `<tr>${r.map((c) => `<td>${escape(c)}</td>`).join('')}</tr>`)
           .join('') +
-        '</tbody></table>';
-  return `<pre><code>${escape(fact.source)}</code></pre>\n${table}`;
+        '</tbody></table>',
+  );
+  return `<pre><code>${escape(fact.source)}</code></pre>\n${html.join('\n')}`;
 }
 
 /** The built index.html with the page's head, and its text inside #root until the app replaces it. */

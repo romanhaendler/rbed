@@ -1,7 +1,7 @@
 package io.github.romanhaendler.rbed.site;
 
+import io.github.romanhaendler.rbed.Aggregates;
 import io.github.romanhaendler.rbed.Channel;
-import io.github.romanhaendler.rbed.Detector;
 import io.github.romanhaendler.rbed.Event;
 import io.github.romanhaendler.rbed.Rule;
 import io.github.romanhaendler.rbed.Sample;
@@ -16,13 +16,23 @@ import org.teavm.jso.JSExport;
  * exports every reachable class that has such methods.
  */
 public final class Bridge {
-  private static final List<Scenario> SCENARIOS = List.of(new FirstRule(), new Expressions());
+  private static final List<Scenario> SCENARIOS = List.of(
+      new FirstRule(),
+      new EventLifecycle(),
+      new Expressions(),
+      new AggregatesScenario(),
+      new PulseChannels(),
+      new Cranes(),
+      new Manufacturing(),
+      new BuildingServices(),
+      new Healthcare(),
+      new Automotive());
 
   private Bridge() {}
 
   /**
    * The catalogue: a JSON array with, for each Scenario, its id, title, time unit, Channel names,
-   * Rule names, parameters (with default and limits) and source template.
+   * the names of its Pulse Channels, Rule names, parameters (with default and limits) and source template.
    */
   @JSExport
   public static String scenarios() {
@@ -37,6 +47,11 @@ public final class Bridge {
       for (int i = 0; i < s.channels.size(); i++) {
         if (i > 0) out.append(',');
         Json.string(out, s.channels.get(i).name());
+      }
+      out.append("],\"pulse\":[");
+      for (int i = 0; i < s.pulseChannels().size(); i++) {
+        if (i > 0) out.append(',');
+        Json.string(out, s.pulseChannels().get(i).name());
       }
       out.append("],\"rules\":[");
       Rule[] rules = s.rules(values(s, "{}"));
@@ -77,9 +92,10 @@ public final class Bridge {
    * @param parameters JSON object of parameter values by id; missing ones take their default,
    *     null stands for NaN
    * @param drawnChannels JSON object reserved for Channel values the reader drew; ignored for now
-   * @return JSON object with the Samples, the Events and, for a Scenario that plots an
-   *     Expression, its name, threshold and value per Sample (null where undefined), or
-   *     {@code {"error": message}} if rbed rejected the Rules or the input was invalid
+   * @return JSON object with the Samples, the Events, the Discarded Pending Events (with the
+   *     timestamp they were Discarded) and, for a Scenario that plots an Expression, its name,
+   *     threshold and value per Sample (null where undefined); or {@code {"error": message}} if
+   *     rbed rejected the Rules or the input was invalid
    */
   @JSExport
   public static String run(String scenarioId, String parameters, String drawnChannels) {
@@ -87,11 +103,9 @@ public final class Bridge {
       Scenario scenario = scenario(scenarioId);
       List<Sample> samples = scenario.samples();
       Map<String, Double> values = values(scenario, parameters);
-      List<Event> events = Detector.builder()
-          .rules(scenario.rules(values))
-          .build()
-          .detect(samples);
-      return result(scenario, samples, events, scenario.plot(values));
+      Lifecycle lifecycle = new Lifecycle();
+      scenario.detect(scenario.rules(values), lifecycle);
+      return result(scenario, values, samples, lifecycle);
     } catch (RuntimeException e) {
       return Json.string(new StringBuilder("{\"error\":"), String.valueOf(e.getMessage()))
           .append('}').toString();
@@ -125,8 +139,9 @@ public final class Bridge {
     return values;
   }
 
-  private static String result(Scenario scenario, List<Sample> samples, List<Event> events,
-      Scenario.Plot plot) {
+  private static String result(Scenario scenario, Map<String, Double> values,
+      List<Sample> samples, Lifecycle lifecycle) {
+    List<Event> events = lifecycle.ended;
     StringBuilder out = new StringBuilder("{\"samples\":[");
     for (int i = 0; i < samples.size(); i++) {
       Sample sample = samples.get(i);
@@ -151,20 +166,53 @@ public final class Bridge {
           .append(",\"confirmed\":").append(e.confirmed().getAsLong())
           .append(",\"end\":").append(e.end().getAsLong())
           .append(",\"truncatedStart\":").append(e.truncatedStart())
-          .append(",\"truncatedEnd\":").append(e.truncatedEnd())
+          .append(",\"truncatedEnd\":").append(e.truncatedEnd());
+      aggregates(out.append(",\"aggregates\":"), scenario, e);
+      String note = scenario.note(e, values);
+      if (note != null) Json.string(out.append(",\"note\":"), note);
+      out.append('}');
+    }
+    out.append("],\"discarded\":[");
+    for (int i = 0; i < lifecycle.discarded.size(); i++) {
+      Lifecycle.Discard d = lifecycle.discarded.get(i);
+      if (i > 0) out.append(',');
+      Json.string(out.append("{\"name\":"), d.event().name())
+          .append(",\"start\":").append(d.event().start())
+          .append(",\"discarded\":").append(d.at())
           .append('}');
     }
     out.append(']');
+    Scenario.Plot plot = scenario.plot(values);
     if (plot != null) {
       Json.string(out.append(",\"expression\":{\"name\":"), plot.name());
       Json.number(out.append(",\"threshold\":"), plot.threshold()).append(",\"values\":[");
-      double[] values = ExpressionValues.of(plot.expression(), samples);
-      for (int i = 0; i < values.length; i++) {
+      double[] plotted = ExpressionValues.of(plot.expression(), samples);
+      for (int i = 0; i < plotted.length; i++) {
         if (i > 0) out.append(',');
-        Json.number(out, values[i]);
+        Json.number(out, plotted[i]);
       }
       out.append("]}");
     }
     return out.append('}').toString();
+  }
+
+  /** The Event's Aggregates by Channel name, in the Scenario's Channel order; NaN becomes null. */
+  private static StringBuilder aggregates(StringBuilder out, Scenario scenario, Event e) {
+    out.append('{');
+    boolean first = true;
+    for (Channel channel : scenario.channels) {
+      Aggregates a = e.aggregates().get(channel);
+      if (a == null) continue;
+      if (!first) out.append(',');
+      first = false;
+      Json.string(out, channel.name()).append(':');
+      Json.number(out.append("{\"min\":"), a.min());
+      Json.number(out.append(",\"max\":"), a.max());
+      Json.number(out.append(",\"mean\":"), a.mean());
+      out.append(",\"count\":").append(a.count());
+      Json.number(out.append(",\"timeWeightedMean\":"), a.timeWeightedMean());
+      Json.number(out.append(",\"integral\":"), a.integral()).append('}');
+    }
+    return out.append('}');
   }
 }

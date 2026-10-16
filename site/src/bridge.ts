@@ -1,6 +1,7 @@
 // The two functions of the Scenario module (site/scenarios, Bridge.java), typed.
 import * as compiled from 'rbed-scenarios';
-import { fillSource } from './parameters';
+import type { Aggregates } from './aggregates.ts';
+import { fillSource } from './parameters.ts';
 
 export type Parameter = {
   id: string;
@@ -19,6 +20,8 @@ export type Scenario = {
   title: string;
   timeUnit: { name: string; millis: number };
   channels: string[];
+  /** Those of the Channels that are Pulse Channels: a value only in the Samples that carry one. */
+  pulse: string[];
   /** Names of the Rules, which are the names of their Events. */
   rules: string[];
   parameters: Parameter[];
@@ -33,7 +36,14 @@ export type Event = {
   end: number;
   truncatedStart: boolean;
   truncatedEnd: boolean;
+  /** By Channel name, for each Channel the Rule aggregates. */
+  aggregates: Record<string, Aggregates>;
+  /** What the Scenario's listener makes of the Event, such as the load a crane lifted. */
+  note?: string;
 };
+
+/** A Pending Event that stopped holding before it was Confirmed, and when that was noticed. */
+export type Discard = { name: string; start: number; discarded: number };
 
 /** For a Scenario that plots one: an Expression's value per Sample, null where it is undefined,
  *  and the threshold its Rule's Condition compares it to. */
@@ -43,6 +53,7 @@ export type Result =
   | {
       samples: { timestamp: number; values: Record<string, number | null> }[];
       events: Event[];
+      discarded: Discard[];
       expression?: PlottedExpression;
     }
   | { error: string };

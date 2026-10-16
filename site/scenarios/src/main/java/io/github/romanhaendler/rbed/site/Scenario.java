@@ -1,6 +1,8 @@
 package io.github.romanhaendler.rbed.site;
 
 import io.github.romanhaendler.rbed.Channel;
+import io.github.romanhaendler.rbed.Detector;
+import io.github.romanhaendler.rbed.Event;
 import io.github.romanhaendler.rbed.Expression;
 import io.github.romanhaendler.rbed.Rule;
 import io.github.romanhaendler.rbed.Sample;
@@ -35,8 +37,36 @@ abstract class Scenario {
 
   abstract List<Sample> samples();
 
+  /** Those of its Channels that are Pulse Channels; rbed does not tell a Channel's kind. */
+  List<Channel> pulseChannels() {
+    return List.of();
+  }
+
   /** The Rules for the given value of every parameter, by parameter id. */
   abstract Rule[] rules(Map<String, Double> values);
+
+  /**
+   * Runs the Rules over the Samples with {@code lifecycle} as the listener, setting
+   * {@code lifecycle.now} to each Sample's timestamp before pushing it, and closes the Detector.
+   * A Scenario that feeds its Detector differently (a sampling rate, time advances) overrides it
+   * and keeps {@code lifecycle.now} current the same way.
+   */
+  void detect(Rule[] rules, Lifecycle lifecycle) {
+    Detector detector = Detector.builder().rules(rules).listener(lifecycle).build();
+    for (Sample sample : samples()) {
+      lifecycle.now = sample.timestamp();
+      detector.push(sample.timestamp(), sample.values());
+    }
+    detector.close();
+  }
+
+  /**
+   * What the Scenario's listener makes of an Event at the given parameter values, such as the
+   * class of a lifted load; or null.
+   */
+  String note(Event event, Map<String, Double> values) {
+    return null;
+  }
 
   /** The Expression to plot for the given parameter values, or null for none. */
   Plot plot(Map<String, Double> values) {
