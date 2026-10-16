@@ -681,6 +681,38 @@ class BridgeTest {
         events(run("silent-sensors", "{\"limit\": 10}")));
   }
 
+  @Test
+  void validationAtDefaultsFindsTheWarmSpellAndTheHotPartOfIt() {
+    assertEquals(List.of("Hot 14000..30000", "Warm 12000..32000"), events(run("validation", "{}")));
+  }
+
+  @Test
+  void anAverageOverMoreSamplesThanTheRetentionLimitIsRejectedByBuild() {
+    assertEquals(Map.of("error", "Rule Warm: averageOverSamples(12) exceeds the Retention Limit of"
+            + " 10. Raise it with Detector.builder().retentionLimit(...)."),
+        run("validation", "{\"window\": 12}"));
+    assertEquals(List.of("Hot 14000..30000", "Warm 12000..32000"),
+        events(run("validation", "{\"window\": 5, \"retention\": 5}")));
+  }
+
+  @Test
+  void aRetentionLimitBelowOneIsRejected() {
+    assertEquals(Map.of("error", "Retention Limit must be >= 1: 0"),
+        run("validation", "{\"retention\": 0}"));
+  }
+
+  @Test
+  void aNegativeDurationIsRejected() {
+    assertEquals(Map.of("error", "forDuration must be >= 0: -1000"),
+        run("validation", "{\"duration\": -1}"));
+  }
+
+  @Test
+  void aRuleAddedBeforeTheRuleItRefersToIsRejectedByBuild() {
+    assertEquals(Map.of("error", "Rule Hot references Warm, which is not added before it"),
+        run("validation", "{\"order\": 1}"));
+  }
+
   static final long DAY = 86_400_000;
 
   @Test

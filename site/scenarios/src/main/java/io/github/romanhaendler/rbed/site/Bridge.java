@@ -33,6 +33,7 @@ public final class Bridge {
       new TotalDuration(),
       new Latest(),
       new History(),
+      new Validation(),
       new Cranes(),
       new Manufacturing(),
       new BuildingServices(),

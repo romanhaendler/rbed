@@ -124,6 +124,13 @@ export const PAGES: Page[] = [
     rubric: 'Guide',
   },
   {
+    path: '/errors-and-validation/',
+    title: 'Errors and validation',
+    description:
+      'rbed rejects a mistake as early as it can, mostly in build(), with a message that names it: try a few and read them.',
+    rubric: 'Guide',
+  },
+  {
     path: '/cranes/',
     title: 'Cranes',
     description:
