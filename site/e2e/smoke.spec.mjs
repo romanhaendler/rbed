@@ -1,7 +1,24 @@
-// The site's browser smoke tests: on a concept page and on a domain page, moving a control runs
-// rbed again and changes the Event table; drawing a Channel changes the Java source; on a phone,
-// the Event tables fit without sideways scrolling.
+// The site's browser smoke tests: every page of the manifest loads at desktop and phone width
+// without a page error or sideways scrolling; on a concept page and on a domain page, moving a
+// control runs rbed again and changes the Event table; drawing a Channel changes the Java source;
+// on a phone, the Event tables fit without sideways scrolling.
 import { expect, test } from '@playwright/test';
+import { PAGES } from '../src/pages.ts';
+
+for (const width of [1280, 375]) {
+  test(`every page loads at ${width} px without a page error or sideways scrolling`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 800 });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(`${page.url()}: ${e.message}`));
+    for (const { path } of PAGES) {
+      await page.goto(path.slice(1));
+      await expect(page.locator('.shellContent h1')).toBeVisible();
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow, `${path} scrolls sideways`).toBeLessThanOrEqual(0);
+    }
+    expect(errors).toEqual([]);
+  });
+}
 
 for (const { path, control } of [
   { path: 'aggregates/', control: 'Driving above' },

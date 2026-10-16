@@ -10,7 +10,7 @@ npm run build     # installs rbed from the repository root, compiles the Scenari
 npm test          # installs rbed, runs the JUnit tests and TeaVM, then the Node parity tests
 npm run build:web # builds dist/ from the module npm test compiled, as the Pages workflow does
 npm run preview   # serves dist/ at http://localhost:4173/rbed/
-npm run test:browser  # after build: the Playwright smoke test against dist/ (once: npx playwright install chromium)
+npm run test:browser  # after build: the Playwright smoke tests against dist/, every page at 1280 and 375 px (once: npx playwright install chromium)
 ```
 
 `npm run dev` serves the app with hot reload once `npm run build:java` has produced the compiled module.
