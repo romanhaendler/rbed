@@ -1,11 +1,13 @@
 // A Scenario live, with the tools every page that shows one offers: its Channels and Events on
 // one time axis with a hover readout, a control per parameter, a reset, toggles for each Rule
-// and Channel, the Java source with the current values, and the Event table, whose rows and the
-// chart's bands select each other. Non-default values live in the address. The Detector runs
+// and Channel, the Java source with the current values, and the Event table with each Event's
+// Aggregates, whose rows and the chart's bands select each other; a selected Event's Aggregates
+// are shown in full under the chart. Non-default values live in the address. The Detector runs
 // again on every change.
 import { LimitBand, Tooltip, type TooltipHit, useChart } from '@umriss-ui/charts';
 import { Alert, Button, Checkbox, FormField, Slider, VisuallyHidden } from '@umriss-ui/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { type Aggregates, aggregatesLine, formatNumber } from './aggregates.ts';
 import { type Discard, type Event, type Scenario, run, source } from './bridge';
 import { CodeBlock } from './CodeBlock';
 import { fromQuery, toQuery } from './parameters';
@@ -133,7 +135,7 @@ function EventChart({
   const { scenario, rows, lifecycle, channels, rules } = shown;
   const { name: unit, millis } = scenario.timeUnit;
   // A click (or Enter) on the chart selects the Event under it, if any.
-  const { Chart, XAxis, YAxis, Line, StateBand, Scatter } = useChart(rows, {
+  const { Chart, XAxis, YAxis, Line, Scatter, StateBand } = useChart(rows, {
     onSelect: (hit) => {
       const band = hit.points.find((p) => p.segment !== undefined && (p.datum as unknown as BandRow).s !== null);
       select(band && (band.datum as unknown as BandRow).key);
@@ -188,9 +190,14 @@ function EventChart({
           radius={4}
         />
       ))}
-      {channels.map((c) => (
-        <Line key={c} value={c} name={c} color={channelColour(scenario, c)} markers="always" />
-      ))}
+      {/* A Pulse Channel has no value between its Samples, so it is drawn as marks, not a line. */}
+      {channels.map((c) =>
+        scenario.pulse.includes(c) ? (
+          <Scatter key={c} value={c} name={c} color={channelColour(scenario, c)} radius={5} />
+        ) : (
+          <Line key={c} value={c} name={c} color={channelColour(scenario, c)} markers="always" />
+        ),
+      )}
       <Tooltip mode="x" render={(hit: TooltipHit<Row>) => <Readout shown={live.current} t={hit.xValue} />} />
     </Chart>
   );
@@ -273,6 +280,55 @@ function DiscardedTable({ scenario, discarded }: { scenario: Scenario; discarded
   );
 }
 
+const AGGREGATE_COMPONENTS: [Exclude<keyof Aggregates, 'count'>, string][] = [
+  ['min', 'min'],
+  ['max', 'max'],
+  ['mean', 'mean'],
+  ['timeWeightedMean', 'time-weighted mean'],
+  ['integral', 'integral (value × s)'],
+];
+
+/** Every Aggregate of the selected Event, a column per Channel. */
+function AggregatesPanel({ scenario, event }: { scenario: Scenario; event: Event }) {
+  const { name: unit, millis } = scenario.timeUnit;
+  const channels = Object.keys(event.aggregates);
+  return (
+    <div className="tableScroll aggregatesPanel">
+      <table className="eventTable">
+        <caption>
+          Aggregates of {event.name}, {event.start / millis} to {event.end / millis} {unit}
+        </caption>
+        <thead>
+          <tr>
+            <td />
+            {channels.map((c) => (
+              <th scope="col" key={c}>
+                {c}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {AGGREGATE_COMPONENTS.map(([component, label]) => (
+            <tr key={component}>
+              <th scope="row">{label}</th>
+              {channels.map((c) => (
+                <td key={c}>{formatNumber(event.aggregates[c][component])}</td>
+              ))}
+            </tr>
+          ))}
+          <tr>
+            <th scope="row">count</th>
+            {channels.map((c) => (
+              <td key={c}>{event.aggregates[c].count}</td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function EventTable({
   scenario,
   events,
@@ -306,7 +362,7 @@ function EventTable({
           )}
           {events.map((e) => {
             const key = eventKey(e);
-            return (
+            return [
               <tr key={key} data-selected={key === selected || undefined}>
                 <td>
                   <button
@@ -322,8 +378,18 @@ function EventTable({
                 <td>{e.confirmed / millis}</td>
                 <td>{e.end / millis}</td>
                 <td>{[e.truncatedStart && 'start', e.truncatedEnd && 'end'].filter(Boolean).join(', ')}</td>
-              </tr>
-            );
+              </tr>,
+              // The Aggregates under their Event, so the table stays five columns wide on a phone.
+              <tr key={`${key} aggregates`} className="aggregateRow" data-selected={key === selected || undefined}>
+                <td colSpan={5}>
+                  <span className="aggregateLabel">Aggregates</span>{' '}
+                  {Object.entries(e.aggregates).map(([channel, a], i) => [
+                    i > 0 && '; ',
+                    <span key={channel}>{aggregatesLine(channel, a)}</span>,
+                  ])}
+                </td>
+              </tr>,
+            ];
           })}
         </tbody>
       </table>
@@ -386,16 +452,18 @@ export function ScenarioView({ scenario }: { scenario: Scenario }) {
       channels: scenario.channels.filter((c) => !hidden.includes(c)),
       rules: scenario.rules.filter((r) => !hidden.includes(r)),
     };
+    const event = result.events.find((e) => eventKey(e) === selected);
     stage = (
       <>
         <EventChart
           key={`${scenario.id} ${shown.rules.join(' ')}`}
           shown={shown}
-          selected={result.events.find((e) => eventKey(e) === selected)}
+          selected={event}
           select={select}
         />
         <LifecycleKey />
         <EventSummary scenario={scenario} lifecycle={result} />
+        {event && <AggregatesPanel scenario={scenario} event={event} />}
       </>
     );
   }

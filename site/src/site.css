@@ -678,3 +678,28 @@ pre {
   color: var(--u-color-text-secondary);
   overflow-wrap: anywhere;
 }
+
+/* ---------------- Aggregates ---------------- */
+
+/* An Event's row and the row of its Aggregates below it read as one. */
+.eventTable tr:has(+ .aggregateRow) td {
+  border-bottom: none;
+}
+
+.aggregateRow td {
+  padding-top: 0;
+  color: var(--u-color-text-secondary);
+}
+
+/* A Channel's line wraps as a whole. */
+.aggregateRow span {
+  display: inline-block;
+}
+
+.aggregateRow .aggregateLabel {
+  color: var(--u-color-text-muted);
+}
+
+.aggregatesPanel {
+  margin-top: var(--u-space-4);
+}

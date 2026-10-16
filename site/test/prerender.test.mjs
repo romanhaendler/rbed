@@ -18,7 +18,20 @@ const facts = new Map([
       millis: 1000,
       result: {
         samples: [],
-        events: [{ name: 'Run', start: 2000, confirmed: 2000, end: 7500, truncatedStart: false, truncatedEnd: true }],
+        events: [
+          {
+            name: 'Run',
+            start: 2000,
+            confirmed: 2000,
+            end: 7500,
+            truncatedStart: false,
+            truncatedEnd: true,
+            aggregates: {
+              speed: { min: 5.5, max: 9, mean: 7.123456, count: 3, timeWeightedMean: 7, integral: 38.5 },
+              load: { min: null, max: null, mean: null, count: 0, timeWeightedMean: null, integral: null },
+            },
+          },
+        ],
         discarded: [],
       },
     },
@@ -33,8 +46,8 @@ test('the twin is the Markdown with each Scenario as its Java source and its def
     '# Data gaps\n\nA gap <ends> an Event.\n\n' +
       '```java\nRule.named("Run").when(speed.above(5)).maxGap(Duration.ofSeconds(10));\n```\n\n' +
       'Events at the default parameters:\n\n' +
-      '| Name | Start (s) | Confirmed (s) | End (s) | Truncated |\n| --- | --- | --- | --- | --- |\n' +
-      '| Run | 2 | 2 | 7.5 | end |\n\n' +
+      '| Name | Start (s) | Confirmed (s) | End (s) | Truncated | Aggregates |\n| --- | --- | --- | --- | --- | --- |\n' +
+      '| Run | 2 | 2 | 7.5 | end | speed: min 5.5, max 9, mean 7.12; load: no value |\n\n' +
       'That is all.\n',
   );
 });
@@ -52,7 +65,7 @@ test('Discarded Pending Events at the defaults get a table of their own, after t
   const discarded = new Map([['gaps', { ...facts.get('gaps'), result }]]);
   assert.ok(
     twin(markdown, discarded).includes(
-      '| Run | 2 | 2 | 7.5 | end |\n\n' +
+      '| Run | 2 | 2 | 7.5 | end | speed: min 5.5, max 9, mean 7.12; load: no value |\n\n' +
         'Discarded Pending Events at the default parameters:\n\n' +
         '| Name | Start (s) | Discarded (s) |\n| --- | --- | --- |\n| Run | 9 | 9.5 |\n\nThat is all.',
     ),
@@ -74,7 +87,7 @@ test("a page's HTML holds its head, its text, its Java source and its default Ev
     '<div id="root"><div class="prerendered">',
     '<p>A gap &lt;ends&gt; an Event.</p>',
     'Rule.named(&quot;Run&quot;).when(speed.above(5))',
-    '<td>Run</td><td>2</td><td>2</td><td>7.5</td><td>end</td>',
+    '<td>Run</td><td>2</td><td>2</td><td>7.5</td><td>end</td><td>speed: min 5.5, max 9, mean 7.12; load: no value</td>',
     '.js .prerendered{visibility:hidden}',
   ]) {
     assert.ok(html.includes(part), part);

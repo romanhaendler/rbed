@@ -29,6 +29,20 @@ export const PAGES: Page[] = [
       'How an Event goes Pending, is Confirmed or Discarded, and Ends, and what forDuration has to do with it.',
     rubric: 'Guide',
   },
+  {
+    path: '/aggregates/',
+    title: 'Aggregates',
+    description:
+      "Every Event carries each Channel's minimum, maximum, mean, count, time-weighted mean and integral over its Samples.",
+    rubric: 'Guide',
+  },
+  {
+    path: '/pulse-channels/',
+    title: 'Pulse Channels',
+    description:
+      'Pulse Channels report one-off occurrences such as deployments: their value exists only in the Sample that carries it.',
+    rubric: 'Guide',
+  },
 ];
 
 /** The page path an address names when the site is served below `base`, or undefined outside it. */

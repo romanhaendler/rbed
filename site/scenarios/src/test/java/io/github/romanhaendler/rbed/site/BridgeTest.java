@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterAll;
@@ -150,6 +151,75 @@ class BridgeTest {
             Map.of("timestamp", 2000.0, "values", Map.of("temp", 85.0)),
             Map.of("timestamp", 3000.0, "values", Map.of("temp", 70.0))),
         run("first-rule", "{}").get("samples"));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void eachEventCarriesTheAggregatesOfItsRule() {
+    List<Map<String, Object>> events =
+        (List<Map<String, Object>>) run("first-rule", "{\"threshold\": 70}").get("events");
+    assertEquals(Map.of("temp", Map.of("min", 75.0, "max", 85.0, "mean", 80.0, "count", 2.0,
+            "timeWeightedMean", 80.0, "integral", 160.0)),
+        events.get(0).get("aggregates"));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void aggregatesAtDefaultsWeighTheIrregularSamplesByTime() {
+    Map<String, Object> result = run("aggregates", "{}");
+    assertEquals(List.of("Drive 22000..70000", "Drive 102000..132000"), events(result));
+    Map<String, Object> first =
+        ((List<Map<String, Object>>) result.get("events")).get(0);
+    Map<String, Map<String, Object>> aggregates =
+        (Map<String, Map<String, Object>>) first.get("aggregates");
+    assertEquals(List.of("speed", "temp"), List.copyOf(aggregates.keySet()));
+    Map<String, Object> speed = aggregates.get("speed");
+    assertEquals(2.0, speed.get("min"));
+    assertEquals(14.0, speed.get("max"));
+    assertEquals(112.0 / 12, (Double) speed.get("mean"), 1e-12);
+    assertEquals(12.0, speed.get("count"));
+    assertEquals(560.0 / 48, (Double) speed.get("timeWeightedMean"), 1e-12);
+    assertEquals(560.0, (Double) speed.get("integral"), 1e-12);
+  }
+
+  @Test
+  void aHigherThresholdShortensTheDrives() {
+    assertEquals(List.of("Drive 26000..66000", "Drive 106000..128000"),
+        events(run("aggregates", "{\"threshold\": 7}")));
+  }
+
+  @Test
+  void catalogueNamesThePulseChannels() {
+    Map<String, Map<String, Object>> byId = new HashMap<>();
+    for (Map<String, Object> s : scenarios()) byId.put((String) s.get("id"), s);
+    assertEquals(List.of(), byId.get("first-rule").get("pulse"));
+    assertEquals(List.of("deploy"), byId.get("pulse-channels").get("pulse"));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void pulseValuesStayAbsentInSamplesThatDoNotCarryThem() {
+    List<Map<String, Object>> samples =
+        (List<Map<String, Object>>) run("pulse-channels", "{}").get("samples");
+    List<Double> deploys = samples.stream()
+        .filter(s -> ((Map<String, Object>) s.get("values")).containsKey("deploy"))
+        .map(s -> (Double) s.get("timestamp"))
+        .toList();
+    assertEquals(List.of(600_000.0, 3_600_000.0), deploys);
+  }
+
+  @Test
+  void pulseChannelsAtDefaultsAttributeOnlyTheFirstErrorSpike() {
+    assertEquals(List.of("Deployment 600000..660000", "Regression 1500000..2100000",
+            "Deployment 3600000..3660000"),
+        events(run("pulse-channels", "{}")));
+  }
+
+  @Test
+  void aLongerWindowAttributesTheSecondErrorSpikeToo() {
+    assertEquals(List.of("Deployment 600000..660000", "Regression 1500000..2100000",
+            "Deployment 3600000..3660000", "Regression 6000000..6300000"),
+        events(run("pulse-channels", "{\"window\": 45}")));
   }
 
   @Test
