@@ -11,7 +11,7 @@ final class FirstRule extends Scenario {
   static final Channel TEMP = Channel.named("temp");
 
   FirstRule() {
-    super("first-rule", "A first Rule", "ms", 1, List.of(TEMP),
+    super("first-rule", "A first Rule", "s", 1_000, List.of(TEMP),
         List.of(new Parameter("threshold", "Threshold", 80, 60, 90, 1, "°C")),
         """
         Channel temp = Channel.named("temp");
