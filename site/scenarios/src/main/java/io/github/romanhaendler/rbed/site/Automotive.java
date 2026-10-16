@@ -22,24 +22,46 @@ final class Automotive extends Scenario {
             new Parameter("idlingRpm", "Idling above", 600, 300, 1000, 50, "rpm"),
             new Parameter("idlingMinutes", "Idling for", 2, 1, 10, 1, "min")),
         """
+        import io.github.romanhaendler.rbed.*;
+        import java.time.Duration;
+        import java.util.Map;
+
         Channel rpm = Channel.named("rpm");
         Channel speed = Channel.named("speed");
-        long SECOND = 1_000, MINUTE = 60 * SECOND;
 
         Rule trip = Rule.named("Trip")
-            .when(speed.above(${moving})).forDuration(10 * SECOND)
-            .endWhen(speed.below(0.5)).forDuration(${stopMinutes} * MINUTE);
+            .when(speed.above(${moving})).forDuration(Duration.ofSeconds(10))
+            .endWhen(speed.below(0.5)).forDuration(Duration.ofMinutes(${stopMinutes}));
         Rule harshBraking = Rule.named("HarshBraking").when(speed.rate().below(-${braking}));
         Rule idling = Rule.named("Idling")
             .when(speed.below(0.5).and(rpm.above(${idlingRpm})))
-            .forDuration(${idlingMinutes} * MINUTE);
+            .forDuration(Duration.ofMinutes(${idlingMinutes}));
         Detector detector = Detector.builder()
             .rules(trip, harshBraking, idling)
+            .listener(new EventListener() {
+              @Override public void onEnded(Event e) {
+                if (e.is(trip)) System.out.println("a trip of " + km(e, speed) + " km");
+              }
+            })
             .build();
 
+        for (int s = 0; s < 1_500; s++) {   // at 1 Hz
+          detector.push(s * 1_000L, Map.of(speed, speedAt(s), rpm, s < 60 ? 0.0 : 800.0));
+        }
+        detector.close();
+
+        // In the enclosing class:
         // Distance of a Trip in km: the integral of speed (m/s) over time
-        double km(Event trip) {
+        static double km(Event trip, Channel speed) {
           return trip.aggregates(speed).integral() / 1000;
+        }
+
+        static double speedAt(int s) {   // m/s
+          if (s < 300) return 0;
+          if (s < 310) return 2 * (s - 300);       // accelerating at 2 m/s²
+          if (s < 900) return 20;
+          if (s < 904) return 20 - 5 * (s - 900);  // braking at 5 m/s²
+          return 0;
         }
         """);
   }

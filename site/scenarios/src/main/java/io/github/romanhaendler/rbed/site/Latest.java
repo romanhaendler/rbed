@@ -22,6 +22,11 @@ final class Latest extends Scenario {
     super("latest", "latest", "s", 1_000, List.of(WEIGHT),
         List.of(new Parameter("fraction", "Fraction of the maximum", 0.5, 0.1, 0.9, 0.05, "")),
         """
+        import static io.github.romanhaendler.rbed.Conditions.*;
+
+        import io.github.romanhaendler.rbed.*;
+        import java.util.Map;
+
         Channel weight = Channel.named("weight");
 
         Rule loadLifted = Rule.named("LoadLifted").when(weight.above(500)).endWhen(weight.below(50));
@@ -31,8 +36,15 @@ final class Latest extends Scenario {
             .rules(loadLifted, partialSetDown)
             .build();
 
-        detector.push(0,     Map.of(weight, 0.0));   // one Sample a second
-        detector.push(1_000, Map.of(weight, 0.0));
+        for (int s = 0; s <= 110; s++) {   // one Sample a second
+          double kg = s >= 25 && s < 30 ? 300
+              : s >= 10 && s < 40 ? 800
+              : s >= 75 && s < 80 ? 350
+              : s >= 60 && s < 90 ? 600
+              : 0;
+          detector.push(s * 1_000L, Map.of(weight, kg));
+        }
+        detector.close();
         """);
   }
 

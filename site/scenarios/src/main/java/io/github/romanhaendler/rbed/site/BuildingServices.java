@@ -25,25 +25,42 @@ final class BuildingServices extends Scenario {
             new Parameter("starts", "Frequent: more than", 2, 1, 4, 1, "Runs an hour"),
             new Parameter("shortMinutes", "Short cycle under", 5, 1, 15, 1, "min")),
         """
+        import static io.github.romanhaendler.rbed.Conditions.*;
+
+        import io.github.romanhaendler.rbed.*;
+        import java.time.Duration;
+        import java.util.Map;
+
         Channel power = Channel.named("power");
-        long SECOND = 1_000, MINUTE = 60 * SECOND;
 
         Rule run = Rule.named("Run")
-            .when(power.above(${running})).forDuration(${runSeconds} * SECOND)
-            .endWhen(power.below(100)).forDuration(30 * SECOND);
+            .when(power.above(${running})).forDuration(Duration.ofSeconds(${runSeconds}))
+            .endWhen(power.below(100)).forDuration(Duration.ofSeconds(30));
         Rule quickRestart = Rule.named("QuickRestart")
-            .when(after(run).within(${restartMinutes} * MINUTE).and(power.above(${running})))
-            .forDuration(30 * SECOND)
+            .when(after(run).within(Duration.ofMinutes(${restartMinutes})).and(power.above(${running})))
+            .forDuration(Duration.ofSeconds(30))
             .endWhen(power.below(100));
         Rule frequentStarts = Rule.named("FrequentStarts")
-            .when(count(run).within(60 * MINUTE).above(${starts}));
+            .when(count(run).within(Duration.ofHours(1)).above(${starts}));
         Detector detector = Detector.builder()
             .rules(run, quickRestart, frequentStarts)
+            .listener(new EventListener() {
+              @Override public void onEnded(Event e) {
+                if (e.is(run) && shortCycle(e)) System.out.println("short cycle from " + e.start());
+              }
+            })
             .build();
 
+        for (int s = 0; s < 2_400; s += 10) {   // the power every 10 s
+          boolean on = s >= 100 && s < 700 || s >= 800 && s < 920 || s >= 1_600 && s < 2_200;
+          detector.push(s * 1_000L, Map.of(power, on ? 2_000.0 : 20.0));
+        }
+        detector.close();
+
+        // In the enclosing class:
         // A plain method classifies the Ended Runs
-        boolean shortCycle(Event run) {
-          return run.end().getAsLong() - run.start() < ${shortMinutes} * MINUTE;
+        static boolean shortCycle(Event run) {
+          return run.end().getAsLong() - run.start() < Duration.ofMinutes(${shortMinutes}).toMillis();
         }
         """);
   }

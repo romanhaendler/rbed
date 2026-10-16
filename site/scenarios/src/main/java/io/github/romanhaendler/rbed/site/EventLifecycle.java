@@ -23,6 +23,10 @@ final class EventLifecycle extends Scenario {
     super("event-lifecycle", "The Event lifecycle", "s", 1_000, List.of(TEMP),
         List.of(new Parameter("duration", "Duration", 2, 0, 6, 1, "s")),
         """
+        import io.github.romanhaendler.rbed.*;
+        import java.time.Duration;
+        import java.util.Map;
+
         Channel temp = Channel.named("temp");
 
         Rule overheat = Rule.named("Overheat")
@@ -30,10 +34,18 @@ final class EventLifecycle extends Scenario {
         Detector detector = Detector.builder()
             .rules(overheat)
             .listener(new EventListener() {
-              @Override public void onPending(Event e)   { System.out.println("pending at " + e.start()); }
-              @Override public void onConfirmed(Event e) { System.out.println("confirmed at " + e.confirmed().getAsLong()); }
-              @Override public void onEnded(Event e)     { System.out.println("ended at " + e.end().getAsLong()); }
-              @Override public void onDiscarded(Event e) { System.out.println("discarded"); }
+              @Override public void onPending(Event e) {
+                System.out.println("pending at " + e.start());
+              }
+              @Override public void onConfirmed(Event e) {
+                System.out.println("confirmed at " + e.confirmed().getAsLong());
+              }
+              @Override public void onEnded(Event e) {
+                System.out.println("ended at " + e.end().getAsLong());
+              }
+              @Override public void onDiscarded(Event e) {
+                System.out.println("discarded");
+              }
             })
             .build();
 

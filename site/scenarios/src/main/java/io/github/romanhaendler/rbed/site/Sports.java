@@ -31,15 +31,22 @@ final class Sports extends Scenario {
             new Parameter("recoveryMinutes", "Recovered within", 2, 1, 5, 1, "min"),
             new Parameter("sprints", "Done after more than", 2, 0, 3, 1, "Sprints")),
         """
+        import static io.github.romanhaendler.rbed.Conditions.*;
+
+        import io.github.romanhaendler.rbed.*;
+        import java.time.Duration;
+        import java.util.ArrayList;
+        import java.util.List;
+        import java.util.Map;
+
         Channel hr = Channel.named("hr");
         Channel speed = Channel.named("speed");
-        long SECOND = 1_000, MINUTE = 60 * SECOND;
 
         Rule sprint = Rule.named("Sprint")
-            .when(speed.above(${sprint})).forDuration(${sprintSeconds} * SECOND)
+            .when(speed.above(${sprint})).forDuration(Duration.ofSeconds(${sprintSeconds}))
             .endWhen(speed.below(4));
         Rule recovered = Rule.named("Recovered")
-            .when(after(sprint).within(${recoveryMinutes} * MINUTE).and(hr.below(${recoveredHr})));
+            .when(after(sprint).within(Duration.ofMinutes(${recoveryMinutes})).and(hr.below(${recoveredHr})));
         Rule sessionDone = Rule.named("SessionDone").when(count(sprint).above(${sprints}));
         List<Long> recoverySeconds = new ArrayList<>();
         Detector detector = Detector.builder()
@@ -53,10 +60,18 @@ final class Sports extends Scenario {
 
               // The recovery time, from the end of a Sprint to Recovered
               @Override public void onConfirmed(Event e) {
-                if (e.is(recovered)) recoverySeconds.add((e.start() - lastSprintEnd) / SECOND);
+                if (e.is(recovered)) recoverySeconds.add((e.start() - lastSprintEnd) / 1_000);
               }
             })
             .build();
+
+        for (int s = 0; s < 420; s++) {   // at 1 Hz: a warm-up minute, then reps of 30 s sprint, 90 s jog
+          int inRep = (s - 60) % 120;
+          boolean sprinting = s >= 60 && inRep < 30;
+          double heartRate = s < 60 ? 100 : inRep < 30 ? 140 + inRep : 170 - (inRep - 30);
+          detector.push(s * 1_000L, Map.of(speed, sprinting ? 7.0 : 2.0, hr, heartRate));
+        }
+        detector.close();
         """);
   }
 

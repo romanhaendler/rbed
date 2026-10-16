@@ -26,19 +26,30 @@ final class PulseChannels extends Scenario {
             new Parameter("window", "Window after a Deployment", 30, 5, 60, 5, "min"),
             new Parameter("limit", "Error limit", 5, 0, 15, 1, "errors/min")),
         """
+        import static io.github.romanhaendler.rbed.Conditions.*;
+
+        import io.github.romanhaendler.rbed.*;
+        import java.time.Duration;
+        import java.util.HashMap;
+        import java.util.Map;
+
         Channel deploy = Channel.pulse("deploy");
         Channel errors = Channel.named("errors");
 
         Rule deployment = Rule.named("Deployment").when(deploy.above(0.5));
         Rule regression = Rule.named("Regression")
-            .when(after(deployment).within(${window} * 60_000).and(errors.above(${limit})));
+            .when(after(deployment).within(Duration.ofMinutes(${window})).and(errors.above(${limit})));
         Detector detector = Detector.builder()
             .rules(deployment, regression)
             .build();
 
-        detector.push(0,       Map.of(errors, 3.0));               // one Sample a minute
-        detector.push(600_000, Map.of(errors, 3.0, deploy, 1.0));  // Deployment starts
-        detector.push(660_000, Map.of(errors, 3.0));               // deploy is absent: Deployment Ended
+        for (int m = 0; m <= 120; m++) {   // one Sample a minute
+          Map<Channel, Double> values = new HashMap<>();
+          values.put(errors, m >= 25 && m < 35 ? 12.0 : m >= 100 && m < 105 ? 9.0 : 3.0);
+          if (m == 10 || m == 60) values.put(deploy, 1.0);   // only the Samples with a deployment carry deploy
+          detector.push(m * 60_000L, values);
+        }
+        detector.close();
         """);
   }
 
