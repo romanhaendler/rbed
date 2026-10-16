@@ -701,7 +701,7 @@ Values of Channels that no Rule uses are ignored and leave no trace. What a Dete
 | Feature                         | Retains                                       |
 | ------------------------------- | --------------------------------------------- |
 | Channel used by a Rule          | 1 value                                       |
-| `averageOverSamples(n)`         | n values                                      |
+| `averageOverSamples(n)`         | n values; `build()` rejects n above the Retention Limit |
 | `averageOverDuration(w)`        | every value within `w`, at most the Retention Limit |
 | `count(...).within(w)`          | one timestamp per Confirmed Event within `w`, at most the Retention Limit |
 | everything else                 | constant per Rule                             |

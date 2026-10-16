@@ -4,8 +4,8 @@
 
 **Blocked by:** 02 (Retention Limit for duration windows)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `averageOverSamples(n)` with n above the limit fails in `build()` with a message naming the Rule and n
-- [ ] n equal to the limit builds and works as before
-- [ ] Raising the limit with `retentionLimit(...)` lets the same Rule build
+- [x] `averageOverSamples(n)` with n above the limit fails in `build()` with a message naming the Rule and n
+- [x] n equal to the limit builds and works as before
+- [x] Raising the limit with `retentionLimit(...)` lets the same Rule build
