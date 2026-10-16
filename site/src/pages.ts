@@ -30,6 +30,27 @@ export const PAGES: Page[] = [
     rubric: 'Guide',
   },
   {
+    path: '/end-conditions/',
+    title: 'End Conditions and hysteresis',
+    description:
+      'An End Condition with its own threshold and duration keeps a noisy signal near a threshold from producing a flood of short Events.',
+    rubric: 'Guide',
+  },
+  {
+    path: '/data-gaps/',
+    title: 'Data gaps',
+    description:
+      'maxGap bounds how far apart two Samples may be: a longer gap Ends a running Event, and both sides of the gap are marked Truncated.',
+    rubric: 'Guide',
+  },
+  {
+    path: '/conditions-and-expressions/',
+    title: 'Conditions and Expressions',
+    description:
+      'What a Rule compares: rates, moving averages and arithmetic between Channels, plotted per Sample, and why no Event starts where an Expression is undefined.',
+    rubric: 'Guide',
+  },
+  {
     path: '/aggregates/',
     title: 'Aggregates',
     description:
