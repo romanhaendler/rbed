@@ -1,15 +1,15 @@
-// Every page of the site, in the README's order. The web app builds its navigation and routes
-// from this list, and build steps read it in Node, so it imports nothing.
+// Every page of the site, in the README's order. The web app builds its navigation, routes and
+// search from this list, and the build (prerender.mjs) reads it in Node, so it imports nothing.
 //
-// To add a page: insert it here at its README position, with rubric "Guide" for a README chapter
-// or "Examples" for a domain example, and give its path a view in Shell.tsx. A page that is not
-// in this list is not linked anywhere.
+// A page's text is the Markdown file src/content/<markdownFile(page)>; see site/README.md, "Adding
+// a page". A page that is not in this list is not linked, built or searched anywhere.
 
 export type Page = {
   /** Address below the site's base, starting and ending with a slash. */
   path: string;
+  /** The name in the navigation, the search and the document title. */
   title: string;
-  /** One sentence, for the page head and the search engines. */
+  /** One sentence, for the search engines, the sharing card and llms.txt. */
   description: string;
   /** The navigation's heading the page stands under; the front page has none. */
   rubric?: 'Guide' | 'Examples';
@@ -33,4 +33,13 @@ export function pathOf(pathname: string, base: string): string | undefined {
 export function pageAt(pathname: string, base: string): Page | undefined {
   const path = pathOf(pathname, base);
   return PAGES.find((p) => p.path === path);
+}
+
+/** The page's Markdown below src/content/, which is also its twin's address below the base. */
+export function markdownFile(page: Pick<Page, 'path'>): string {
+  return page.path === '/' ? 'index.md' : page.path.slice(1, -1) + '.md';
+}
+
+export function titleOf(page: Pick<Page, 'path' | 'title'>): string {
+  return page.path === '/' ? 'rbed: rule-based event detection' : `${page.title} · rbed`;
 }

@@ -66,6 +66,18 @@ class BridgeTest {
     assertEquals(List.of("HighTemperature 2000..3000"), events(run("first-rule", "{}")));
   }
 
+  /**
+   * The build prerenders every Scenario at its defaults with the compiled module; this puts
+   * exactly those calls under the parity test.
+   */
+  @Test
+  void everyScenarioRunsAtItsDefaults() {
+    for (Map<String, Object> scenario : scenarios()) {
+      Map<String, Object> result = run((String) scenario.get("id"), "{}");
+      assertTrue(result.containsKey("events"), scenario.get("id") + ": " + result);
+    }
+  }
+
   @Test
   void lowerThresholdStartsAtTheFirstSampleAsTruncated() {
     assertEquals(List.of("HighTemperature 1000..3000 truncatedStart"),

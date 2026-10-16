@@ -59,6 +59,43 @@ pre {
   color: var(--u-color-text-secondary);
 }
 
+/* Opens the search palette; looks like a field, as on the umriss-ui Pages. */
+.shellSearch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--u-space-2);
+  width: 260px;
+  height: 32px;
+  margin-left: var(--u-space-4);
+  padding: 0 var(--u-space-2) 0 var(--u-space-3);
+  border: none;
+  border-radius: var(--u-radius-md);
+  background: var(--u-color-surface-sunken);
+  box-shadow: var(--u-edge);
+  font: inherit;
+  font-size: var(--u-text-sm);
+  color: var(--u-color-text-muted);
+  cursor: pointer;
+}
+
+.shellSearch span {
+  flex: 1;
+  text-align: left;
+}
+
+.shellSearch kbd {
+  padding: 0 var(--u-space-1);
+  border-radius: var(--u-radius-xs);
+  background: var(--u-color-surface);
+  box-shadow: var(--u-edge);
+  font-family: var(--u-font-mono);
+  font-size: 11px;
+}
+
+.shellSearch:hover {
+  color: var(--u-color-text-secondary);
+}
+
 .shellOut {
   display: flex;
   align-items: center;
@@ -89,6 +126,7 @@ pre {
 }
 
 .shellMark:focus-visible,
+.shellSearch:focus-visible,
 .shellIcon:focus-visible,
 .railEntry:focus-visible,
 .page a:focus-visible,
@@ -234,6 +272,15 @@ pre {
   .shellContent {
     padding: var(--u-space-6) var(--u-space-4);
   }
+  .shellSearch {
+    width: auto;
+    flex: 1;
+    min-width: 0;
+    margin-left: 0;
+  }
+  .shellSearch kbd {
+    display: none;
+  }
 }
 
 /* ---------------- A page ---------------- */
@@ -241,7 +288,7 @@ pre {
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--u-space-8);
+  gap: var(--u-space-4);
 }
 
 .page a {
@@ -267,13 +314,17 @@ pre {
   font-size: 0.9em;
 }
 
-.pageHead {
-  display: flex;
-  flex-direction: column;
-  gap: var(--u-space-3);
+.page > * {
+  min-width: 0;
 }
 
-.pageName {
+/* A page's Markdown (src/markdown.ts). Its blocks of text stand in the page's column as if the
+   wrapper were not there. */
+.flow {
+  display: contents;
+}
+
+.flow > h1 {
   margin: 0;
   font-size: min(32px, 8vw);
   overflow-wrap: anywhere;
@@ -283,36 +334,32 @@ pre {
 }
 
 /* Takes the focus when a page is chosen in the drawer, so a screen reader announces it. */
-.pageName:focus {
+.flow > h1:focus {
   outline: none;
 }
 
-.pagePromise {
+/* The sentences under the page's name, up to its first section. */
+.flow > h1 ~ p:not(h2 ~ p) {
+  color: var(--u-color-text-secondary);
+}
+
+.front .flow > h1 + p {
   max-width: 40rem;
   font-size: 1.75rem;
   line-height: var(--u-leading-tight);
   font-weight: var(--u-weight-medium);
   letter-spacing: var(--u-tracking-display);
-}
-
-.pageSentence {
-  color: var(--u-color-text-secondary);
+  color: var(--u-color-text);
 }
 
 @media (max-width: 600px) {
-  .pagePromise {
+  .front .flow > h1 + p {
     font-size: 1.375rem;
   }
 }
 
-.section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--u-space-4);
-}
-
-.sectionTitle {
-  margin: 0;
+.flow > h2 {
+  margin: var(--u-space-5) 0 0;
   padding-bottom: var(--u-space-2);
   border-bottom: 1px solid var(--u-edge-color);
   font-size: var(--u-text-lg);
@@ -320,7 +367,14 @@ pre {
   letter-spacing: var(--u-tracking-tight);
 }
 
-.section ol {
+.flow > h3 {
+  margin: var(--u-space-3) 0 0;
+  font-size: var(--u-text-md);
+  font-weight: var(--u-weight-semibold);
+}
+
+.flow > ol,
+.flow > ul:not(.tiles) {
   margin: 0;
   padding-left: var(--u-space-6);
   max-width: 68ch;
@@ -391,18 +445,6 @@ pre {
   line-height: 1.75;
   color: var(--u-color-text);
   tab-size: 2;
-}
-
-.installGrid {
-  display: grid;
-  gap: var(--u-space-4);
-}
-
-@media (min-width: 900px) {
-  .installGrid {
-    grid-template-columns: 3fr 2fr;
-    align-items: start;
-  }
 }
 
 /* ---------------- A Scenario: chart, controls, source ---------------- */
@@ -512,7 +554,8 @@ pre {
   border-radius: var(--u-radius-md);
   background: var(--u-color-surface);
   box-shadow: var(--u-edge);
-  color: var(--u-color-text);
+  font-size: var(--u-text-sm);
+  color: var(--u-color-text-secondary);
   text-decoration: none;
 }
 
@@ -521,21 +564,13 @@ pre {
 }
 
 .tile strong {
+  font-size: var(--u-text-md);
   font-weight: var(--u-weight-semibold);
-}
-
-.tile span {
-  font-size: var(--u-text-sm);
-  color: var(--u-color-text-secondary);
+  color: var(--u-color-text);
 }
 
 .tile code {
   font-size: var(--u-text-xs);
   color: var(--u-color-text-secondary);
   overflow-wrap: anywhere;
-}
-
-.pageFoot {
-  font-size: var(--u-text-sm);
-  color: var(--u-color-text-secondary);
 }

@@ -1,18 +1,26 @@
 // The shell after the umriss-ui demo's (MIT): header bar, sidebar from the page list, content
 // column, and the routing. Every page is a path of its own below Vite's base; a link to one of
 // them moves without a reload, anything else is the browser's.
-import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { FrontPage, REPOSITORY } from './FrontPage';
-import { PAGES, pageAt } from './pages';
+import { CommandPalette, useCommandPaletteShortcut } from '@umriss-ui/core';
+import { useEffect, useRef, useState } from 'react';
+import { CATALOGUE, MarkdownPage, markdownOf } from './MarkdownPage';
+import { markdownFile, PAGES, pageAt, titleOf } from './pages.ts';
+import { searchItems } from './search.ts';
 
 const BASE = import.meta.env.BASE_URL;
+const REPOSITORY = 'https://github.com/romanhaendler/rbed';
+const SHORTCUT = /Mac|iP/.test(navigator.platform) ? '⌘K' : 'Ctrl K';
 
-/** The view of each page in pages.ts, by its path. */
-const VIEWS: Record<string, () => ReactNode> = {
-  '/': FrontPage,
-};
+const SEARCH = searchItems(PAGES, markdownOf, (id) => CATALOGUE.find((s) => s.id === id)?.source ?? '');
 
 const href = (path: string) => BASE + path.slice(1);
+
+/** Moves to an address of the site without a reload. */
+function go(address: string) {
+  window.history.pushState(null, '', address);
+  window.dispatchEvent(new PopStateEvent('popstate'));
+  document.documentElement.scrollTop = 0;
+}
 
 function useCurrentPage() {
   const [page, setPage] = useState(() => pageAt(window.location.pathname, BASE));
@@ -26,9 +34,7 @@ function useCurrentPage() {
       if (url.origin !== window.location.origin || pageAt(url.pathname, BASE) === undefined) return;
       if (url.pathname === window.location.pathname && url.hash !== '') return;
       event.preventDefault();
-      window.history.pushState(null, '', url.pathname + url.search + url.hash);
-      follow();
-      document.documentElement.scrollTop = 0;
+      go(url.pathname + url.search + url.hash);
     };
     window.addEventListener('popstate', follow);
     document.addEventListener('click', onClick);
@@ -81,26 +87,31 @@ function Rail({ current }: { current?: string }) {
 
 function NotFound() {
   return (
-    <div className="page">
-      <header className="pageHead">
-        <h1 className="pageName" tabIndex={-1}>
-          No page at this address
-        </h1>
-        <p className="pageSentence">
+    <article className="page">
+      <div className="flow">
+        <h1 tabIndex={-1}>No page at this address</h1>
+        <p>
           The page may have moved. Start again from the <a href={BASE}>front page</a>.
         </p>
-      </header>
-    </div>
+      </div>
+    </article>
   );
 }
 
 export function Shell() {
   const page = useCurrentPage();
   const drawer = useRef<HTMLDialogElement>(null);
-  const View = page === undefined ? NotFound : VIEWS[page.path];
+  const [searching, setSearching] = useState(false);
+  useCommandPaletteShortcut(() => setSearching(true));
 
   useEffect(() => {
-    document.title = page === undefined ? 'No page · rbed' : page.path === '/' ? 'rbed: rule-based event detection' : `${page.title} · rbed`;
+    // The same head the build writes into each page's index.html (prerender.mjs).
+    document.title = page === undefined ? 'No page · rbed' : titleOf(page);
+    if (page !== undefined) {
+      const address = (path: string) => new URL(BASE + path, window.location.href).href;
+      document.querySelector('link[rel=canonical]')?.setAttribute('href', address(page.path.slice(1)));
+      document.querySelector('link[rel=alternate][type="text/markdown"]')?.setAttribute('href', address(markdownFile(page)));
+    }
     // A page chosen in the drawer closes it and takes the focus, so a screen reader announces it.
     if (drawer.current?.open) {
       drawer.current.close();
@@ -123,7 +134,15 @@ export function Shell() {
         <a className="shellMark" href={BASE}>
           rbed <span className="shellVersion">{__RBED_VERSION__}</span>
         </a>
+        <button type="button" className="shellSearch" onClick={() => setSearching(true)} aria-keyshortcuts="Control+K Meta+K /">
+          <Icon d="M6.4 6.4 9 9M4 7.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z" />
+          <span>Search</span>
+          <kbd>{SHORTCUT}</kbd>
+        </button>
         <div className="shellOut">
+          <a className="shellIcon" href={`${BASE}llms.txt`} aria-label="llms.txt, the documentation for coding agents" title="llms.txt">
+            <Icon d="M2.5 1h3.5L8 3v6H2.5ZM6 1v2h2M4 5h2.5M4 7h2.5" />
+          </a>
           <a className="shellIcon" href={REPOSITORY} aria-label="Source on GitHub" title="Source on GitHub">
             <Icon d="M3.5 2.5 1 5l2.5 2.5M6.5 2.5 9 5 6.5 7.5" />
           </a>
@@ -140,7 +159,7 @@ export function Shell() {
       <div className="shellBody">
         <Rail current={page?.path} />
         <main className="shellContent">
-          <View />
+          {page === undefined ? <NotFound /> : <MarkdownPage key={page.path} page={page} />}
         </main>
       </div>
       {/* The sidebar again, as a drawer for narrow screens. A click on the dialog itself is one on
@@ -155,6 +174,14 @@ export function Shell() {
       >
         <Rail current={page?.path} />
       </dialog>
+      <CommandPalette
+        open={searching}
+        onClose={() => setSearching(false)}
+        items={SEARCH}
+        restingItems={SEARCH}
+        onChoose={(path) => go(href(path))}
+        aria-label="Search the documentation"
+      />
     </>
   );
 }
