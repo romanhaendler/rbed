@@ -50,7 +50,7 @@ export const PAGES: Page[] = [
     path: '/data-gaps/',
     title: 'Data gaps',
     description:
-      'maxGap bounds how far apart two Samples may be: a longer gap Ends a running Event, and both sides of the gap are marked Truncated.',
+      'maxGap bounds how far apart two Samples may be: a longer gap Ends a Confirmed Event Truncated and Discards a Pending one, and an Event right after it has a Truncated start.',
     rubric: 'Guide',
   },
   {
@@ -141,7 +141,7 @@ export const PAGES: Page[] = [
     path: '/memory/',
     title: 'Memory and the Retention Limit',
     description:
-      'What a Detector keeps in memory follows from its Rules; the Retention Limit caps every window, dropping the oldest entries, and droppedValues() tells when it did.',
+      'What a Detector keeps in memory follows from its Rules; the Retention Limit caps every time window, dropping the oldest entries, and droppedValues() tells when it did.',
     rubric: 'Guide',
   },
   {

@@ -70,7 +70,8 @@ final class AfterScenario extends Scenario {
 
   @Override
   List<Threshold> thresholds(Map<String, Double> values) {
-    return List.of(new Threshold(TEMP, "ExcursionAfterDoor", "when >", 8));
+    return List.of(new Threshold(TEMP, "ExcursionAfterDoor", "when >", 8),
+        new Threshold(DOOR, "DoorOpen", "when >", 0.5));
   }
 
   @Override

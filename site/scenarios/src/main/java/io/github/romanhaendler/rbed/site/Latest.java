@@ -76,6 +76,14 @@ final class Latest extends Scenario {
     return new Rule[] {loadLifted, partialSetDown};
   }
 
+  /** The limit {@code PartialSetDown} compares the weight with; it has no threshold of its own. */
+  @Override
+  List<Plot> plots(Map<String, Double> values) {
+    double fraction = values.get("fraction");
+    return List.of(new Plot("latest(loadLifted).max(weight).times(" + fraction + ")",
+        latest(rules(values)[0]).max(WEIGHT).times(fraction)));
+  }
+
   @Override
   List<Threshold> thresholds(Map<String, Double> values) {
     return List.of(new Threshold(WEIGHT, "LoadLifted", "when >", 500),

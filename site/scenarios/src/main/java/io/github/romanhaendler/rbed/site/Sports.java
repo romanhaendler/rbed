@@ -35,8 +35,6 @@ final class Sports extends Scenario {
 
         import io.github.romanhaendler.rbed.*;
         import java.time.Duration;
-        import java.util.ArrayList;
-        import java.util.List;
         import java.util.Map;
 
         Channel hr = Channel.named("hr");
@@ -48,7 +46,6 @@ final class Sports extends Scenario {
         Rule recovered = Rule.named("Recovered")
             .when(after(sprint).within(Duration.ofMinutes(${recoveryMinutes})).and(hr.below(${recoveredHr})));
         Rule sessionDone = Rule.named("SessionDone").when(count(sprint).above(${sprints}));
-        List<Long> recoverySeconds = new ArrayList<>();
         Detector detector = Detector.builder()
             .rules(sprint, recovered, sessionDone)
             .listener(new EventListener() {
@@ -60,7 +57,7 @@ final class Sports extends Scenario {
 
               // The recovery time, from the end of a Sprint to Recovered
               @Override public void onConfirmed(Event e) {
-                if (e.is(recovered)) recoverySeconds.add((e.start() - lastSprintEnd) / 1_000);
+                if (e.is(recovered)) System.out.println("recovered after " + (e.start() - lastSprintEnd) / 1_000 + " s");
               }
             })
             .build();

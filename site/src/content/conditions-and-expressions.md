@@ -11,7 +11,10 @@ Expressions are compared to get Conditions, and Conditions are combined with `an
 
 ## What the Condition sees
 
-One Rule, `AboveLimit`, compares an Expression of a noisy temperature with a fixed threshold. Pick the Expression: the dashed line is its value at every Sample, and the horizontal line is the threshold. The values are computed by rbed itself, not by the page. Where the Expression is undefined, the dashed line is absent and the stretch is shaded.
+One Rule, `AboveLimit`, compares an Expression of a noisy temperature with a fixed threshold. Choose the Expression to see how each one turns the same data into a different Condition.
+
+<!-- live -->
+The dashed line is the Expression's value at every Sample, and the horizontal line is the threshold. The values are computed by rbed itself, not by the page. Where the Expression is undefined, the dashed line is absent and the stretch is shaded.
 
 The temperature starts warm, has a single outlier at 15 s and ramps up from 30 s. The Channel `ambient` reports only from 5 s on.
 
@@ -22,7 +25,7 @@ At the default, a moving average over 5 Samples, `AboveLimit` runs from 4 s, whe
 ### Things to try
 
 - **Moving average over Samples**: the temperature is above 24 from the first Sample, but the average of 5 Samples is undefined until the fifth. The first Event starts at 4 s, Truncated at its start. Raise the Samples averaged to 10 and the warm start is averaged away.
-- **Rate**: the outlier at 15 s is a single step of 8.2 °C in one second, so the rate crosses its threshold and makes an Event of its own. A rate shows noise in full.
+- **Rate**: the outlier at 15 s is a single step of 8.2 °C in one second, so the rate crosses its threshold and makes an Event of its own; the ramp from 30 s makes a second one, from 31 s to 39 s. A rate shows noise in full.
 - **Moving average over a duration**: undefined until the values span the window. With 10 s, the warm start lies entirely in the warm-up and leaves no Event.
 - **Arithmetic between Channels**: `temp.minus(ambient)` is undefined until `ambient` has a value. Arithmetic does not smooth: the outlier makes an Event here, too.
 

@@ -7,9 +7,11 @@ A refrigerated truck carries vaccines, which must stay between 2 and 8 °C; its 
 ## The Rules
 
 - **Excursion**: above 8 °C for 15 minutes, over as soon as it is back at 8 °C or below.
-- **DoorOpen**: the door sensor reads 1, here from minute 60 to 65.
-- **ExcursionAfterDoor**: above 8 °C within 30 minutes after the door closed, to attribute the cause. It starts at 65, the moment the door closed; the second Excursion, from 300, is too long after it.
-- **CumulativeLimit**: the total time of the Excursions above 45 minutes. The first adds 28 minutes; the second, Confirmed at 315, brings the total to 46 at 318. It holds until the data ends, so its end is Truncated.
+- **DoorOpen**: the door sensor reads 1.
+- **ExcursionAfterDoor**: above 8 °C within 30 minutes after the door closed, to attribute the cause.
+- **CumulativeLimit**: the total time of the Excursions above 45 minutes.
+
+At the defaults, the door is open from minute 60 to 65, and the temperature is above 8 °C from minute 62 to 90 and from 300 to 330. The first `Excursion` runs from 62 to 90, Confirmed at 77. `ExcursionAfterDoor` starts at 65, the moment the door closed, and runs to 90; the second Excursion, from 300, is too long after the door. The first Excursion adds 28 minutes; the second, Confirmed at 315, brings the total to 46 at 318, where `CumulativeLimit` starts. It holds until the data ends, so its end is Truncated.
 
 ### Things to try
 

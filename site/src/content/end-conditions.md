@@ -25,12 +25,12 @@ At the default End threshold of 500 kg the Rule flaps: four Events, the first on
 ### Things to try
 
 - Move the End threshold down to 450 kg: the noise around 500 no longer Ends anything. One Event runs from 4 s until the swing at 14 s, and a second one until the load is set down.
-- Move it to 440 kg: even the swing stays inside the hysteresis, and a single Event runs from 4 s to 22 s. So it does down to 290 kg. Lower End thresholds End it later: the README's 50 kg at 23 s, the first Sample below 50.
+- Move it to 440 kg: even the swing stays inside the hysteresis, and a single Event runs from 4 s to 22 s, and so it does down to 290 kg. Lower End thresholds End it later: the README's 50 kg at 23 s, the first Sample below 50.
 - Lower it to 0 kg: the End Condition never holds. The Event runs until `close()`, which Ends it at the last Sample with a Truncated end.
 
 ## When does the next Event start?
 
-At an End threshold of 500 kg, the weight is above 500 again at 6 s and 7 s, yet no Event starts there. While an Event runs on its End Condition, `when` is not evaluated, and a new Event only starts once `when` has been seen not holding after the previous one Ended: 489 kg at 8 s does that, and the next Event starts at 10 s. Each Rule has at most one Event in progress, and this is why a Rule with an End Condition does not flicker.
+At an End threshold of 500 kg, the weight is above 500 again at 6 s and 7 s, yet no Event starts there. While an Event runs on its End Condition, `when` is not evaluated, and a new Event only starts once `when` has been seen not holding after the previous one Ended (or a [data gap](../data-gaps/) has passed): 489 kg at 8 s does that, and the next Event starts at 10 s. Each Rule has at most one Event in progress, and this is why a Rule with an End Condition does not flicker.
 
 ## A duration for the End Condition
 

@@ -34,7 +34,7 @@ final class EndConditions extends Scenario {
 
         Rule loadLifted = Rule.named("LoadLifted")
             .when(weight.above(500))
-            .endWhen(weight.below(${end})).forDuration(Duration.ofSeconds(${endDuration}));
+            .endWhen(weight.below(${end})).forDuration(Duration.ofSeconds(${endDuration}));   // 0 s: Ends at once
         Detector detector = Detector.builder()
             .rules(loadLifted)
             .build();
@@ -70,7 +70,7 @@ final class EndConditions extends Scenario {
   List<Threshold> thresholds(Map<String, Double> values) {
     double end = values.get("end");
     return end == 500
-        ? List.of(new Threshold(WEIGHT, "LoadLifted", "when > and endWhen <", 500))
+        ? List.of(new Threshold(WEIGHT, "LoadLifted", "when > 500, endWhen <", 500))
         : List.of(new Threshold(WEIGHT, "LoadLifted", "when >", 500),
             new Threshold(WEIGHT, "LoadLifted", "endWhen <", end));
   }

@@ -28,7 +28,7 @@ The Event table on every page of this site shows each Event's minimum, maximum a
 ## The components
 
 - `min`, `max`, `mean`: over the Samples of the Event in which the Channel had a value.
-- `count`: the number of those Samples. If it is 0, `min`, `max` and `mean` are NaN, which the site shows as a dash.
+- `count`: the number of those Samples. If it is 0, `min`, `max` and `mean` are NaN: the site's Event tables then say "no value", and the full Aggregates show a dash.
 - `timeWeightedMean`: the mean with each value weighted by how long it held, until the next Sample, time advance or the Event's end.
 - `integral`: value × seconds, time-weighted like the mean: distance from speed, energy from power, dose from rate.
 

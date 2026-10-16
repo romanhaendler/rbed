@@ -23,7 +23,10 @@ Values of Channels that no Rule uses are ignored, so a Sample may carry more Cha
 
 ## Sensors at different rates
 
-A Sample does not have to contain every Channel. A Channel missing from a Sample keeps its last value, so sensors reporting at different rates can share one Detector. Here a room's temperature `temp` reports every second and rises from 21 °C to 30 °C. Its humidity reports less often; it rises from 50 % to 65 % at 30 s and falls again. `Muggy` is an Event while the temperature is above 26 °C and the humidity above 60 %. Hover over the chart to read both Channels at each Sample: between two reports, `humidity` is the value of the last one.
+A Sample does not have to contain every Channel. A Channel missing from a Sample keeps its last value, so sensors reporting at different rates can share one Detector. Here a room's temperature `temp` reports every second and rises from 21 °C to 30 °C. Its humidity reports less often; it rises from 50 % to 65 % at 30 s and falls again. `Muggy` is an Event while the temperature is above 26 °C and the humidity above 60 %. Between two reports, `humidity` is the value of the last one.
+
+<!-- live -->
+Hover over the chart to read both Channels at each Sample.
 
 <!-- scenario samples-and-channels -->
 
