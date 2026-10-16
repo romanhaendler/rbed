@@ -91,7 +91,7 @@ final class Healthcare extends Scenario {
 
   /** Pushes a Sample every second, and advances time instead during the dropout. */
   @Override
-  void detect(Rule[] rules, Lifecycle lifecycle) {
+  void detect(Rule[] rules, List<Sample> samples, Lifecycle lifecycle) {
     Detector detector = Detector.builder().rules(rules).listener(lifecycle).build();
     for (long s = 0; s < 600; s++) {
       if (dropout(s)) {

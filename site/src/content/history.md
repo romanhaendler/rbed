@@ -25,7 +25,7 @@ A machine reports whether it is in service mode once a day, for 200 days; it is 
 
 <!-- scenario history -->
 
-With History, the restarted Detector knows the maintenance of day 10, so the service is overdue from day 102, when that maintenance lies more than 90 days back, until the next one is over on day 141. Switch History off, and the new Detector knows of no maintenance at all: from the restart on day 60 the service counts as overdue, at once and with a Truncated start.
+With History, the restarted Detector knows the maintenance of day 10, so the service is overdue from day 102, when that maintenance lies more than 90 days back, until the next one is over on day 141. Choose "Without History", and the new Detector knows of no maintenance at all: from the restart on day 60 the service counts as overdue, at once and with a Truncated start.
 
 The Detector before the restart is in the same position at day 0: it has no History, so the service counts as overdue until the first maintenance it sees. Move the restart to day 120, more than 90 days after that maintenance, and History makes no difference: the service is overdue either way.
 

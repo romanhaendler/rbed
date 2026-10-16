@@ -30,7 +30,7 @@ The rate is at most 1000 Hz, since timestamps have millisecond resolution. With 
 
 With a sampling rate, every duration is measured in Sample positions converted to time. That is exact for truly regular data, and wrong by exactly as much as the data is not regular.
 
-Below, an accelerometer was logged at 10 Hz, but the logger lost the Samples from 2.1 to 2.9 s. `Vibration` requires `accel` above 3 for 1.5 s. Pushed with their timestamps, both vibrations last long enough: the first from 1.5 to 3.5 s, Confirmed at 3 s. Switch on sampling rate mode, and the same Samples are pushed as values at a declared 10 Hz: every Sample after the loss now lies 0.9 s early. The first vibration seems to stop at 2.6 s, before its 1.5 s are reached, and is Discarded; the second is still Confirmed, but 0.9 s earlier than it happened.
+Below, an accelerometer was logged at 10 Hz, but the logger lost the Samples from 2.1 to 2.9 s. `Vibration` requires `accel` above 3 for 1.5 s. Pushed with their timestamps, both vibrations last long enough: the first from 1.5 to 3.5 s, Confirmed at 3 s. Choose "Values at a sampling rate", and the same Samples are pushed as values with `detectValues` at a declared 10 Hz: every Sample after the loss now lies 0.9 s early. The first vibration seems to stop at 2.6 s, before its 1.5 s are reached, and is Discarded; the second is still Confirmed, but 0.9 s earlier than it happened.
 
 <!-- scenario sampling-rate -->
 

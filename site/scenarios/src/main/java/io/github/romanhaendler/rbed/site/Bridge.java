@@ -19,6 +19,9 @@ public final class Bridge {
   private static final List<Scenario> SCENARIOS = List.of(
       new FirstRule(),
       new EventLifecycle(),
+      new EndConditions(),
+      new DataGaps(),
+      new Expressions(),
       new AggregatesScenario(),
       new SamplingRate(),
       new SilentSensors(),
@@ -72,7 +75,15 @@ public final class Bridge {
         Json.number(out.append(",\"max\":"), p.max());
         Json.number(out.append(",\"step\":"), p.step());
         Json.string(out.append(",\"unit\":"), p.unit());
-        if (p.toggle()) out.append(",\"toggle\":true");
+        if (!p.options().isEmpty()) {
+          out.append(",\"options\":[");
+          for (int j = 0; j < p.options().size(); j++) {
+            if (j > 0) out.append(',');
+            Json.string(out.append("{\"label\":"), p.options().get(j).label());
+            Json.string(out.append(",\"source\":"), p.options().get(j).source()).append('}');
+          }
+          out.append(']');
+        }
         out.append('}');
       }
       Json.string(out.append("],\"source\":"), s.source).append('}');
@@ -87,9 +98,11 @@ public final class Bridge {
    *     null stands for NaN
    * @param drawnChannels JSON object reserved for Channel values the reader drew; ignored for now
    * @return JSON object with the Samples, the Events, the Discarded Pending Events (with the
-   *     timestamp they were Discarded), the timestamps time was advanced to without a Sample and,
-   *     if the Detector was restarted, the timestamp of the restart; or
-   *     {@code {"error": message}} if rbed rejected the Rules or the input was invalid
+   *     timestamp they were Discarded), the timestamps time was advanced to without a Sample,
+   *     the timestamp of the restart if the Detector was restarted, and, for a Scenario that
+   *     plots an Expression, its name,
+   *     threshold and value per Sample (null where undefined); or {@code {"error": message}} if
+   *     rbed rejected the Rules or the input was invalid
    */
   @JSExport
   public static String run(String scenarioId, String parameters, String drawnChannels) {
@@ -98,7 +111,7 @@ public final class Bridge {
       Map<String, Double> values = values(scenario, parameters);
       List<Sample> samples = scenario.samples(values);
       Lifecycle lifecycle = new Lifecycle();
-      scenario.detect(scenario.rules(values), values, lifecycle);
+      scenario.detect(scenario.rules(values), samples, values, lifecycle);
       return result(scenario, values, samples, lifecycle);
     } catch (RuntimeException e) {
       return Json.string(new StringBuilder("{\"error\":"), String.valueOf(e.getMessage()))
@@ -124,6 +137,9 @@ public final class Bridge {
       if (value == null) value = Double.NaN;
       if (!(value instanceof Double d)) {
         throw new IllegalArgumentException("Parameter " + p.id() + " is not a number");
+      }
+      if (!p.options().isEmpty() && !(d >= 0 && d < p.options().size() && d == Math.rint(d))) {
+        throw new IllegalArgumentException("Parameter " + p.id() + " has no option " + d);
       }
       values.put(p.id(), d);
     }
@@ -179,6 +195,17 @@ public final class Bridge {
     }
     out.append(']');
     if (lifecycle.restart != null) out.append(",\"restart\":").append(lifecycle.restart);
+    Scenario.Plot plot = scenario.plot(values);
+    if (plot != null) {
+      Json.string(out.append(",\"expression\":{\"name\":"), plot.name());
+      Json.number(out.append(",\"threshold\":"), plot.threshold()).append(",\"values\":[");
+      double[] plotted = ExpressionValues.of(plot.expression(), samples);
+      for (int i = 0; i < plotted.length; i++) {
+        if (i > 0) out.append(',');
+        Json.number(out, plotted[i]);
+      }
+      out.append("]}");
+    }
     return out.append('}').toString();
   }
 

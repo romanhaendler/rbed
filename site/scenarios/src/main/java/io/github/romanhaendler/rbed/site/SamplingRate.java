@@ -20,23 +20,26 @@ final class SamplingRate extends Scenario {
   SamplingRate() {
     super("sampling-rate", "Batch processing and sampling rates", "s", 1_000, List.of(ACCEL),
         List.of(
-            Parameter.toggle("samplingRate", "Sampling rate mode", false),
+            Parameter.choice("mode", "Push", 0, List.of(
+                new Option("With timestamps", """
+                    Detector detector = Detector.builder()
+                        .rules(vibration)
+                        .build();
+                    List<Event> events = detector.detect(recording);"""),
+                new Option("Values at a sampling rate", """
+                    Detector detector = Detector.builder()
+                        .samplingRate(${rate})  // Sample i is at round(i * 1000 / ${rate}) ms
+                        .rules(vibration)
+                        .build();
+                    List<Event> events = detector.detectValues(values);  // the recording's values""")
+            )),
             new Parameter("rate", "Declared rate", 10, 1, 20, 1, "Hz")),
         """
         Channel accel = Channel.named("accel");
         Rule vibration = Rule.named("Vibration").when(accel.above(3)).forDuration(1_500);
 
-        boolean samplingRate = ${samplingRate};
-        Detector.Builder builder = Detector.builder().rules(vibration);
-        if (samplingRate) builder.samplingRate(${rate});  // Sample i is at round(i * 1000 / ${rate})
-        Detector detector = builder.build();
-
-        // logged at 10 Hz, 0 to 8 s; the Samples from 2.1 to 2.9 s were lost
-        for (Sample s : recording) {
-          if (samplingRate) detector.push(s.values());
-          else detector.push(s.timestamp(), s.values());
-        }
-        detector.close();
+        // recording: logged at 10 Hz from 0 to 8 s; the Samples from 2.1 to 2.9 s were lost
+        ${mode}
         """);
   }
 
@@ -57,7 +60,7 @@ final class SamplingRate extends Scenario {
   /** With a sampling rate, the timestamps rbed derives: round(i * 1000 / rate). */
   @Override
   List<Sample> samples(Map<String, Double> values) {
-    if (!on(values, "samplingRate")) return samples();
+    if (values.get("mode") == 0) return samples();
     double hz = values.get("rate");
     List<Sample> recorded = samples();
     List<Sample> derived = new ArrayList<>();
@@ -73,14 +76,15 @@ final class SamplingRate extends Scenario {
   }
 
   @Override
-  void detect(Rule[] rules, Map<String, Double> values, Lifecycle lifecycle) {
-    if (!on(values, "samplingRate")) {
-      detect(rules, lifecycle);
+  void detect(Rule[] rules, List<Sample> samples, Map<String, Double> values,
+      Lifecycle lifecycle) {
+    if (values.get("mode") == 0) {
+      detect(rules, samples, lifecycle);
       return;
     }
     Detector detector = Detector.builder().samplingRate(values.get("rate"))
         .rules(rules).listener(lifecycle).build();
-    for (Sample sample : samples(values)) {
+    for (Sample sample : samples) {
       lifecycle.now = sample.timestamp();  // the derived round(index * 1000 / rate)
       detector.push(sample.values());
     }

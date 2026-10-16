@@ -1,6 +1,7 @@
 package io.github.romanhaendler.rbed.site;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -239,6 +240,65 @@ class BridgeTest {
   }
 
   @Test
+  void anEndConditionAtTheStartThresholdLetsTheNoisyWeightFlap() {
+    // With an End Condition, `when` is not evaluated while the Event runs: a new Event starts
+    // only after the weight has been seen at or below 500 again, so 508 at 6 s starts none.
+    assertEquals(List.of("LoadLifted 4000..5000", "LoadLifted 10000..12000",
+            "LoadLifted 15000..17000", "LoadLifted 21000..22000"),
+        events(run("end-conditions", "{}")));
+  }
+
+  @Test
+  void movingTheEndThresholdApartLeavesOnlyTheSwingAsASecondEvent() {
+    assertEquals(List.of("LoadLifted 4000..14000", "LoadLifted 18000..22000"),
+        events(run("end-conditions", "{\"end\": 450}")));
+  }
+
+  @Test
+  void anEndThresholdBelowTheSwingKeepsOneEvent() {
+    assertEquals(List.of("LoadLifted 4000..22000"),
+        events(run("end-conditions", "{\"end\": 440}")));
+    assertEquals(List.of("LoadLifted 4000..23000"),
+        events(run("end-conditions", "{\"end\": 50}")));
+  }
+
+  @Test
+  void anEndDurationKeepsTheEventAcrossTheSwingAndEndsItWhereTheWeightDropped() {
+    assertEquals(List.of("LoadLifted 4000..22000"),
+        events(run("end-conditions", "{\"end\": 450, \"endDuration\": 1}")));
+  }
+
+  @Test
+  void anEndConditionThatNeverHoldsEndsTheEventTruncatedAtClose() {
+    assertEquals(List.of("LoadLifted 4000..29000 truncatedEnd"),
+        events(run("end-conditions", "{\"end\": 0}")));
+  }
+
+  @Test
+  void aGapLongerThanMaxGapEndsTheEventAtTheGapAndTruncatesBothSides() {
+    assertEquals(List.of("Running 6000..12000 truncatedEnd", "Running 18000..32000 truncatedStart"),
+        events(run("data-gaps", "{}")));
+  }
+
+  @Test
+  void aMaxGapAsLongAsTheGapKeepsTheEventAcrossIt() {
+    assertEquals(List.of("Running 6000..32000"),
+        events(run("data-gaps", "{\"maxGap\": 6}")));
+  }
+
+  @Test
+  void aGapOutsideTheEventLeavesItComplete() {
+    assertEquals(List.of("Running 6000..32000"),
+        events(run("data-gaps", "{\"gap\": 33}")));
+  }
+
+  @Test
+  void anEventRightAfterAGapHasATruncatedStart() {
+    assertEquals(List.of("Running 8000..32000 truncatedStart"),
+        events(run("data-gaps", "{\"gap\": 2}")));
+  }
+
+  @Test
   void resultHasTheSamples() {
     assertEquals(List.of(
             Map.of("timestamp", 1000.0, "values", Map.of("temp", 75.0)),
@@ -326,7 +386,7 @@ class BridgeTest {
 
   @Test
   void withASamplingRateTheLostSamplesShortenTimeAndTheVibrationIsDiscarded() {
-    Map<String, Object> result = run("sampling-rate", "{\"samplingRate\": 1}");
+    Map<String, Object> result = run("sampling-rate", "{\"mode\": 1}");
     assertEquals(List.of("Vibration 4100..6100"), events(result));
     assertEquals(List.of("5600"), confirmed(result));
     assertEquals(List.of("Vibration 1500..2600"), discarded(result));
@@ -335,7 +395,7 @@ class BridgeTest {
 
   @Test
   void aSlowerDeclaredRateStretchesEveryDuration() {
-    Map<String, Object> result = run("sampling-rate", "{\"samplingRate\": 1, \"rate\": 5}");
+    Map<String, Object> result = run("sampling-rate", "{\"mode\": 1, \"rate\": 5}");
     assertEquals(List.of("Vibration 3000..5200", "Vibration 8200..12200"), events(result));
     assertEquals(List.of("4600", "9800"), confirmed(result));
   }
@@ -354,7 +414,7 @@ class BridgeTest {
 
   @Test
   void withoutAdvancesTheSilenceGoesUnnoticed() {
-    Map<String, Object> result = run("silent-sensors", "{\"advance\": 0}");
+    Map<String, Object> result = run("silent-sensors", "{\"timer\": 1}");
     assertEquals(List.of("HighHeartRate 12000..45000"), events(result));
     assertEquals(List.of(), result.get("advances"));
   }
@@ -380,7 +440,7 @@ class BridgeTest {
   void withoutHistoryTheRestartedDetectorFindsTheServiceOverdueAtOnce() {
     assertEquals(List.of("Maintenance 10..11", "OverdueService 0..11 truncatedStart",
             "Maintenance 140..141", "OverdueService 60..141 truncatedStart"),
-        describe(run("history", "{\"history\": 0}"), DAY));
+        describe(run("history", "{\"history\": 1}"), DAY));
   }
 
   @Test
@@ -389,17 +449,7 @@ class BridgeTest {
         "OverdueService 102..119 truncatedEnd", "Maintenance 140..141",
         "OverdueService 120..141 truncatedStart");
     assertEquals(expected, describe(run("history", "{\"restart\": 120}"), DAY));
-    assertEquals(expected, describe(run("history", "{\"restart\": 120, \"history\": 0}"), DAY));
-  }
-
-  @Test
-  void catalogueMarksToggles() {
-    Map<String, Map<String, Object>> byId = new HashMap<>();
-    for (Map<String, Object> s : scenarios()) byId.put((String) s.get("id"), s);
-    assertEquals(List.of(Map.of("id", "samplingRate", "label", "Sampling rate mode",
-            "default", 0.0, "min", 0.0, "max", 1.0, "step", 1.0, "unit", "", "toggle", true),
-        Map.of("id", "rate", "label", "Declared rate", "default", 10.0, "min", 1.0, "max", 20.0,
-            "step", 1.0, "unit", "Hz")), byId.get("sampling-rate").get("parameters"));
+    assertEquals(expected, describe(run("history", "{\"restart\": 120, \"history\": 1}"), DAY));
   }
 
   @SuppressWarnings("unchecked")
@@ -425,5 +475,82 @@ class BridgeTest {
     Map<String, Object> first = scenarios().get(0);
     assertEquals(List.of("HighTemperature"), first.get("rules"));
     assertEquals(Map.of("name", "s", "millis", 1000.0), first.get("timeUnit"));
+  }
+
+  /** The Expression's values in a result, null where it is undefined. */
+  @SuppressWarnings("unchecked")
+  static List<Double> expressionValues(Map<String, Object> result) {
+    return (List<Double>) ((Map<String, Object>) result.get("expression")).get("values");
+  }
+
+  @Test
+  void movingAverageOverFiveSamplesIsUndefinedForTheFirstFour() {
+    List<Double> values =
+        expressionValues(run("expressions", "{\"expression\": 1, \"samples\": 5}"));
+    assertEquals(Arrays.asList(null, null, null, null), values.subList(0, 4));
+    assertEquals(26.0, values.get(4), 1e-12); // mean of 26, 26.2, 25.9, 26.1, 25.8
+  }
+
+  @Test
+  void noEventStartsWhileTheMovingAverageWarmsUp() {
+    // temp is above 24 from the first Sample, but the average is undefined until 4 s.
+    assertEquals(
+        List.of("AboveLimit 4000..7000 truncatedStart", "AboveLimit 37000..59000 truncatedEnd"),
+        events(run("expressions", "{}")));
+  }
+
+  /** The number of Samples before the Expression is first defined. */
+  static long warmUp(Map<String, Object> result) {
+    return expressionValues(result).stream().takeWhile(v -> v == null).count();
+  }
+
+  @Test
+  void rateIsDefinedFromTheSecondValueAndSeesTheOutlier() {
+    Map<String, Object> result = run("expressions", "{\"expression\": 0}");
+    assertEquals(1, warmUp(result));
+    assertEquals(8.2, expressionValues(result).get(15), 1e-12); // 28 after 19.8, one second apart
+    assertEquals(List.of("AboveLimit 15000..16000", "AboveLimit 31000..39000"), events(result));
+  }
+
+  @Test
+  void movingAverageOverADurationIsUndefinedUntilItsValuesSpanTheWindow() {
+    assertEquals(10, warmUp(run("expressions", "{\"expression\": 2}")));
+    assertEquals(5, warmUp(run("expressions", "{\"expression\": 2, \"window\": 5}")));
+  }
+
+  @Test
+  void differenceOfTwoChannelsIsUndefinedUntilBothHaveAValue() {
+    Map<String, Object> result = run("expressions", "{\"expression\": 3}");
+    assertEquals(5, warmUp(result));
+    assertEquals(4.1, expressionValues(result).get(5), 1e-12); // 26.1 - 22
+    assertEquals(List.of("AboveLimit 15000..16000", "AboveLimit 38000..59000 truncatedEnd"),
+        events(result));
+  }
+
+  @Test
+  void anExpressionThatIsNoOptionReturnsAnError() {
+    assertEquals(Map.of("error", "Parameter expression has no option 4.0"),
+        run("expressions", "{\"expression\": 4}"));
+    assertEquals(Map.of("error", "Parameter expression has no option 0.5"),
+        run("expressions", "{\"expression\": 0.5}"));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void catalogueListsTheExpressionsAsOptionsWithTheirSource() {
+    Map<String, Object> scenario = scenarios().stream()
+        .filter(s -> s.get("id").equals("expressions")).findFirst().orElseThrow();
+    Map<String, Object> expression =
+        ((List<Map<String, Object>>) scenario.get("parameters")).get(0);
+    assertEquals("expression", expression.get("id"));
+    assertEquals(1.0, expression.get("default"));
+    assertEquals(Map.of("label", "Moving average over Samples",
+            "source", "temp.averageOverSamples(${samples}).above(24)"),
+        ((List<Object>) expression.get("options")).get(1));
+  }
+
+  @Test
+  void aScenarioWithoutAnExpressionHasNoneInItsResult() {
+    assertFalse(run("first-rule", "{}").containsKey("expression"));
   }
 }

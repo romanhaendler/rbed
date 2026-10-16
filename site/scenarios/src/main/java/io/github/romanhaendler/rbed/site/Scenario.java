@@ -3,6 +3,7 @@ package io.github.romanhaendler.rbed.site;
 import io.github.romanhaendler.rbed.Channel;
 import io.github.romanhaendler.rbed.Detector;
 import io.github.romanhaendler.rbed.Event;
+import io.github.romanhaendler.rbed.Expression;
 import io.github.romanhaendler.rbed.Rule;
 import io.github.romanhaendler.rbed.Sample;
 import java.util.List;
@@ -36,11 +37,7 @@ abstract class Scenario {
 
   abstract List<Sample> samples();
 
-  /**
-   * The Samples as the Detector sees them at the given parameter values, for the chart: by
-   * default {@link #samples()}. A Scenario whose parameters change the timestamps, such as a
-   * sampling rate, overrides it.
-   */
+  /** The Samples for the given parameter values; the same for every value unless overridden. */
   List<Sample> samples(Map<String, Double> values) {
     return samples();
   }
@@ -54,14 +51,14 @@ abstract class Scenario {
   abstract Rule[] rules(Map<String, Double> values);
 
   /**
-   * Runs the Rules over the Samples with {@code lifecycle} as the listener, setting
+   * Runs the Rules over {@code samples} with {@code lifecycle} as the listener, setting
    * {@code lifecycle.now} to each Sample's timestamp before pushing it, and closes the Detector.
    * A Scenario that feeds its Detector differently (a sampling rate, time advances) overrides it
    * and keeps {@code lifecycle.now} current the same way.
    */
-  void detect(Rule[] rules, Lifecycle lifecycle) {
+  void detect(Rule[] rules, List<Sample> samples, Lifecycle lifecycle) {
     Detector detector = Detector.builder().rules(rules).listener(lifecycle).build();
-    for (Sample sample : samples()) {
+    for (Sample sample : samples) {
       lifecycle.now = sample.timestamp();
       detector.push(sample.timestamp(), sample.values());
     }
@@ -69,17 +66,13 @@ abstract class Scenario {
   }
 
   /**
-   * Like {@link #detect(Rule[], Lifecycle)}, for a Scenario whose feeding depends on its
-   * parameters (a sampling rate, time advances, a restart switched on or off). The bridge calls
-   * this one.
+   * Like {@link #detect(Rule[], List, Lifecycle)}, for a Scenario whose feeding depends on its
+   * parameters (a sampling rate, a timer advancing time, a restart with or without History).
+   * The bridge calls this one.
    */
-  void detect(Rule[] rules, Map<String, Double> values, Lifecycle lifecycle) {
-    detect(rules, lifecycle);
-  }
-
-  /** Whether a toggle parameter is on. */
-  static boolean on(Map<String, Double> values, String id) {
-    return values.get(id) != 0;
+  void detect(Rule[] rules, List<Sample> samples, Map<String, Double> values,
+      Lifecycle lifecycle) {
+    detect(rules, samples, lifecycle);
   }
 
   /**
@@ -90,19 +83,31 @@ abstract class Scenario {
     return null;
   }
 
+  /** The Expression to plot for the given parameter values, or null for none. */
+  Plot plot(Map<String, Double> values) {
+    return null;
+  }
+
+  /** An Expression plotted next to the Channels, with the threshold its Condition compares to. */
+  record Plot(String name, Expression expression, double threshold) {}
+
   /**
-   * A number the reader can change, with its default and the limits of its control; a toggle is
-   * 0 (off) or 1 (on), shown as a switch, and written into the source as false or true.
+   * A number the reader can change, with its default and the limits of its control. A choice has
+   * options: its value is the index of the chosen one, and {@code ${id}} in the source stands for
+   * that option's source, which may hold placeholders of its own.
    */
   record Parameter(String id, String label, double defaultValue, double min, double max,
-      double step, String unit, boolean toggle) {
+      double step, String unit, List<Option> options) {
     Parameter(String id, String label, double defaultValue, double min, double max, double step,
         String unit) {
-      this(id, label, defaultValue, min, max, step, unit, false);
+      this(id, label, defaultValue, min, max, step, unit, List.of());
     }
 
-    static Parameter toggle(String id, String label, boolean on) {
-      return new Parameter(id, label, on ? 1 : 0, 0, 1, 1, "", true);
+    static Parameter choice(String id, String label, int defaultIndex, List<Option> options) {
+      return new Parameter(id, label, defaultIndex, 0, options.size() - 1, 1, "", options);
     }
   }
+
+  /** One option of a choice: its label and the Java source it stands for. */
+  record Option(String label, String source) {}
 }

@@ -21,7 +21,12 @@ final class SilentSensors extends Scenario {
   SilentSensors() {
     super("silent-sensors", "Silent sensors: advancing time", "s", 1_000, List.of(HR),
         List.of(
-            Parameter.toggle("advance", "Timer advances time", true),
+            Parameter.choice("timer", "While silent", 0, List.of(
+                new Option("A timer advances time", """
+                    if (reading != null) detector.push(now, Map.of(hr, reading));
+                    else detector.advanceTo(now);  // the timer: time passes without a Sample"""),
+                new Option("Nothing happens", """
+                    if (reading != null) detector.push(now, Map.of(hr, reading));"""))),
             new Parameter("limit", "Silent after", 5, 1, 15, 1, "s")),
         """
         Channel hr = Channel.named("hr");
@@ -33,10 +38,8 @@ final class SilentSensors extends Scenario {
             .rules(highHeartRate, sensorLost)
             .build();
 
-        // every second: a Sample, or, while the sensor is silent from 25 to 44 s, the timer
-        boolean timer = ${advance};
-        if (reading != null) detector.push(now, Map.of(hr, reading));
-        else if (timer) detector.advanceTo(now);
+        // every second; the sensor is silent from 25 to 44 s, so reading is null then
+        ${timer}
         """);
   }
 
@@ -67,13 +70,13 @@ final class SilentSensors extends Scenario {
 
   /** Pushes the Samples and, if the timer is on, advances time every second of the silence. */
   @Override
-  void detect(Rule[] rules, Map<String, Double> values, Lifecycle lifecycle) {
+  void detect(Rule[] rules, List<Sample> samples, Map<String, Double> values,
+      Lifecycle lifecycle) {
     Detector detector = Detector.builder().rules(rules).listener(lifecycle).build();
-    List<Sample> samples = samples();
     int next = 0;
     for (long s = 0; s <= 60; s++) {
       if (silent(s)) {
-        if (on(values, "advance")) lifecycle.advance(detector, s * 1_000);
+        if (values.get("timer") == 0) lifecycle.advance(detector, s * 1_000);
       } else {
         Sample sample = samples.get(next++);
         lifecycle.now = sample.timestamp();

@@ -23,7 +23,9 @@ final class History extends Scenario {
     super("history", "Restarts: History", "d", DAY, List.of(SERVICE_MODE),
         List.of(
             new Parameter("restart", "Restart on day", 60, 20, 180, 10, "d"),
-            Parameter.toggle("history", "Supply History", true)),
+            Parameter.choice("history", "After the restart", 0, List.of(
+                new Option("With History", "\n    .history(stored)"),
+                new Option("Without History", "")))),
         """
         Channel serviceMode = Channel.named("serviceMode");
         Rule maintenance = Rule.named("Maintenance").when(serviceMode.above(0.5));
@@ -42,10 +44,9 @@ final class History extends Scenario {
         before.close();
 
         // after the restart
-        boolean withHistory = ${history};
-        Detector.Builder builder = Detector.builder().rules(maintenance, overdueService);
-        if (withHistory) builder.history(stored);
-        Detector restarted = builder.build();
+        Detector restarted = Detector.builder()
+            .rules(maintenance, overdueService)${history}
+            .build();
         // ... one Sample a day from day ${restart} on
         """);
   }
@@ -69,17 +70,18 @@ final class History extends Scenario {
 
   /**
    * Pushes the Samples before the restart day to one Detector and closes it, then the rest to a
-   * new one, which gets every Event Ended so far as History if the toggle is on.
+   * new one, which gets every Event Ended so far as History unless the reader chose without.
    */
   @Override
-  void detect(Rule[] rules, Map<String, Double> values, Lifecycle lifecycle) {
+  void detect(Rule[] rules, List<Sample> samples, Map<String, Double> values,
+      Lifecycle lifecycle) {
     long restart = Math.round(values.get("restart")) * DAY;
     Detector detector = Detector.builder().rules(rules).listener(lifecycle).build();
-    for (Sample sample : samples()) {
+    for (Sample sample : samples) {
       if (sample.timestamp() == restart) {
         detector.close();
         Detector.Builder builder = Detector.builder().rules(rules).listener(lifecycle);
-        if (on(values, "history")) builder.history(List.copyOf(lifecycle.ended));
+        if (values.get("history") == 0) builder.history(List.copyOf(lifecycle.ended));
         detector = builder.build();
         lifecycle.restart = restart;
       }

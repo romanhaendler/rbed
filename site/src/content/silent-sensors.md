@@ -24,9 +24,9 @@ A heart rate is reported every second. From 12 s it is high, and from 25 to 44 s
 
 <!-- scenario silent-sensors -->
 
-With the timer, the last reading at 24 s grows older with every advance. At 30 s it is 6 s old, more than the limit of 5 s: `HighHeartRate` Ends there and `SensorLost` is Confirmed, both without a Sample. `SensorLost` Ends at 45 s, when the sensor reports again. Raise the limit, and both move later.
+With the timer, the last reading at 24 s grows older with every advance. At 30 s it is 6 s old, more than the limit of 5 s: `HighHeartRate` Ends there and `SensorLost` is Confirmed, both without a Sample. `SensorLost` Ends at 45 s, when the sensor reports again. Raise *Silent after*, and both move later.
 
-Switch the timer off, and the Detector learns of the silence only when the next Sample arrives at 45 s. That Sample carries `hr`, so its age is 0 again: `SensorLost` never happens, and `HighHeartRate` runs through the whole silence on a reading that is 21 seconds old by the time the next one arrives.
+Choose "Nothing happens" instead of the timer, and the Detector learns of the silence only when the next Sample arrives at 45 s. That Sample carries `hr`, so its age is 0 again: `SensorLost` never happens, and `HighHeartRate` runs through the whole silence on a reading that is 21 seconds old by the time the next one arrives.
 
 ## What an advance does
 

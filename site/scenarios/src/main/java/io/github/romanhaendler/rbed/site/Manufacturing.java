@@ -88,9 +88,9 @@ final class Manufacturing extends Scenario {
 
   /** The Samples' values in order; the Detector derives the timestamps from its sampling rate. */
   @Override
-  void detect(Rule[] rules, Lifecycle lifecycle) {
+  void detect(Rule[] rules, List<Sample> samples, Lifecycle lifecycle) {
     Detector detector = Detector.builder().samplingRate(1).rules(rules).listener(lifecycle).build();
-    for (Sample sample : samples()) {
+    for (Sample sample : samples) {
       lifecycle.now = sample.timestamp();  // the derived round(index * 1000 / 1)
       detector.push(sample.values());
     }
