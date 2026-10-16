@@ -56,6 +56,11 @@ final class ExpressionValues {
         .when(expression.between(-Double.MAX_VALUE, Double.MAX_VALUE));
     Probe first = run(scenario, values, rules, new Rule[][] {{definedRule}}, samples);
     int n = first.positions.size();
+    // An advance before the first Sample would have no probe values to compare with.
+    if (n > 0 && first.positions.get(0) != 0) {
+      throw new IllegalStateException("Scenario " + scenario.id
+          + " advances time before its first Sample");
+    }
     int positions = 1;
     for (int p : first.positions) positions = Math.max(positions, p + 1);
     // The moment each Sample is pushed at.

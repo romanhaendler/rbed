@@ -1,7 +1,6 @@
 // The two functions of the Scenario module (site/scenarios, Bridge.java), typed.
 import * as compiled from 'rbed-scenarios';
 import type { Aggregates } from './aggregates.ts';
-import { inStartOrder } from './events.ts';
 import { fillSource } from './parameters.ts';
 
 export type Parameter = {
@@ -82,7 +81,9 @@ export type Result =
       /** Timestamp of the first Sample after the Detector was restarted, if it was. */
       restart?: number;
     }
-  | { error: string };
+  /** `by` is 'rbed' when rbed rejected the Rules or the Samples; otherwise the site cannot run
+   *  the input. */
+  | { error: string; by?: 'rbed' };
 
 export function scenarios(): Scenario[] {
   return JSON.parse(compiled.scenarios());
@@ -94,7 +95,7 @@ export function run(
   parameters: Record<string, number>,
   drawn: Record<string, (number | null)[]> = {},
 ): Result {
-  return inStartOrder(JSON.parse(compiled.run(scenarioId, JSON.stringify(parameters), JSON.stringify(drawn))));
+  return JSON.parse(compiled.run(scenarioId, JSON.stringify(parameters), JSON.stringify(drawn)));
 }
 
 /** The source with each placeholder replaced by its parameter's value. */

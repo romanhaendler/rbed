@@ -15,17 +15,6 @@ export const ofRule = ({ events, discarded }: Lifecycle, rule: string): Lifecycl
   discarded: discarded.filter((d) => d.name === rule),
 });
 
-const byStart = (a: { name: string; start: number }, b: { name: string; start: number }) =>
-  a.start - b.start || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
-
-/** A run's Events and Discarded Pending Events in the order they started (then by name), as a
-    reader reads the chart; the bridge gives them in the order they Ended or were Discarded. */
-export function inStartOrder<R extends object>(result: R): R {
-  if (!('events' in result) || !('discarded' in result)) return result;
-  const { events, discarded } = result as unknown as Lifecycle;
-  return { ...result, events: [...events].sort(byStart), discarded: [...discarded].sort(byStart) };
-}
-
 /** What selects an Event in the table and on the chart. */
 export const eventKey = (e: Event) => `${e.name} ${e.start}`;
 

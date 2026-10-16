@@ -6,10 +6,10 @@ A Rule may only refer to Rules added before it with `rules(...)`, so it sees the
 
 ## Restricting a Rule to a phase
 
-Many criteria only make sense in a certain operating state. Vibration of a stopped machine is irrelevant, and a Rule for it would fire on every truck driving past. Define the phase once as a Rule and refer to it:
+Many criteria only make sense in a certain operating state. Vibration of a stopped machine is irrelevant, and a Rule for it would produce an Event for every truck driving past. Define the phase once as a Rule and refer to it:
 
 ```java
-Rule running = Rule.named("Running").when(rpm.above(100)).forDuration(10_000);
+Rule running = Rule.named("Running").when(rpm.above(100)).forDuration(Duration.ofSeconds(10));
 Rule roughRunning = Rule.named("RoughRunning").when(during(running).and(vibration.above(4)));
 ```
 
@@ -28,13 +28,16 @@ At the default durations:
 - The dip at 20 s is too short for `Desaturation` and is Discarded.
 - At 230 s both go Pending again. `Desaturation` is Confirmed at 240 s, but the heart rate falls at 250 s, before its 30 seconds are reached: `Tachycardia` is Discarded, and there is no `HypoxicTachycardia`.
 
-Shorten `Tachycardia`'s duration to 15 s and it is Confirmed at 245 s, so `HypoxicTachycardia` holds from 245 s until `Tachycardia` Ends at 250 s. Set `Desaturation`'s duration to 0 s and the combination starts with the dip at 100 s.
+### Things to try
+
+- Shorten `Tachycardia`'s duration to 15 s: it is Confirmed at 245 s, so `HypoxicTachycardia` holds from 245 s until `Tachycardia` Ends at 250 s.
+- Set `Desaturation`'s duration to 0 s: the combination starts with the dip at 100 s.
 
 The [Healthcare](../healthcare/) example uses these Rules on a longer recording.
 
 ## Reference
 
 - [during: while another Event runs](https://github.com/romanhaendler/rbed#during-while-another-event-runs) and [Rule order](https://github.com/romanhaendler/rbed#rule-order) in the README, the canonical text
-- [Conditions](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Conditions.html) in the Javadoc
+- [Conditions](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Conditions.html) in the Javadoc
 
-Methods used: [`when`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#when%28io.github.romanhaendler.rbed.Condition%29), [`above`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Expression.html#above%28double%29), [`forDuration`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#forDuration%28long%29), [`during`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Conditions.html#during%28io.github.romanhaendler.rbed.Rule%29), [`and`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Condition.html#and%28io.github.romanhaendler.rbed.Condition%29), [`below`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Expression.html#below%28double%29), [`push`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#push%28long,java.util.Map%29).
+Methods used: [`Channel.named`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Channel.html#named%28java.lang.String%29), [`Rule.named`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#named%28java.lang.String%29), [`Rule.when`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#when%28io.github.romanhaendler.rbed.Condition%29), [`Expression.above`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Expression.html#above%28double%29), [`Rule.forDuration`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#forDuration%28java.time.Duration%29), [`Expression.below`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Expression.html#below%28double%29), [`Conditions.during`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Conditions.html#during%28io.github.romanhaendler.rbed.Rule%29), [`Condition.and`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Condition.html#and%28io.github.romanhaendler.rbed.Condition%29), [`Detector.builder`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#builder%28%29), [`Detector.Builder.rules`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.Builder.html#rules%28io.github.romanhaendler.rbed.Rule...%29), [`Detector.Builder.build`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.Builder.html#build%28%29), [`Detector.push`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#push%28long,java.util.Map%29), [`Detector.close`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#close%28%29).

@@ -29,16 +29,27 @@ final class Validation extends Scenario {
                 new Option("Warm, then Hot", ".rules(warm, hot)"),
                 new Option("Hot, then Warm", ".rules(hot, warm)")))),
         """
+        import static io.github.romanhaendler.rbed.Conditions.*;
+
+        import io.github.romanhaendler.rbed.*;
+        import java.time.Duration;
+        import java.util.Map;
+
         Channel temp = Channel.named("temp");
 
         Rule warm = Rule.named("Warm")
             .when(temp.averageOverSamples(${window}).above(25))
-            .forDuration(${duration} * 1_000);
+            .forDuration(Duration.ofSeconds(${duration}));
         Rule hot = Rule.named("Hot").when(during(warm).and(temp.above(27)));
         Detector detector = Detector.builder()
             .retentionLimit(${retention})
             ${order}
             .build();
+
+        for (int s = 0; s <= 40; s++) {   // one Sample a second
+          detector.push(s * 1_000L, Map.of(temp, s >= 10 && s < 30 ? 28.0 : 22.0));
+        }
+        detector.close();
         """);
   }
 

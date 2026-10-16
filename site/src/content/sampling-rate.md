@@ -34,13 +34,17 @@ Below, an accelerometer was logged at 10 Hz, but the logger lost the Samples fro
 
 <!-- scenario sampling-rate draw -->
 
-Declare a different rate, and every duration stretches or shrinks with it: at 5 Hz the Samples are 200 ms apart, so the first vibration lasts 2.2 s and is Confirmed again, at 4.6 s, although on the clock it lasted 2 s. `forSamples` counts Samples in either mode, so only `forDuration` and the other time-based parts of a Rule depend on the rate.
+### Things to try
+
+- Declare a different rate, and every duration stretches or shrinks with it: at 5 Hz the Samples are 200 ms apart, so the first vibration lasts 2.2 s and is Confirmed again, at 4.6 s, although on the clock it lasted 2 s.
+
+`forSamples` counts Samples in either mode, so only `forDuration` and the other time-based parts of a Rule depend on the rate.
 
 Use a sampling rate when the data really is regular and has no timestamps. When Samples can go missing, push them with their timestamps.
 
 ## Reference
 
 - [Batch processing and sampling rates](https://github.com/romanhaendler/rbed#batch-processing-and-sampling-rates) in the README, the canonical text
-- [Detector](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html) in the Javadoc: `detect`, `detectValues`, `push` and `Detector.Builder.samplingRate`
+- [Detector](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html) in the Javadoc: `detect`, `detectValues`, `push` and `Detector.Builder.samplingRate`
 
-Methods used: [`when`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#when%28io.github.romanhaendler.rbed.Condition%29), [`above`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Expression.html#above%28double%29), [`detect`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#detect%28java.lang.Iterable%29), [`forDuration`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#forDuration%28long%29), [`samplingRate`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.Builder.html#samplingRate%28double%29), [`detectValues`](https://javadoc.io/doc/io.github.romanhaendler/rbed/latest/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#detectValues%28java.lang.Iterable%29).
+Methods used: [`Channel.named`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Channel.html#named%28java.lang.String%29), [`Rule.named`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#named%28java.lang.String%29), [`Rule.when`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#when%28io.github.romanhaendler.rbed.Condition%29), [`Expression.above`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Expression.html#above%28double%29), [`Rule.forDuration`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#forDuration%28java.time.Duration%29), [`Detector.builder`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#builder%28%29), [`Detector.Builder.rules`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.Builder.html#rules%28io.github.romanhaendler.rbed.Rule...%29), [`Detector.Builder.build`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.Builder.html#build%28%29), [`Detector.detect`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#detect%28java.lang.Iterable%29), [`Detector.Builder.samplingRate`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.Builder.html#samplingRate%28double%29), [`Detector.detectValues`](../api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#detectValues%28java.lang.Iterable%29).

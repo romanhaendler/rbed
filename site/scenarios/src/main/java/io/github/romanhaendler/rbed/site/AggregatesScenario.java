@@ -29,6 +29,9 @@ final class AggregatesScenario extends Scenario {
     super("aggregates", "Aggregates", "s", 1_000, List.of(SPEED, TEMP),
         List.of(new Parameter("threshold", "Driving above", 1, 0, 13, 1, "m/s")),
         """
+        import io.github.romanhaendler.rbed.*;
+        import java.util.Map;
+
         Channel speed = Channel.named("speed");   // m/s
         Channel temp = Channel.named("temp");     // engine temperature, °C
 
@@ -45,6 +48,18 @@ final class AggregatesScenario extends Scenario {
               }
             })
             .build();
+
+        double[][] log = {   // time (s), speed (m/s), engine temperature (°C)
+          {0, 0, 60}, {10, 0, 60}, {20, 0, 60}, {22, 3, 61}, {24, 6, 62}, {26, 9, 63}, {28, 12, 64},
+          {30, 14, 65}, {40, 14, 70}, {50, 14, 74}, {60, 14, 77}, {62, 11, 77}, {64, 8, 77},
+          {66, 5, 77}, {68, 2, 76}, {70, 0, 76}, {80, 0, 74}, {90, 0, 72}, {100, 0, 70},
+          {102, 3, 70}, {104, 6, 71}, {106, 8, 71}, {116, 8, 73}, {126, 8, 75}, {128, 5, 75},
+          {130, 2, 75}, {132, 0, 75}, {140, 0, 74}, {150, 0, 73},
+        };
+        for (double[] row : log) {
+          detector.push((long) row[0] * 1_000, Map.of(speed, row[1], temp, row[2]));
+        }
+        detector.close();
         """);
   }
 

@@ -31,14 +31,29 @@ final class SamplingRate extends Scenario {
                         .samplingRate(${rate})  // Sample i is at round(i * 1000 / ${rate}) ms
                         .rules(vibration)
                         .build();
-                    List<Event> events = detector.detectValues(values);  // the recording's values""")
+                    List<Event> events = detector.detectValues(  // the recording's values only
+                        recording.stream().map(Sample::values).toList());""")
             )),
             new Parameter("rate", "Declared rate", 10, 1, 20, 1, "Hz")),
         """
-        Channel accel = Channel.named("accel");
-        Rule vibration = Rule.named("Vibration").when(accel.above(3)).forDuration(1_500);
+        import io.github.romanhaendler.rbed.*;
+        import java.time.Duration;
+        import java.util.ArrayList;
+        import java.util.List;
+        import java.util.Map;
 
-        // recording: logged at 10 Hz from 0 to 8 s; the Samples from 2.1 to 2.9 s were lost
+        Channel accel = Channel.named("accel");
+        Rule vibration = Rule.named("Vibration")
+            .when(accel.above(3)).forDuration(Duration.ofMillis(1_500));
+
+        // the recording: logged at 10 Hz from 0 to 8 s; the Samples from 2.1 to 2.9 s were lost
+        List<Sample> recording = new ArrayList<>();
+        for (int tenth = 0; tenth <= 80; tenth++) {
+          if (tenth > 20 && tenth < 30) continue;
+          boolean shaking = tenth >= 15 && tenth < 35 || tenth >= 50 && tenth < 70;
+          recording.add(new Sample(tenth * 100L, Map.of(accel, (shaking ? 4.0 : 0.5) + tenth % 3 * 0.2)));
+        }
+
         ${mode}
         """);
   }

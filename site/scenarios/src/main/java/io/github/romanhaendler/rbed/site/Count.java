@@ -25,17 +25,28 @@ final class Count extends Scenario {
             new Parameter("window", "Window", 60, 10, 120, 10, "min"),
             new Parameter("limit", "Limit", 3, 0, 6, 1, "Runs")),
         """
+        import static io.github.romanhaendler.rbed.Conditions.*;
+
+        import io.github.romanhaendler.rbed.*;
+        import java.time.Duration;
+        import java.util.Map;
+
         Channel power = Channel.named("power");
 
-        Rule run = Rule.named("Run").when(power.above(500)).forDuration(30_000);
+        Rule run = Rule.named("Run").when(power.above(500)).forDuration(Duration.ofSeconds(30));
         Rule frequentStarts = Rule.named("FrequentStarts")
             .when(count(run).within(Duration.ofMinutes(${window})).above(${limit}));
         Detector detector = Detector.builder()
             .rules(run, frequentStarts)
             .build();
 
-        detector.push(0,      Map.of(power, 0.0));   // one Sample a minute
-        detector.push(60_000, Map.of(power, 0.0));
+        int[] starts = {10, 30, 45, 60, 150, 200};   // each run lasts five minutes
+        for (int m = 0; m <= 240; m++) {   // one Sample a minute
+          double watts = 0;
+          for (int start : starts) if (m >= start && m < start + 5) watts = 800;
+          detector.push(m * 60_000L, Map.of(power, watts));
+        }
+        detector.close();
         """);
   }
 

@@ -98,7 +98,7 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
   let stage;
   if ('error' in result) {
     stage = (
-      <Alert tone="danger" title="rbed rejects these parameters">
+      <Alert tone="danger" title={result.by === 'rbed' ? 'rbed rejects these parameters' : 'The site cannot run these parameters'}>
         {result.error}
       </Alert>
     );

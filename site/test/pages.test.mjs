@@ -12,6 +12,11 @@ test('a path below the base is the page path, with or without its trailing slash
   assert.equal(pathOf('/event-lifecycle/', '/'), '/event-lifecycle/');
 });
 
+test("a page's index.html, as GitHub Pages also serves it, is the page", () => {
+  assert.equal(pathOf('/rbed/cranes/index.html', '/rbed/'), '/cranes/');
+  assert.equal(pathOf('/rbed/index.html', '/rbed/'), '/');
+});
+
 test('a path outside the base is no page path', () => {
   assert.equal(pathOf('/other/', '/rbed/'), undefined);
   assert.equal(pathOf('/rbedx/', '/rbed/'), undefined);
@@ -27,11 +32,12 @@ test('a page reads its Markdown from the file named after its path, which is als
   assert.equal(markdownFile({ path: '/event-lifecycle/' }), 'event-lifecycle.md');
 });
 
-test("every link from one page to another names a page of the manifest", () => {
+test("every link from one page to another names a page of the manifest or the site's Javadoc", () => {
   for (const page of PAGES) {
     const markdown = readFileSync(new URL(`../src/content/${markdownFile(page)}`, import.meta.url), 'utf8');
     for (const [, link] of markdown.matchAll(/\]\(((?!https?:|mailto:|#)[^)\s]+)\)/g)) {
       const target = new URL(link, `https://site.example/rbed${page.path}`).pathname;
+      if (target.startsWith('/rbed/api/')) continue; // the build checks these against the Javadoc
       assert.ok(pageAt(target, '/rbed/') !== undefined, `${page.path} links ${link}`);
     }
   }

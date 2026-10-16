@@ -35,10 +35,29 @@ final class Expressions extends Scenario {
             new Parameter("samples", "Samples averaged", 5, 1, 20, 1, "Samples"),
             new Parameter("window", "Window", 10, 1, 30, 1, "s")),
         """
+        import io.github.romanhaendler.rbed.*;
+        import java.time.Duration;
+        import java.util.Map;
+
         Channel temp = Channel.named("temp");
         Channel ambient = Channel.named("ambient");
 
         Rule aboveLimit = Rule.named("AboveLimit").when(${expression});
+        Detector detector = Detector.builder()
+            .rules(aboveLimit)
+            .build();
+
+        double[] noise = {0.0, 0.2, -0.1, 0.1, -0.2, 0.1, 0.0, -0.1, 0.2, -0.1};
+        for (int s = 0; s < 60; s++) {   // one Sample per second
+          double value = s < 6 ? 26 + noise[s % 10]
+              : s == 15 ? 28                              // an outlier
+              : s < 30 ? 20 + noise[s % 10]
+              : s < 38 ? 20 + (s - 30) + noise[s % 10]    // a ramp
+              : 28 + noise[s % 10];
+          if (s < 5) detector.push(s * 1_000L, Map.of(temp, value));   // ambient reports from 5 s on
+          else detector.push(s * 1_000L, Map.of(temp, value, ambient, 22.0));
+        }
+        detector.close();
         """);
   }
 

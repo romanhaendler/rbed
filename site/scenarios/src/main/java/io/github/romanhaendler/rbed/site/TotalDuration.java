@@ -22,17 +22,26 @@ final class TotalDuration extends Scenario {
     super("total-duration", "totalDuration", "min", MINUTE, List.of(TEMP),
         List.of(new Parameter("limit", "Limit", 45, 0, 70, 5, "min")),
         """
+        import static io.github.romanhaendler.rbed.Conditions.*;
+
+        import io.github.romanhaendler.rbed.*;
+        import java.time.Duration;
+        import java.util.Map;
+
         Channel temp = Channel.named("temp");
 
         Rule excursion = Rule.named("Excursion").when(temp.above(8));
         Rule cumulativeLimit = Rule.named("CumulativeLimit")
-            .when(totalDuration(excursion).above(${limit} * 60_000));
+            .when(totalDuration(excursion).above(Duration.ofMinutes(${limit}).toMillis()));
         Detector detector = Detector.builder()
             .rules(excursion, cumulativeLimit)
             .build();
 
-        detector.push(0,      Map.of(temp, 5.0));   // one Sample a minute
-        detector.push(60_000, Map.of(temp, 5.0));
+        for (int m = 0; m <= 240; m++) {   // one Sample a minute
+          boolean warm = m >= 20 && m < 40 || m >= 80 && m < 95 || m >= 150 && m < 175;
+          detector.push(m * 60_000L, Map.of(temp, warm ? 10.0 : 5.0));
+        }
+        detector.close();
         """);
   }
 

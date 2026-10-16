@@ -143,6 +143,19 @@ export function channelBands(scenario: Scenario, rows: Row[]): string[][] {
   return bands.map((b) => b.channels);
 }
 
+/** Whether some Sample lacks a value of the Channel. */
+export const hasGaps = (rows: Row[], channel: string) => rows.some((r) => r[channel] == null);
+
+/** The Channel's value as rbed sees it at each Sample: a Sample without one keeps the last;
+    none before the first. */
+export function heldRows(rows: Row[], channel: string): Row[] {
+  let held: number | null = null;
+  return rows.map((r) => {
+    held = r[channel] ?? held;
+    return { t: r.t, [channel]: held } as Row;
+  });
+}
+
 /** The plot's units: the lanes, the band of the Expressions with a unit, each band of Channels. */
 export const plotUnits = (lanes: number, separate: boolean, bands: number) =>
   lanes + (separate ? SEPARATE_UNITS : 0) + bands * CHANNEL_UNITS;

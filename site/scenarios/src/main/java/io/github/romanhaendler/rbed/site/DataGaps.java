@@ -22,6 +22,10 @@ final class DataGaps extends Scenario {
             new Parameter("gap", "Gap from", 12, 0, 33, 1, "s"),
             new Parameter("maxGap", "maxGap", 5, 1, 10, 1, "s")),
         """
+        import io.github.romanhaendler.rbed.*;
+        import java.time.Duration;
+        import java.util.Map;
+
         Channel rpm = Channel.named("rpm");
 
         Rule running = Rule.named("Running")

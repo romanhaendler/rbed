@@ -5,11 +5,12 @@ import {
   channelBands,
   expressionKey,
   expressionRows,
+  hasGaps,
+  heldRows,
   timeTicks,
   undefinedStretches,
   windowStretches,
 } from '../src/chartModel.ts';
-import { inStartOrder } from '../src/events.ts';
 
 const scenario = (channels, pulse = []) => ({ id: 's', channels, pulse, rules: ['R'], timeUnit: { name: 's', millis: 1000 } });
 const rows = (columns) => columns[Object.keys(columns)[0]].map((_, i) => ({ t: i, ...Object.fromEntries(Object.entries(columns).map(([c, v]) => [c, v[i]])) }));
@@ -69,20 +70,19 @@ test('the Expressions are read at every Sample and advance, and undefined where 
   assert.deepEqual(undefinedStretches(plotted, 2), [[0, 2]]);
 });
 
+test('a Channel missing from a Sample keeps its last value, as rbed holds it', () => {
+  const r = rows({ humidity: [null, 50, null, null, 60, null] });
+  assert.equal(hasGaps(r, 'humidity'), true);
+  assert.deepEqual(
+    heldRows(r, 'humidity').map((x) => x.humidity),
+    [null, 50, 50, 50, 60, 60],
+  );
+  assert.equal(hasGaps(rows({ temp: [1, 2] }), 'temp'), false);
+});
+
 test('few Samples at whole units are the time ticks; many are left to the chart', () => {
   assert.deepEqual(timeTicks(rows({ temp: [70, 72, 85] })), [0, 1, 2]);
   assert.equal(timeTicks(rows({ temp: Array(20).fill(70) })), undefined);
-});
-
-test('Events and Discarded Pending Events are listed in the order they started', () => {
-  const e = (name, start, end) => ({ name, start, end });
-  const result = inStartOrder({
-    events: [e('Hot', 14, 16), e('Warm', 12, 20), e('Cold', 12, 13)],
-    discarded: [{ name: 'B', start: 9, discarded: 10 }, { name: 'A', start: 3, discarded: 11 }],
-  });
-  assert.deepEqual(result.events.map((x) => x.name), ['Cold', 'Warm', 'Hot']);
-  assert.deepEqual(result.discarded.map((x) => x.name), ['A', 'B']);
-  assert.deepEqual(inStartOrder({ error: 'no' }), { error: 'no' });
 });
 
 test('a within(...) window runs from the end of each Event of its Rule', () => {

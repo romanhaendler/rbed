@@ -24,21 +24,32 @@ final class Logistics extends Scenario {
             new Parameter("doorMinutes", "Caused by the door within", 30, 5, 120, 5, "min"),
             new Parameter("totalMinutes", "Total time limit", 45, 15, 120, 5, "min")),
         """
+        import static io.github.romanhaendler.rbed.Conditions.*;
+
+        import io.github.romanhaendler.rbed.*;
+        import java.time.Duration;
+        import java.util.Map;
+
         Channel door = Channel.named("door");
         Channel temp = Channel.named("temp");
-        long MINUTE = 60_000;
 
         Rule excursion = Rule.named("Excursion")
-            .when(temp.above(${limit})).forDuration(${excursionMinutes} * MINUTE)
+            .when(temp.above(${limit})).forDuration(Duration.ofMinutes(${excursionMinutes}))
             .endWhen(temp.above(${limit}).not());
         Rule doorOpen = Rule.named("DoorOpen").when(door.above(0.5));
         Rule excursionAfterDoor = Rule.named("ExcursionAfterDoor")
-            .when(after(doorOpen).within(${doorMinutes} * MINUTE).and(temp.above(${limit})));
+            .when(after(doorOpen).within(Duration.ofMinutes(${doorMinutes})).and(temp.above(${limit})));
         Rule cumulativeLimit = Rule.named("CumulativeLimit")
-            .when(totalDuration(excursion).above(${totalMinutes} * MINUTE));
+            .when(totalDuration(excursion).above(Duration.ofMinutes(${totalMinutes}).toMillis()));
         Detector detector = Detector.builder()
             .rules(excursion, doorOpen, excursionAfterDoor, cumulativeLimit)
             .build();
+
+        for (int m = 0; m < 480; m++) {   // every minute
+          double celsius = m >= 62 && m < 90 ? 10 : m >= 300 && m < 330 ? 9 : 5;
+          detector.push(m * 60_000L, Map.of(temp, celsius, door, m >= 60 && m < 65 ? 1.0 : 0.0));
+        }
+        detector.close();
         """);
   }
 

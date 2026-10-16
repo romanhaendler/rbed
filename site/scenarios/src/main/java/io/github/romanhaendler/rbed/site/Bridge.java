@@ -19,6 +19,7 @@ import org.teavm.jso.JSExport;
 public final class Bridge {
   private static final List<Scenario> SCENARIOS = List.of(
       new FirstRule(),
+      new SamplesAndChannels(),
       new EventLifecycle(),
       new EndConditions(),
       new DataGaps(),
@@ -113,27 +114,43 @@ public final class Bridge {
    * @param drawnChannels JSON object of Channel values the reader drew, by Channel name, one
    *     number per Sample of the Scenario (null: absent in that Sample); they replace that
    *     Channel's own values
-   * @return JSON object with the Samples, the Events, the Discarded Pending Events (with the
+   * @return JSON object with the Samples, the Events (in the order they started), the Discarded Pending Events (with the
    *     timestamp they were Discarded), the timestamps time was advanced to without a Sample,
    *     the timestamp of the restart if the Detector was restarted, each Expression the Scenario
    *     plots (its name, unit if it has one of its own, threshold or null, value per Sample and,
    *     if time was advanced, value per advance; null where undefined), the Channel thresholds
-   *     of its Rules and the windows their {@code within} opens; or {@code {"error": message}} if
-   *     rbed rejected the Rules or the input was invalid
+   *     of its Rules and the windows their {@code within} opens; or {@code {"error": message,
+   *     "by": "rbed"}} if rbed rejected the Rules or the Samples, or {@code {"error": message}}
+   *     if the input was invalid
    */
   @JSExport
   public static String run(String scenarioId, String parameters, String drawnChannels) {
+    Scenario scenario;
+    Map<String, Double> values;
+    List<Sample> samples;
     try {
-      Scenario scenario = scenario(scenarioId);
-      Map<String, Double> values = values(scenario, parameters);
-      List<Sample> samples = drawn(scenario, scenario.samples(values), drawnChannels);
-      Lifecycle lifecycle = new Lifecycle();
+      scenario = scenario(scenarioId);
+      values = values(scenario, parameters);
+      samples = drawn(scenario, scenario.samples(values), drawnChannels);
+    } catch (RuntimeException e) {
+      return error(e, "");
+    }
+    Lifecycle lifecycle = new Lifecycle();
+    try {
       scenario.detect(scenario.rules(values), samples, values, lifecycle);
+    } catch (RuntimeException e) {
+      return error(e, ",\"by\":\"rbed\"");
+    }
+    try {
       return result(scenario, values, samples, lifecycle);
     } catch (RuntimeException e) {
-      return Json.string(new StringBuilder("{\"error\":"), String.valueOf(e.getMessage()))
-          .append('}').toString();
+      return error(e, "");
     }
+  }
+
+  private static String error(RuntimeException e, String by) {
+    return Json.string(new StringBuilder("{\"error\":"), String.valueOf(e.getMessage()))
+        .append(by).append('}').toString();
   }
 
   private static Scenario scenario(String id) {
@@ -199,14 +216,27 @@ public final class Bridge {
       if (!p.options().isEmpty() && !(d >= 0 && d < p.options().size() && d == Math.rint(d))) {
         throw new IllegalArgumentException("Parameter " + p.id() + " has no option " + d);
       }
+      // Also keeps NaN from the Scenarios: TeaVM's Math.round throws on it, the JVM's gives 0.
+      if (!(d >= p.min() && d <= p.max())) {
+        throw new IllegalArgumentException("Parameter " + p.id() + " is not a number between "
+            + plain(p.min()) + " and " + plain(p.max()));
+      }
       values.put(p.id(), d);
     }
     return values;
   }
 
+  /** A whole number without its ".0". */
+  private static String plain(double d) {
+    return d == Math.rint(d) ? Long.toString((long) d) : Double.toString(d);
+  }
+
   private static String result(Scenario scenario, Map<String, Double> values,
       List<Sample> samples, Lifecycle lifecycle) {
-    List<Event> events = lifecycle.ended;
+    // In the order they started, not the order they Ended in, for the table and the chart.
+    List<Event> events = new ArrayList<>(lifecycle.ended);
+    events.sort((a, b) -> a.start() != b.start()
+        ? Long.compare(a.start(), b.start()) : a.name().compareTo(b.name()));
     StringBuilder out = new StringBuilder("{\"samples\":[");
     for (int i = 0; i < samples.size(); i++) {
       Sample sample = samples.get(i);

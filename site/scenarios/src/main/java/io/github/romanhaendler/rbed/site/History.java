@@ -27,10 +27,19 @@ final class History extends Scenario {
                 new Option("With History", "\n    .history(stored)"),
                 new Option("Without History", "")))),
         """
+        import static io.github.romanhaendler.rbed.Conditions.*;
+
+        import io.github.romanhaendler.rbed.*;
+        import java.time.Duration;
+        import java.util.ArrayList;
+        import java.util.List;
+        import java.util.Map;
+
         Channel serviceMode = Channel.named("serviceMode");
         Rule maintenance = Rule.named("Maintenance").when(serviceMode.above(0.5));
         Rule overdueService = Rule.named("OverdueService")
             .when(after(maintenance).within(Duration.ofDays(90)).not());
+        long day = Duration.ofDays(1).toMillis();
 
         // before the restart: store the Ended Events (in a database; here in a list)
         List<Event> stored = new ArrayList<>();
@@ -40,14 +49,19 @@ final class History extends Scenario {
               @Override public void onEnded(Event e) { stored.add(e); }
             })
             .build();
-        // ... one Sample a day until day ${restart}, then
+        for (int d = 0; d < ${restart}; d++) {   // one Sample a day, maintenance on days 10 and 140
+          before.push(d * day, Map.of(serviceMode, d == 10 || d == 140 ? 1.0 : 0.0));
+        }
         before.close();
 
         // after the restart
         Detector restarted = Detector.builder()
             .rules(maintenance, overdueService)${history}
             .build();
-        // ... one Sample a day from day ${restart} on
+        for (int d = ${restart}; d <= 200; d++) {
+          restarted.push(d * day, Map.of(serviceMode, d == 10 || d == 140 ? 1.0 : 0.0));
+        }
+        restarted.close();
         """);
   }
 

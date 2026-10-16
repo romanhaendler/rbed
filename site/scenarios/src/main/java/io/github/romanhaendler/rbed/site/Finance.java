@@ -18,6 +18,9 @@ final class Finance extends Scenario {
             new Parameter("fast", "Fast average over", 50, 5, 150, 5, "Samples"),
             new Parameter("slow", "Slow average over", 200, 50, 400, 10, "Samples")),
         """
+        import io.github.romanhaendler.rbed.*;
+        import java.util.Map;
+
         Channel price = Channel.named("price");
 
         Rule deathCross = Rule.named("DeathCross").when(
@@ -27,6 +30,12 @@ final class Finance extends Scenario {
         Detector detector = Detector.builder()
             .rules(deathCross, goldenCross)
             .build();
+
+        for (int day = 0; day < 600; day++) {   // daily closing prices: falling, then rising from day 300
+          double close = day < 300 ? 200 - day / 3.0 : 100 + (day - 300) / 2.0;
+          detector.push(day * 86_400_000L, Map.of(price, close));
+        }
+        detector.close();
         """);
   }
 

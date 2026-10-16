@@ -21,6 +21,8 @@ import {
   expressionColor,
   expressionKey,
   expressionValue,
+  hasGaps,
+  heldRows,
   isSeparate,
   LATEST_COLOR,
   lane,
@@ -87,7 +89,11 @@ function Readout({ model, t }: { model: ChartModel; t: number }) {
         {t} {scenario.timeUnit.name}
       </div>
       <div className="uc-tooltip-list">
-        {channels.map((c) => line(c, channelColor(scenario, c), String(row[c] ?? '–')))}
+        {channels.map((c) => {
+          // A Channel the Sample lacks keeps its last value.
+          const kept = rows.findLast((r) => r.t <= t && r[c] != null)?.[c];
+          return line(c, channelColor(scenario, c), row[c] != null ? String(row[c]) : kept != null ? `${kept} (kept)` : '–');
+        })}
         {expressions.map((x, k) =>
           line(x.name, expressionColor(scenario, k), expressionValue(expressionRow?.[expressionKey(k)]) + (x.unit ? ` ${x.unit}` : '')),
         )}
@@ -301,6 +307,15 @@ export function EventChart({
           ) : (
             <Line key={c} value={c} name={c} color={channelColor(scenario, c)} markers={markers} yAxisId={axisOf(c).id} />
           ),
+        )}
+        {/* A Channel some Samples lack keeps its last value in rbed: a held step line under the
+            line through the values it has, drawn as marks. */}
+        {channels.map(
+          (c) =>
+            !scenario.pulse.includes(c) &&
+            hasGaps(rows, c) && (
+              <Line key={`held ${c}`} data={heldRows(rows, c)} value={c} name={`${c} (kept)`} color={channelColor(scenario, c)} step markers="never" strokeWidth={1} yAxisId={axisOf(c).id} />
+            ),
         )}
         {expressions.map((x, k) => (
           <Line
