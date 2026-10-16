@@ -89,14 +89,20 @@ final class Healthcare extends Scenario {
     return new Rule[] {tachycardia, desaturation, hypoxicTachycardia, sensorLost};
   }
 
-  /** Pushes a Sample every second, and advances time instead during the dropout. */
+  /**
+   * Pushes a Sample every second, and advances time instead during the dropout. It makes its
+   * values itself, so drawn values do not reach it; its page does not offer drawing.
+   */
   @Override
   void detect(Rule[] rules, List<Sample> samples, Lifecycle lifecycle) {
     Detector detector = Detector.builder().rules(rules).listener(lifecycle).build();
     for (long s = 0; s < 600; s++) {
-      lifecycle.now = s * 1_000;
-      if (dropout(s)) detector.advanceTo(s * 1_000);
-      else detector.push(s * 1_000, values(s));
+      if (dropout(s)) {
+        lifecycle.advance(detector, s * 1_000);
+      } else {
+        lifecycle.now = s * 1_000;
+        detector.push(s * 1_000, values(s));
+      }
     }
     detector.close();
   }

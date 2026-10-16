@@ -37,9 +37,13 @@ test('a fenced code block keeps its text and names its language and label', () =
 test('a Scenario marker stands on its own line and splits the text', () => {
   assert.deepEqual(parse('Before\n\n<!-- scenario first-rule -->\n\nAfter'), [
     { kind: 'html', html: '<p>Before</p>' },
-    { kind: 'scenario', id: 'first-rule' },
+    { kind: 'scenario', id: 'first-rule', draw: false },
     { kind: 'html', html: '<p>After</p>' },
   ]);
+});
+
+test('a Scenario marker ending in draw lets the reader draw its Channels', () => {
+  assert.deepEqual(parse('<!-- scenario first-rule draw -->'), [{ kind: 'scenario', id: 'first-rule', draw: true }]);
 });
 
 test('a list of nothing but links is a list of tiles', () => {

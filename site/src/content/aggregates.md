@@ -14,7 +14,7 @@ Reading a Channel the Rule does not aggregate throws an `IllegalArgumentExceptio
 
 Select a Drive in the chart or in the table to see all its Aggregates. Move the threshold, and the Aggregates change with the Event's span.
 
-<!-- scenario aggregates -->
+<!-- scenario aggregates draw -->
 
 The Event table on every page of this site shows each Event's minimum, maximum and mean per Channel under the Event.
 

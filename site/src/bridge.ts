@@ -58,6 +58,10 @@ export type Result =
       events: Event[];
       discarded: Discard[];
       expression?: PlottedExpression;
+      /** Timestamps the Detector was advanced to without a Sample. */
+      advances: number[];
+      /** Timestamp of the first Sample after the Detector was restarted, if it was. */
+      restart?: number;
     }
   | { error: string };
 
@@ -65,8 +69,13 @@ export function scenarios(): Scenario[] {
   return JSON.parse(compiled.scenarios());
 }
 
-export function run(scenarioId: string, parameters: Record<string, number>): Result {
-  return JSON.parse(compiled.run(scenarioId, JSON.stringify(parameters), '{}'));
+/** `drawn`: Channel values the reader drew, by Channel name, one per Sample (null: absent), in place of the Scenario's own. */
+export function run(
+  scenarioId: string,
+  parameters: Record<string, number>,
+  drawn: Record<string, (number | null)[]> = {},
+): Result {
+  return JSON.parse(compiled.run(scenarioId, JSON.stringify(parameters), JSON.stringify(drawn)));
 }
 
 /** The source with each placeholder replaced by its parameter's value. */

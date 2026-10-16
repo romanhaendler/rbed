@@ -4,15 +4,15 @@
 //
 // Blocks: # to ### headings, paragraphs, - and 1. lists (one level; a list of nothing but links is
 // shown as tiles), ``` fenced code (```lang Label), and a Scenario marker on a line of its own:
-// <!-- scenario first-rule -->. Inline: `code`, **strong**, *em*, [text](url). Nothing else, and
+// <!-- scenario first-rule -->, or <!-- scenario first-rule draw --> to let the reader draw its Channels. Inline: `code`, **strong**, *em*, [text](url). Nothing else, and
 // no raw HTML: every character of the text is escaped.
 
 export type Block =
   | { kind: 'html'; html: string }
   | { kind: 'code'; language: string; label: string; source: string }
-  | { kind: 'scenario'; id: string };
+  | { kind: 'scenario'; id: string; draw: boolean };
 
-export const SCENARIO_MARKER = /^<!-- scenario (\S+) -->$/;
+export const SCENARIO_MARKER = /^<!-- scenario (\S+)( draw)? -->$/;
 
 const INLINE = /`([^`]+)`|\[((?:[^\]`]|`[^`]*`)+)\]\(([^)\s]+)\)|\*\*(.+?)\*\*|\*([^*\s][^*]*)\*/g;
 const ITEM = /^(?:[-*]|\d+\.) +/;
@@ -75,7 +75,7 @@ export function parse(markdown: string): Block[] {
       i = stop + 1;
     } else if ((m = SCENARIO_MARKER.exec(line))) {
       flush();
-      blocks.push({ kind: 'scenario', id: m[1] });
+      blocks.push({ kind: 'scenario', id: m[1], draw: m[2] !== undefined });
       i++;
     } else if ((m = /^(#{1,3}) +(.*)$/.exec(line))) {
       const level = m[1].length;
