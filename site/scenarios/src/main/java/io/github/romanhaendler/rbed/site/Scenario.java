@@ -80,15 +80,9 @@ abstract class Scenario {
     return null;
   }
 
-  /** The Expression to plot for the given parameter values, or null for none. */
-  Plot plot(Map<String, Double> values) {
-    return null;
-  }
-
-  /** Every Expression to plot for the given parameter values: by default the one of {@code plot}. */
+  /** The Expressions to plot for the given parameter values: by default none. */
   List<Plot> plots(Map<String, Double> values) {
-    Plot plot = plot(values);
-    return plot == null ? List.of() : List.of(plot);
+    return List.of();
   }
 
   /**
@@ -124,8 +118,9 @@ abstract class Scenario {
   }
 
   /**
-   * A comparison of a Channel with a value in the Rules: the Rule (or Rules) it belongs to, the
-   * condition ({@code "when >"}, {@code "endWhen <"}) and the value.
+   * A comparison of a Channel with a value in the Rules: the Rule it belongs to, or several
+   * ({@code "Trip endWhen, Idling when"}), the condition ({@code "when >"}, {@code "endWhen <"};
+   * it may name several parts, {@code "when > and endWhen <"}) and the value.
    */
   record Threshold(Channel channel, String rule, String condition, double value) {}
 

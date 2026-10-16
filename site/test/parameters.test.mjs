@@ -21,6 +21,10 @@ test('a value that is no finite number gives the default', () => {
   assert.equal(fromQuery('?threshold=abc', PARAMETERS).threshold, 80);
   assert.equal(fromQuery('?threshold=Infinity', PARAMETERS).threshold, 80);
   assert.equal(fromQuery('?threshold=', PARAMETERS).threshold, 80);
+  assert.equal(fromQuery('?threshold=%20', PARAMETERS).threshold, 80);
+  assert.equal(fromQuery('?threshold=0x1A', PARAMETERS).threshold, 80);
+  assert.equal(fromQuery('?threshold=%2085%20', PARAMETERS).threshold, 85);
+  assert.equal(fromQuery('?threshold=8.5e1', PARAMETERS).threshold, 85);
 });
 
 test("a value is kept to its control's range and steps, so the source shows what runs", () => {

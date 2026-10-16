@@ -79,21 +79,21 @@ final class Expressions extends Scenario {
 
   @Override
   Rule[] rules(Map<String, Double> values) {
-    Plot plot = plot(values);
+    Plot plot = plots(values).get(0);
     return new Rule[] {Rule.named("AboveLimit").when(plot.expression().above(plot.threshold()))};
   }
 
   @Override
-  Plot plot(Map<String, Double> values) {
+  List<Plot> plots(Map<String, Double> values) {
     int samples = values.get("samples").intValue();
     double window = values.get("window");
-    return switch (values.get("expression").intValue()) {
+    return List.of(switch (values.get("expression").intValue()) {
       case 0 -> new Plot("temp.rate()", TEMP.rate(), RATE_LIMIT);
       case 1 -> new Plot("temp.averageOverSamples(" + samples + ")",
           TEMP.averageOverSamples(samples), AVERAGE_LIMIT);
       case 2 -> new Plot("temp.averageOverDuration(" + (long) window + " s)",
           TEMP.averageOverDuration(Math.round(window * 1_000)), AVERAGE_LIMIT);
       default -> new Plot("temp.minus(ambient)", TEMP.minus(AMBIENT), SPREAD_LIMIT);
-    };
+    });
   }
 }
