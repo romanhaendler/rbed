@@ -25,6 +25,16 @@ test('inline code, emphasis and links; text is escaped', () => {
   ]);
 });
 
+test('a link is only a link for http(s), mailto, an anchor or a relative address', () => {
+  const html = (text) => parse(text)[0].html;
+  assert.equal(
+    html('[a](https://e.org/) [b](mailto:x@e.org) [c](#c) [d](../cranes/) [e](api/X.html)'),
+    '<p><a href="https://e.org/">a</a> <a href="mailto:x@e.org">b</a> <a href="#c">c</a> ' +
+      '<a href="../cranes/">d</a> <a href="api/X.html">e</a></p>',
+  );
+  assert.equal(html('[x](javascript:void0) [y](JavaScript:a) [z](data:text/html,a)'), '<p>x y z</p>');
+});
+
 test('a fenced code block keeps its text and names its language and label', () => {
   assert.deepEqual(parse('Intro\n\n```xml Maven\n<a>\n  b\n</a>\n```\n\nAfter'), [
     { kind: 'html', html: '<p>Intro</p>' },

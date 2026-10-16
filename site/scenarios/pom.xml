@@ -13,9 +13,9 @@
   <properties>
     <maven.compiler.release>17</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <!-- site/package.json passes the version of ../../pom.xml, so the site uses the rbed of the
-         same commit (installed with mvn install from the repository root) -->
-    <rbed.version>0.2.0</rbed.version>
+    <!-- rbed.version has no default: site/package.json passes the version of ../../pom.xml
+         (node version.mjs), so the site uses the rbed of the same commit (installed with mvn
+         install from the repository root). By hand: -Drbed.version=$(node ../version.mjs) -->
     <teavm.version>0.16.0</teavm.version>
   </properties>
 

@@ -1,7 +1,7 @@
 // Light syntax highlighting for the Java the site shows: comments, strings, annotations,
 // numbers, keywords and capitalised names (types). Imports nothing, so Node can test it.
 
-export type JavaKind = '' | 'comment' | 'string' | 'annotation' | 'number' | 'keyword' | 'type';
+type JavaKind = '' | 'comment' | 'string' | 'annotation' | 'number' | 'keyword' | 'type';
 
 const KEYWORDS =
   'abstract|assert|boolean|break|byte|case|catch|char|class|continue|default|do|double|else|enum|extends|false|final|finally|float|for|if|implements|import|instanceof|int|interface|long|new|null|package|private|protected|public|record|return|short|static|super|switch|this|throw|throws|true|try|var|void|while';

@@ -5,10 +5,9 @@
   "scripts": {
     "build": "npm run build:java && npm run build:web",
     "build:web": "tsc --noEmit && vite build",
-    "build:java": "npm run install:rbed && mvn -q -f scenarios/pom.xml package -DskipTests -Drbed.version=$(npm run -s rbed:version)",
+    "build:java": "npm run install:rbed && mvn -q -f scenarios/pom.xml package -DskipTests -Drbed.version=$(node version.mjs)",
     "install:rbed": "mvn -q -f ../pom.xml install -DskipTests",
-    "rbed:version": "mvn -q -f ../pom.xml help:evaluate -Dexpression=project.version -DforceStdout",
-    "test": "npm run install:rbed && mvn -q -f scenarios/pom.xml verify -Drbed.version=$(npm run -s rbed:version) && node --test test/*.test.mjs",
+    "test": "npm run install:rbed && mvn -q -f scenarios/pom.xml verify -Drbed.version=$(node version.mjs) && node --test test/*.test.mjs",
     "dev": "vite",
     "preview": "vite preview",
     "test:browser": "playwright test"

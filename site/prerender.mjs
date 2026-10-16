@@ -1,7 +1,7 @@
 // What the site is for a reader without JavaScript, a coding agent or a search engine, after the
 // umriss-ui Pages (ADR-0037 there): for every page of src/pages.ts its own index.html with the
 // head and the prerendered text, Java source and default Events, and its Markdown twin; then
-// llms.txt, llms-full.txt and sitemap.xml. vite.config.ts runs prerender() after `vite build`.
+// llms.txt, llms-full.txt and sitemap.xml. vite.config.mjs runs prerender() after `vite build`.
 //
 // The default Events come from the compiled Scenario module (scenarios/target/js/rbed.js) run in
 // Node, not from a second JVM step: the Node parity test, which runs before every build in the
@@ -17,12 +17,6 @@ import { defaultsOf, fillSource } from './src/parameters.ts';
 export const SITE = 'https://romanhaendler.github.io/rbed/';
 
 const site = (path) => new URL(path, import.meta.url);
-
-/** The rbed version of this commit, as the root pom states it. */
-export function rbedVersion() {
-  const pom = readFileSync(site('../pom.xml'), 'utf8');
-  return /<artifactId>rbed<\/artifactId>\s*<version>([^<]+)<\/version>/.exec(pom)[1];
-}
 
 /** A page's Markdown, with the build's rbed version for {{version}}. */
 export function markdownOf(page, version) {

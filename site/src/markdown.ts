@@ -21,12 +21,15 @@ export function escape(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-export function slug(text: string): string {
+function slug(text: string): string {
   return text
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
 }
+
+/** A link target with no scheme (relative, an anchor) or with http(s) or mailto; not javascript:. */
+const safe = (url: string) => !/^[a-z][a-z0-9+.-]*:/i.test(url) || /^(https?|mailto):/i.test(url);
 
 export function inline(text: string): string {
   let html = '';
@@ -34,7 +37,7 @@ export function inline(text: string): string {
   for (const m of text.matchAll(INLINE)) {
     html += escape(text.slice(last, m.index));
     if (m[1] !== undefined) html += `<code>${escape(m[1])}</code>`;
-    else if (m[2] !== undefined) html += `<a href="${escape(m[3])}">${inline(m[2])}</a>`;
+    else if (m[2] !== undefined) html += safe(m[3]) ? `<a href="${escape(m[3])}">${inline(m[2])}</a>` : inline(m[2]);
     else if (m[4] !== undefined) html += `<strong>${inline(m[4])}</strong>`;
     else html += `<em>${inline(m[5])}</em>`;
     last = m.index + m[0].length;
