@@ -10,6 +10,8 @@ const pom = readFileSync(root('../pom.xml'), 'utf8');
 const version = /<artifactId>rbed<\/artifactId>\s*<version>([^<]+)<\/version>/.exec(pom)![1];
 
 export default defineConfig({
+  // served at https://romanhaendler.github.io/rbed/; npm run preview serves it at /rbed/ too
+  base: '/rbed/',
   define: {
     __RBED_VERSION__: JSON.stringify(version),
   },
