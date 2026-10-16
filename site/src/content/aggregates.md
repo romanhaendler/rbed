@@ -31,7 +31,7 @@ The time-weighted values are NaN if the Channel had no value during the Event, a
 
 ## While an Event runs
 
-The listener receives a snapshot of the Event at each stage of its lifecycle. Aggregates in the Pending and Confirmed snapshots cover the Event so far; those of the Ended Event cover it from its start to its end.
+The listener receives the Event as it stands at each stage of its lifecycle. Aggregates of the Pending and the Confirmed Event cover the Event so far; those of the Ended Event cover it from its start to its end.
 
 Another Rule can use them in its Conditions: `latest(rule).min(x)`, `.max(x)` and `.mean(x)` are the Aggregates of the most recent Confirmed Event of `rule` (see [latest](https://github.com/romanhaendler/rbed#latest-values-of-the-most-recent-event)).
 

@@ -44,7 +44,8 @@ export type Event = {
   note?: string;
 };
 
-/** A Pending Event that stopped holding before it was Confirmed, and when that was noticed. */
+/** A Discarded Pending Event: one whose Conditions stopped holding before it was Confirmed, and
+ *  when that was noticed. */
 export type Discard = { name: string; start: number; discarded: number };
 
 /** For a Scenario that plots one: an Expression's value per Sample, null where it is undefined,

@@ -1,10 +1,10 @@
 # End Conditions and hysteresis
 
-Real signals hover around their thresholds. A Rule that only has `when` Ends its Event the moment the Condition stops holding, so a weight fluctuating between 490 and 520 around a threshold of 500 produces a new Event every few Samples. An End Condition fixes this: once an Event is Confirmed, it continues until the End Condition holds, whatever `when` does.
+Real Channels hover around their thresholds. A Rule that only has `when` Ends its Event the moment the Condition stops holding, so a weight fluctuating between 490 and 520 around a threshold of 500 produces a new Event every few Samples. An End Condition fixes this: once an Event is Confirmed, it continues until the End Condition holds, whatever `when` does.
 
 ## A separate end threshold
 
-Give the End Condition a threshold below the start threshold, and the signal has to fall clearly before the Event Ends:
+Give the End Condition a threshold below the start threshold, and the weight has to fall clearly before the Event Ends:
 
 ```java
 Rule loadLifted = Rule.named("LoadLifted")

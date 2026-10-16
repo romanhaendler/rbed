@@ -49,7 +49,7 @@ A division by zero, or any other operation without a finite result, is undefined
 
 ## Trends: rising, falling and rate
 
-A threshold tells you *where* a signal is; a trend tells you *where it is going*, so a Rule can react before a threshold is reached.
+A threshold tells you *where* a Channel is; a trend tells you *where it is going*, so a Rule can react before a threshold is reached.
 
 - `rising()` and `falling()` are Conditions: the Channel's latest value is greater, or less, than its previous one. An unchanged value is neither. Combine them with `forSamples` for a sustained trend, or with `and` and a level, so that a high value that is still climbing counts and one that is already falling does not.
 - `rate()` is an Expression: the change per second between the two latest values, `(latest - previous) / seconds between them`, so irregular sampling is handled correctly.
@@ -59,7 +59,7 @@ A threshold tells you *where* a signal is; a trend tells you *where it is going*
 Rule hardBraking = Rule.named("HardBraking").when(speed.rate().below(-4));
 ```
 
-All three are undefined until the Channel has two values. They use the Channel's own values, not Samples: if a Channel is missing from a Sample, they still compare its two latest reported values. Because `rate()` looks at only two values, take the rate of a moving average for noisy signals: `level.averageOverSamples(4).rate()`.
+All three are undefined until the Channel has two values. They use the Channel's own values, not Samples: if a Channel is missing from a Sample, they still compare its two latest reported values. Because `rate()` looks at only two values, take the rate of a moving average for noisy Channels: `level.averageOverSamples(4).rate()`.
 
 ## Moving averages
 
@@ -70,7 +70,7 @@ level.averageOverSamples(5)                          // mean of the last 5 value
 level.averageOverDuration(Duration.ofMinutes(10))    // mean of the last 10 minutes
 ```
 
-`averageOverSamples(n)` is defined once `n` values exist; use it for regularly sampled data. `averageOverDuration` is defined once the values span the window; use it when Samples arrive irregularly or the window has a meaning in time. A longer window smooths more but reacts later. A moving average supports everything a Channel does, including `rate` and another average. Two averages of one Channel make a crossover signal:
+`averageOverSamples(n)` is defined once `n` values exist; use it for regularly sampled data. `averageOverDuration` is defined once the values span the window; use it when Samples arrive irregularly or the window has a meaning in time. A longer window smooths more but reacts later. A moving average supports everything a Channel does, including `rate` and another average. Two averages of one Channel make a crossover:
 
 ```java
 Rule goldenCross = Rule.named("GoldenCross").when(

@@ -36,7 +36,7 @@ export const PAGES: Page[] = [
     path: '/end-conditions/',
     title: 'End Conditions and hysteresis',
     description:
-      'An End Condition with its own threshold and duration keeps a noisy signal near a threshold from producing a flood of short Events.',
+      'An End Condition with its own threshold and duration keeps a noisy Channel near a threshold from producing a flood of short Events.',
     rubric: 'Guide',
   },
   {
