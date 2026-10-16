@@ -6,7 +6,7 @@
     "build": "npm run build:java && npm run build:web",
     "build:web": "tsc --noEmit && vite build",
     "build:java": "npm run install:rbed && mvn -q -f scenarios/pom.xml package -DskipTests -Drbed.version=$(node version.mjs)",
-    "install:rbed": "mvn -q -f ../pom.xml install -DskipTests && mvn -q -f ../pom.xml -Prelease compile javadoc:javadoc",
+    "install:rbed": "mvn -q -f ../pom.xml install -DskipTests && mvn -q -f ../pom.xml -Prelease compile javadoc:javadoc \"-Dheader=<a href='/rbed/'>rbed documentation</a>\"",
     "test": "npm run install:rbed && mvn -q -f scenarios/pom.xml verify -Drbed.version=$(node version.mjs) && node --test test/*.test.mjs",
     "dev": "vite",
     "preview": "vite preview",

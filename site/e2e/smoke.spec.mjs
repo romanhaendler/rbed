@@ -136,3 +136,10 @@ test('the first Tab stop skips to the content', async ({ page }) => {
   await page.keyboard.press('Tab');
   await expect(page.getByRole('link', { name: 'Skip to content' })).toBeFocused();
 });
+
+test('the Javadoc has the site’s fonts and a link back to the site', async ({ page }) => {
+  await page.goto('api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html');
+  expect(await page.evaluate(() => getComputedStyle(document.body).fontFamily)).toContain('Geist Sans');
+  await page.getByRole('link', { name: 'rbed documentation' }).click();
+  await expect(page).toHaveURL(/\/rbed\/$/);
+});
