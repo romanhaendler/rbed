@@ -33,7 +33,7 @@ final class Environment extends Scenario {
 
         Rule floodWarning = Rule.named("FloodWarning")
             .when(level.above(${warning})
-                .and(level.averageOverSamples(4).rate().above(${rising} / 3600.0)))  // cm/h in cm/s
+                .and(level.averageOverSamples(4).rate().above(${rising} / 3600.0)))  // cm/h, as cm/s: rate() is per second
             .forDuration(Duration.ofMinutes(30))
             .endWhen(level.below(${lift})).forDuration(Duration.ofHours(${liftHours}))
             .maxGap(Duration.ofMinutes(${gapMinutes}));
@@ -81,6 +81,13 @@ final class Environment extends Scenario {
     Rule receding = Rule.named("Receding")
         .when(LEVEL.falling().and(LEVEL.above(warning)));
     return new Rule[] {floodWarning, receding};
+  }
+
+  /** The smoothed rate {@code FloodWarning} compares, in cm/h like its parameter. */
+  @Override
+  List<Plot> plots(Map<String, Double> values) {
+    return List.of(new Plot("level.averageOverSamples(4).rate()",
+        LEVEL.averageOverSamples(4).rate().times(HOUR / 1000.0), values.get("rising"), "cm/h"));
   }
 
   @Override

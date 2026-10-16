@@ -8,8 +8,10 @@ Every minute, a web service reports its error count and its CPU load. A further 
 
 - **Deployment**: a deployment is reported. It Ends with the next Sample, which carries no deployment.
 - **ErrorSpike**: more than 5 errors per minute for 2 minutes.
-- **Regression**: more than 5 errors per minute for 2 minutes, all within 30 minutes after a Deployment Ended. The spike at minute 25 starts 14 minutes after the Deployment Ended (minute 11); the one at minute 80 is too long after it, so it is no Regression.
+- **Regression**: more than 5 errors per minute for 2 minutes, all within 30 minutes after a Deployment Ended.
 - **HighCpu**: the CPU above 90 % for 5 minutes.
+
+At the defaults, the deployment at minute 10 is a `Deployment` from minute 10 to 11. The errors are above 5 per minute from minute 25 to 35 and from 80 to 85, an `ErrorSpike` each, Confirmed after 2 minutes. The spike at minute 25 starts 14 minutes after the Deployment Ended, so it is a `Regression` as well; the one at minute 80 is too long after it. The CPU is above 90 % from minute 90 to 100, and `HighCpu` is Confirmed at minute 95.
 
 ### Things to try
 

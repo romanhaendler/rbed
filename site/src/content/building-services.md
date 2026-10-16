@@ -7,8 +7,10 @@ An air conditioner's compressor power is measured every 10 s. Short cycling, sta
 ## The Rules
 
 - **Run**: above 500 W for 30 s, over below 100 W for 30 s. A plain method, which the listener calls for each Ended Run, classifies a Run shorter than 5 minutes as a short cycle, shown as a note in the table.
-- **QuickRestart**: power above 500 W again for 30 s, within 3 minutes after the previous Run's end. It Ends at once below 100 W, while Run waits 30 s to confirm its end.
-- **FrequentStarts**: more than 2 Runs Confirmed within an hour. The Runs are Confirmed at 130, 830 and 1630 s, and the window keeps all three until the data ends, so the Event's end is Truncated.
+- **QuickRestart**: power above 500 W again for 30 s, within 3 minutes after the previous Run's end. It has no duration on its End Condition, so it is over at the first Sample below 100 W.
+- **FrequentStarts**: more than 2 Runs Confirmed within an hour.
+
+At the defaults, the compressor runs from 100 s to 700 s, from 800 s to 920 s and from 1600 s to 2200 s, and each Run is Confirmed 30 s after its start, at 130, 830 and 1630 s. The second one starts 100 s after the first one's end, so it is a `QuickRestart` as well, and at 2 minutes it is a short cycle. `QuickRestart` Ends at once at the first Sample below 100 W (920 s). The Run has the same end, but it is over only once its End Condition has held for 30 s, at 950 s. With the third Run, three are Confirmed within an hour: `FrequentStarts` starts at 1630 s, and the window keeps all three until the data ends at 2390 s, so its end is Truncated.
 
 ### Things to try
 

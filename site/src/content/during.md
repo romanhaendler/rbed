@@ -17,7 +17,10 @@ Rule roughRunning = Rule.named("RoughRunning").when(during(running).and(vibratio
 
 ## Combining Events with their own timing
 
-Each part keeps its own duration, End Condition and hysteresis, and the combination holds while both are Confirmed. A patient's heart rate `hr` is above 100 from 40 s to 200 s, and once more from 230 s to 250 s. Their oxygen saturation `spo2` dips below 90 for one Sample at 20 s, from 100 s to 160 s, and from 230 s to 260 s. `Tachycardia` needs 30 seconds, `Desaturation` 10, and `HypoxicTachycardia` holds while both are Confirmed. The three lanes share the time axis, so you can see the third band start and end where the other two overlap.
+Each part keeps its own duration, End Condition and hysteresis, and the combination holds while both are Confirmed. A patient's heart rate `hr` is above 100 from 40 s to 200 s, and once more from 230 s to 250 s. Their oxygen saturation `spo2` dips below 90 for one Sample at 20 s, from 100 s to 160 s, and from 230 s to 260 s. `Tachycardia` needs 30 seconds, `Desaturation` 10, and `HypoxicTachycardia` holds while both are Confirmed.
+
+<!-- live -->
+The three lanes share the time axis, so you can see the third band start and end where the other two overlap.
 
 <!-- scenario during draw -->
 
@@ -31,7 +34,7 @@ At the default durations:
 ### Things to try
 
 - Shorten `Tachycardia`'s duration to 15 s: it is Confirmed at 245 s, so `HypoxicTachycardia` holds from 245 s until `Tachycardia` Ends at 250 s.
-- Set `Desaturation`'s duration to 0 s: the combination starts with the dip at 100 s.
+- Set `Desaturation`'s duration to 0 s: `HypoxicTachycardia` starts at 100 s, as soon as the saturation drops, and even the dip at 20 s is a `Desaturation` of its own.
 
 The [Healthcare](../healthcare/) example uses these Rules on a longer recording.
 

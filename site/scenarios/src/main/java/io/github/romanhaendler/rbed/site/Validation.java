@@ -85,6 +85,13 @@ final class Validation extends Scenario {
   }
 
   @Override
+  List<Plot> plots(Map<String, Double> values) {
+    int window = (int) Math.round(values.get("window"));
+    return List.of(new Plot("temp.averageOverSamples(" + window + ")",
+        TEMP.averageOverSamples(window), 25));
+  }
+
+  @Override
   List<Threshold> thresholds(Map<String, Double> values) {
     return List.of(new Threshold(TEMP, "Hot", "when >", 27));
   }

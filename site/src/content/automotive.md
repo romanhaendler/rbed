@@ -6,9 +6,11 @@ A vehicle reports its speed (m/s) and engine rpm at 1 Hz. Here the engine runs w
 
 ## The Rules
 
-- **Trip**: moving faster than 1 m/s for 10 s, over after standing still for 3 minutes. Its distance, the integral of speed over time, is computed by a plain method that the listener calls for each Ended Trip, and shown as a note in the table: each speed from 301 to 903 s holds for 1 s, 11.94 km in all.
+- **Trip**: moving faster than 1 m/s for 10 s, over after standing still (below 0.5 m/s) for 3 minutes. Its distance, the integral of speed over time, is computed by a plain method that the listener calls for each Ended Trip, and shown as a note in the table.
 - **HarshBraking**: decelerating faster than 4 m/s², a `rate` below -4.
-- **Idling**: standing with the engine running for 2 minutes. The last one still runs when the data ends at 1499 s, so its end is Truncated.
+- **Idling**: standing (below 0.5 m/s) with the engine above 600 rpm for 2 minutes.
+
+At the defaults, the engine starts at 60 s, and the standing vehicle is `Idling` from 60 s, Confirmed at 180 s, until it moves off at 301 s. The `Trip` runs from 301 s, Confirmed at 311 s, to 904 s, where the vehicle stands still: each speed from 301 to 903 s holds for 1 s, 11.94 km in all. Braking at 5 m/s² is `HarshBraking` from 901 s to 905 s. From 904 s the vehicle is `Idling` again, Confirmed at 1024 s; it still runs when the data ends at 1499 s, so its end is Truncated.
 
 ### Things to try
 

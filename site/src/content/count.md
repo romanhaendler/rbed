@@ -13,13 +13,16 @@ An Event counts from the moment it is Confirmed, so a running Event is included.
 
 ## Frequent starts
 
-A machine's power is sampled once a minute. It runs for five minutes from minutes 10, 30, 45, 60, 150 and 200. A `Run` needs 30 seconds above 500 W, so each one is Confirmed at the next Sample, a minute after its start. `FrequentStarts` holds while more than the limit of Runs were Confirmed within the window. The chart under the Events plots `count(run).within(...)` at every Sample, as rbed computes it, with the limit as a line.
+A machine's power is sampled once a minute. It runs for five minutes from minutes 10, 30, 45, 60, 150 and 200. A `Run` needs 30 seconds above 500 W, so each one is Confirmed at the next Sample, a minute after its start. `FrequentStarts` holds while more than the limit of Runs were Confirmed within the window.
+
+<!-- live -->
+The chart plots `count(run).within(...)` at every Sample, as rbed computes it, with the limit as a line.
 
 <!-- scenario count draw -->
 
 At the defaults, an hour's window and a limit of 3:
 
-- The count steps up at every Confirmed mark of a `Run`: 1 at minute 11, 2 at 31, 3 at 46.
+- The count rises by one each time a `Run` is Confirmed: 1 at minute 11, 2 at 31, 3 at 46.
 - At minute 61 the fourth `Run` is Confirmed, while it is still running. The count is 4, more than 3, and `FrequentStarts` starts.
 - At minute 72 the `Run` Confirmed at minute 11 lies more than an hour back and drops out of the window. The count falls to 3, and `FrequentStarts` Ends.
 - The later Runs are too far apart to count up again.

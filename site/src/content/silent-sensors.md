@@ -21,16 +21,19 @@ detector.push(13_000, Map.of(hr, 70.0));   // SensorLost Ended at 13000
 
 ## A heart rate that falls silent
 
-A heart rate is reported every second. From 12 s it is high, and from 25 to 44 s the sensor is silent. `HighHeartRate` trusts a high reading only while it is recent: `hr` above 120 and not older than the limit. `SensorLost` is the opposite, a reading older than the limit. The small marks just above the lanes are the moments a timer advanced time, once a second while no Sample arrived. The dashed line under the Channel is `hr.age()` in seconds, as rbed computes it at every Sample and every advance, with the limit as a line.
+A heart rate is reported every second. From 12 s it is high, and from 25 to 44 s the sensor is silent. `HighHeartRate` trusts a high reading only while it is recent: `hr` above 120 and not older than the limit. `SensorLost` is the opposite, a reading older than the limit. Without a Sample, a timer advances time once a second, and rbed computes `hr.age()` at every Sample and every advance.
+
+<!-- live -->
+The small marks just above the lanes are the moments a timer advanced time, once a second while no Sample arrived. The dashed line under the Channel is `hr.age()` in seconds, as rbed computes it at every Sample and every advance, with the limit as a line.
 
 <!-- scenario silent-sensors draw -->
 
-At the defaults, with the timer, the last reading at 24 s grows older with every advance: the dashed line climbs a second per second. At 30 s it is 6 s old, more than the limit of 5 s: `HighHeartRate` Ends there and `SensorLost` is Confirmed, both without a Sample. `SensorLost` Ends at 45 s, when the sensor reports again.
+At the defaults, with the timer, the last reading at 24 s grows older with every advance: `hr.age()` grows by a second at every advance. At 30 s it is 6 s old, more than the limit of 5 s: `HighHeartRate` Ends there and `SensorLost` is Confirmed, both without a Sample. `SensorLost` Ends at 45 s, when the sensor reports again.
 
 ### Things to try
 
 - Raise *Silent after* to 10 s: both move later, to 35 s.
-- Choose "Nothing happens" instead of the timer: the Detector learns of the silence only when the next Sample arrives at 45 s. That Sample carries `hr`, so its age is 0 again, and the dashed line, read only at Samples, stays at 0 throughout: there is no `SensorLost` Event, and `HighHeartRate` runs through the whole silence on a reading that is 21 seconds old by the time the next one arrives.
+- Choose "Nothing happens" instead of the timer: the Detector learns of the silence only when the next Sample arrives at 45 s. That Sample carries `hr`, so its age is 0 again, and `hr.age()`, read only at Samples, is 0 at every one of them: there is no `SensorLost` Event, and `HighHeartRate` runs through the whole silence on a reading that is 21 seconds old by the time the next one arrives.
 
 ## What an advance does
 
