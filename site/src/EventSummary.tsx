@@ -18,6 +18,10 @@ export function expressionSummary(expression: PlottedExpression | undefined, row
   );
 }
 
+/** Which Channels' values the reader drew, for the text alternative. */
+export const drawnSummary = (channels: string[]) =>
+  channels.length === 0 ? '' : ` The values of ${channels.join(' and ')} are drawn, not the Scenario's own.`;
+
 /** The time advances and the restart in words, for the text alternative. */
 export function timeSummary({ advances, restart }: { advances: number[]; restart?: number }, scenario: Scenario): string {
   const at = timeIn(scenario.timeUnit);

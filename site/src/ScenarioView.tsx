@@ -10,10 +10,10 @@ import { useMemo, useRef, useState } from 'react';
 import { run, type Scenario, source } from './bridge';
 import { type ChannelAxis, type ChartModel, channelAxisOf, EXPRESSION, expressionRows, type Row } from './chartModel.ts';
 import { CodeBlock } from './CodeBlock';
-import { drawTo } from './draw.ts';
+import { drawnSource, drawTo } from './draw.ts';
 import { DrawLayer } from './DrawLayer';
 import { EventChart, LifecycleKey } from './EventChart';
-import { EventSummary, expressionSummary, timeSummary } from './EventSummary';
+import { drawnSummary, EventSummary, expressionSummary, timeSummary } from './EventSummary';
 import { AggregatesPanel, DiscardedTable, EventTable } from './EventTables';
 import { eventKey } from './events.ts';
 import { defaultsOf, fromQuery } from './parameters';
@@ -98,7 +98,11 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
         <EventSummary
           scenario={scenario}
           lifecycle={result}
-          also={expressionSummary(result.expression, plotted, scenario.timeUnit.name) + timeSummary(result, scenario)}
+          also={
+            expressionSummary(result.expression, plotted, scenario.timeUnit.name) +
+            timeSummary(result, scenario) +
+            drawnSummary(Object.keys(drawn))
+          }
         />
         {event && <AggregatesPanel scenario={scenario} event={event} />}
       </>
@@ -129,7 +133,7 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
           />
         </div>
         <div className="configuratorCode">
-          <CodeBlock language="Java" source={source(scenario, parameters)} />
+          <CodeBlock language="Java" source={drawnSource(source(scenario, parameters), drawn)} />
         </div>
       </div>
       {!('error' in result) && (

@@ -107,7 +107,7 @@ export function ScenarioControls({
           hint={
             pen === ''
               ? 'Choose a Channel to draw its values on the chart.'
-              : `Drag across the chart to draw ${pen}. Reset brings back the Scenario's values.`
+              : `Drag across the chart to draw ${pen}; the hover readout is back once Draw is Off. Reset brings back the Scenario's values.`
           }
         >
           <SegmentedControl
