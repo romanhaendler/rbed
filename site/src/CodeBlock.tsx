@@ -40,7 +40,7 @@ export function CodeBlock({ language, source }: { language: string; source: stri
       {/* A long line scrolls the block sideways, so the keyboard has to reach it too. */}
       <pre className="code" tabIndex={0} aria-label={`${language} source`}>
         <code>
-          {language === 'Java'
+          {language.toLowerCase() === 'java'
             ? javaTokens(source).map(([kind, text], i) =>
                 kind === '' ? text : <span key={i} className={`java-${kind}`}>{text}</span>,
               )

@@ -1,13 +1,10 @@
-import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
-import { PAGES } from './src/pages.ts';
+import { prerender, rbedVersion } from './prerender.mjs';
 
 const root = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 
-// The rbed version of this commit, as the root pom states it.
-const pom = readFileSync(root('../pom.xml'), 'utf8');
-const version = /<artifactId>rbed<\/artifactId>\s*<version>([^<]+)<\/version>/.exec(pom)![1];
+const version = rbedVersion();
 
 export default defineConfig({
   // served at https://romanhaendler.github.io/rbed/; npm run preview serves it at /rbed/ too
@@ -29,19 +26,11 @@ export default defineConfig({
   },
   plugins: [
     {
-      // Every page gets its own index.html, so reloading its path shows it; 404.html shows the
-      // app's "no page" view for any other path.
-      name: 'rbed-pages',
+      // Every page of src/pages.ts gets its own index.html with its text prerendered, its Markdown
+      // twin, and llms.txt, llms-full.txt, sitemap.xml and 404.html (prerender.mjs).
+      name: 'rbed-prerender',
       apply: 'build',
-      closeBundle() {
-        const index = root('dist/index.html');
-        for (const page of PAGES) {
-          if (page.path === '/') continue;
-          mkdirSync(root(`dist${page.path}`), { recursive: true });
-          copyFileSync(index, root(`dist${page.path}index.html`));
-        }
-        copyFileSync(index, root('dist/404.html'));
-      },
+      closeBundle: () => prerender(root('dist'), version),
     },
   ],
 });

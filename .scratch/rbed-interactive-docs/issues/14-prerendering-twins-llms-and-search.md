@@ -4,14 +4,31 @@
 
 **Blocked by:** 02, 03
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Each page's HTML contains its text, its Java source and its default Event table before any script runs
-- [ ] The live page replaces the prerendered content without a visible jump
-- [ ] Each page has a Markdown twin, linked from its head
-- [ ] `llms.txt` lists every page's twin and the reference material, and links to `llms-full.txt`
-- [ ] `llms-full.txt` contains the README (absolute links), the glossary and every page's twin, in navigation order
-- [ ] The site header links to `llms.txt`
-- [ ] A sitemap and a sharing image are deployed
-- [ ] A search finds a page by a method name it explains, such as `averageOverDuration`
-- [ ] A newly added page appears in twins, `llms.txt`, `llms-full.txt`, sitemap and search without changes to this build step
+- [x] Each page's HTML contains its text, its Java source and its default Event table before any script runs
+- [x] The live page replaces the prerendered content without a visible jump
+- [x] Each page has a Markdown twin, linked from its head
+- [x] `llms.txt` lists every page's twin and the reference material, and links to `llms-full.txt`
+- [x] `llms-full.txt` contains the README (absolute links), the glossary and every page's twin, in navigation order
+- [x] The site header links to `llms.txt`
+- [x] A sitemap and a sharing image are deployed
+- [x] A search finds a page by a method name it explains, such as `averageOverDuration`
+- [x] A newly added page appears in twins, `llms.txt`, `llms-full.txt`, sitemap and search without changes to this build step
+
+## Comments
+
+**Done.** Checked in headless Chromium at 1280 and 375 px, light and dark: no horizontal scroll, no page errors; once the app runs no `.prerendered` is left; with JavaScript off the prerendered front page shows its text, the Java source and the default Event table (`HighTemperature 2 2 3`), without horizontal scroll at 375 px. With a temporary second page (`/temp-check/`, removed again) whose prose mentions `averageOverDuration`: it appeared in its own `index.html`, its twin, `llms.txt`, `llms-full.txt` and the sitemap without touching the build; Ctrl+K, typing `averageOverDuration` and Enter moved to it without a reload, set the title and the twin link, and a reload of its path showed it. "Deployed" for the sitemap and the image means: they are in `dist/`, which the Pages workflow uploads; the live deployment still waits for Pages to be enabled (see 02).
+
+**The page recipe changed** (documented in `site/README.md`, "Adding a page"): a page is a Scenario (if any), a manifest entry in `src/pages.ts`, and its Markdown `src/content/<name>.md` (named after the path; the front page is `index.md`). `Shell.tsx` has no `VIEWS` map any more and `FrontPage.tsx` is gone: every page is rendered by `MarkdownPage.tsx` from its Markdown. A line `<!-- scenario <id> -->` places the live `ScenarioView` (`<ScenarioView scenario={...} />`, untouched); `{{version}}` is the build's rbed version.
+
+- **Markdown** (`src/markdown.ts`, own subset, no dependency, imports nothing): `#`..`###` (ids from the text, `h1` gets `tabindex=-1` for the drawer focus), paragraphs, one-level `-`/`1.` lists, fenced code (```` ```lang Label ````, shown as `CodeBlock` with copy), inline `code`, `**strong**`, `*em*`, `[text](url)`. Everything is escaped; no raw HTML, no tables. A list whose items are all a single link renders as tiles (`ul.tiles`/`a.tile`), which is how the front page's domain examples are written; tickets 12/13 can point those links at the domain pages. Text blocks render into `div.flow` (`display: contents`), so headings and paragraphs are direct items of the page column; CSS for them is `.flow > h1/h2/h3/ol/ul`; the sentences between the h1 and the first h2 are secondary, and on the front page (`article.front`) the first one is the large promise. The old `pageHead`/`section`/`installGrid`/`pageFoot` classes are gone (the Maven and Gradle blocks now stack).
+- **Build** (`site/prerender.mjs`, called by a `closeBundle` plugin in `vite.config.ts`, so `npm run build` is unchanged): per page `dist/<path>/index.html` (built `index.html` as template: `<title>rbed</title>` is replaced by the head block with title, description, canonical, `alternate text/markdown` twin link, `og:*` and twitter card, plus `js` class script and `.js .prerendered{visibility:hidden}`; `<div id="root"></div>` gets `<div class="prerendered">` with the HTML), `dist/<name>.md` twin (Markdown with each marker replaced by a `java` fence of the source at defaults plus a Markdown Event table), `llms.txt` (sections Overview/Guide/Examples by rubric, then Reference: README, CONTEXT.md, Javadoc on javadoc.io, llms-full.txt), `llms-full.txt` (README with relative links made absolute to GitHub, CONTEXT.md, each twin prefixed with `Page: <url>`, separated by `---`), `sitemap.xml`, and `404.html` (template, `noindex`). The template must keep `<title>rbed</title>` and an empty `#root`; the build throws otherwise. `rbedVersion()` moved there from `vite.config.ts`.
+- **Default Events come from the compiled module run in Node**, not from a JVM main: that needs no Java entry point, exec plugin or classpath handoff, and parity holds it to the JVM. `BridgeTest.everyScenarioRunsAtItsDefaults` runs every catalogued Scenario at `{}` through the bridge helper, so exactly the prerendered calls are in the parity test (and a Scenario whose defaults rbed rejects fails JUnit). The prerendered table has the columns of the live table at the time (Name, Start, Confirmed, End, Truncated, in the Scenario's unit); when 04/05 add columns (Aggregates, Discarded), extend `eventRows` in `prerender.mjs` to match.
+- **Search** (`src/search.ts` + `CommandPalette` in `Shell.tsx`, header button styled as a field with the ⌘K/Ctrl K chip, also `/`): one item per page (label = title, group = rubric or "Overview"), keywords = method names called in its fenced code and in the source of each Scenario it shows, identifiers in its inline code, and its h2/h3 headings. Computed in the app from the bundled Markdown and the catalogue; no `search.json` is written (one palette, 25 pages).
+- **Head on navigation**: `Shell` sets `document.title` with `titleOf(page)` (in `pages.ts`, shared with the build) and updates the canonical and twin links. Client navigation goes through `go(address)` (pushState + popstate), used by the link handler and the palette.
+- The header has an llms.txt icon link. `public/og-image.png` (1200x630) was rendered once from a plain HTML card (name, promise, a line crossing a threshold with the band of its Event).
+- `tsconfig.json` has `allowImportingTsExtensions`: modules shared with Node (`pages.ts`, `markdown.ts`, `search.ts`) import each other with `.ts` extensions.
+- **umriss-ui gaps:** none found. `CommandPalette` keywords only match as a contiguous run of 3+ characters, which suits method names.
+
+- **Merged with 04:** `CodeBlock` now highlights for any case of `java` (`language.toLowerCase() === 'java'`), so ````java` fences in page Markdown are highlighted like the Scenario source; 04's `.installGrid` CSS was dropped with the front page's grid. The prerendered table still has 04's columns.
