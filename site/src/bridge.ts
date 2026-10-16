@@ -1,6 +1,7 @@
 // The two functions of the Scenario module (site/scenarios, Bridge.java), typed.
 import * as compiled from 'rbed-scenarios';
 import type { Aggregates } from './aggregates.ts';
+import { filledSource } from './parameters.ts';
 
 export type Parameter = {
   id: string;
@@ -10,6 +11,8 @@ export type Parameter = {
   max: number;
   step: number;
   unit: string;
+  /** A switch: 0 off, 1 on; the source says false or true. */
+  toggle?: boolean;
 };
 
 export type Scenario = {
@@ -47,6 +50,10 @@ export type Result =
       samples: { timestamp: number; values: Record<string, number | null> }[];
       events: Event[];
       discarded: Discard[];
+      /** Timestamps the Detector was advanced to without a Sample. */
+      advances: number[];
+      /** Timestamp of the first Sample after the Detector was restarted, if it was. */
+      restart?: number;
     }
   | { error: string };
 
@@ -60,7 +67,5 @@ export function run(scenarioId: string, parameters: Record<string, number>): Res
 
 /** The source with each placeholder replaced by its parameter's value. */
 export function source(scenario: Scenario, parameters: Record<string, number>): string {
-  return scenario.source.replace(/\$\{(\w+)\}/g, (_, id: string) =>
-    Number.isNaN(parameters[id]) ? 'Double.NaN' : String(parameters[id]),
-  );
+  return filledSource(scenario.source, scenario.parameters, parameters);
 }

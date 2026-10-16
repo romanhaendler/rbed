@@ -20,7 +20,10 @@ public final class Bridge {
       new FirstRule(),
       new EventLifecycle(),
       new AggregatesScenario(),
+      new SamplingRate(),
+      new SilentSensors(),
       new PulseChannels(),
+      new History(),
       new Cranes(),
       new Manufacturing(),
       new BuildingServices(),
@@ -68,7 +71,9 @@ public final class Bridge {
         Json.number(out.append(",\"min\":"), p.min());
         Json.number(out.append(",\"max\":"), p.max());
         Json.number(out.append(",\"step\":"), p.step());
-        Json.string(out.append(",\"unit\":"), p.unit()).append('}');
+        Json.string(out.append(",\"unit\":"), p.unit());
+        if (p.toggle()) out.append(",\"toggle\":true");
+        out.append('}');
       }
       Json.string(out.append("],\"source\":"), s.source).append('}');
     }
@@ -81,18 +86,19 @@ public final class Bridge {
    * @param parameters JSON object of parameter values by id; missing ones take their default,
    *     null stands for NaN
    * @param drawnChannels JSON object reserved for Channel values the reader drew; ignored for now
-   * @return JSON object with the Samples, the Events and the Discarded Pending Events (with the
-   *     timestamp they were Discarded), or {@code {"error": message}} if rbed
-   *     rejected the Rules or the input was invalid
+   * @return JSON object with the Samples, the Events, the Discarded Pending Events (with the
+   *     timestamp they were Discarded), the timestamps time was advanced to without a Sample and,
+   *     if the Detector was restarted, the timestamp of the restart; or
+   *     {@code {"error": message}} if rbed rejected the Rules or the input was invalid
    */
   @JSExport
   public static String run(String scenarioId, String parameters, String drawnChannels) {
     try {
       Scenario scenario = scenario(scenarioId);
-      List<Sample> samples = scenario.samples();
       Map<String, Double> values = values(scenario, parameters);
+      List<Sample> samples = scenario.samples(values);
       Lifecycle lifecycle = new Lifecycle();
-      scenario.detect(scenario.rules(values), lifecycle);
+      scenario.detect(scenario.rules(values), values, lifecycle);
       return result(scenario, values, samples, lifecycle);
     } catch (RuntimeException e) {
       return Json.string(new StringBuilder("{\"error\":"), String.valueOf(e.getMessage()))
@@ -166,7 +172,14 @@ public final class Bridge {
           .append(",\"discarded\":").append(d.at())
           .append('}');
     }
-    return out.append("]}").toString();
+    out.append("],\"advances\":[");
+    for (int i = 0; i < lifecycle.advances.size(); i++) {
+      if (i > 0) out.append(',');
+      out.append(lifecycle.advances.get(i));
+    }
+    out.append(']');
+    if (lifecycle.restart != null) out.append(",\"restart\":").append(lifecycle.restart);
+    return out.append('}').toString();
   }
 
   /** The Event's Aggregates by Channel name, in the Scenario's Channel order; NaN becomes null. */

@@ -37,10 +37,31 @@ export const PAGES: Page[] = [
     rubric: 'Guide',
   },
   {
+    path: '/sampling-rate/',
+    title: 'Batch processing and sampling rates',
+    description:
+      'detect runs a recorded series in one call; with a sampling rate, Samples are pushed without timestamps and time is their index divided by the rate.',
+    rubric: 'Guide',
+  },
+  {
+    path: '/silent-sensors/',
+    title: 'Silent sensors: advancing time',
+    description:
+      'advanceTo tells the Detector that time has passed without Samples, so a silent sensor is noticed through age() and durations are reached.',
+    rubric: 'Guide',
+  },
+  {
     path: '/pulse-channels/',
     title: 'Pulse Channels',
     description:
       'Pulse Channels report one-off occurrences such as deployments: their value exists only in the Sample that carries it.',
+    rubric: 'Guide',
+  },
+  {
+    path: '/history/',
+    title: 'Restarts: History',
+    description:
+      'Events stored before a restart, passed to the new Detector as History, keep after, count and totalDuration right across the restart.',
     rubric: 'Guide',
   },
   {

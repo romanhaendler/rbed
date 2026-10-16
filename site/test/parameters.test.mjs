@@ -2,7 +2,7 @@
 // and reading an address gives back exactly what was written.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { fromQuery, toQuery } from '../src/parameters.ts';
+import { filledSource, fromQuery, toQuery } from '../src/parameters.ts';
 
 const PARAMETERS = [
   { id: 'threshold', default: 80 },
@@ -31,4 +31,13 @@ test('only values that differ from the default go into the address, other keys s
 test('reading back what was written gives the same values', () => {
   const values = { threshold: 61, duration: 0.25 };
   assert.deepEqual(fromQuery(toQuery('', values, PARAMETERS), PARAMETERS), values);
+});
+
+test('the source gets each value, a toggle as true or false, NaN as Double.NaN', () => {
+  const parameters = [{ id: 'rate', default: 10 }, { id: 'on', default: 0, toggle: true }];
+  assert.equal(
+    filledSource('rate(${rate}); boolean b = ${on};', parameters, { rate: 12.5, on: 1 }),
+    'rate(12.5); boolean b = true;',
+  );
+  assert.equal(filledSource('${rate} ${on}', parameters, { rate: NaN, on: 0 }), 'Double.NaN false');
 });

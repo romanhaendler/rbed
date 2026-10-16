@@ -4,8 +4,8 @@
 // Aggregates, whose rows and the chart's bands select each other; a selected Event's Aggregates
 // are shown in full under the chart. Non-default values live in the address. The Detector runs
 // again on every change.
-import { LimitBand, Tooltip, type TooltipHit, useChart } from '@umriss-ui/charts';
-import { Alert, Button, Checkbox, FormField, Slider, VisuallyHidden } from '@umriss-ui/core';
+import { LimitBand, LimitLine, Tooltip, type TooltipHit, useChart } from '@umriss-ui/charts';
+import { Alert, Button, Checkbox, FormField, Slider, Switch, VisuallyHidden } from '@umriss-ui/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { type Aggregates, aggregatesLine, formatNumber } from './aggregates.ts';
 import { type Discard, type Event, type Scenario, run, source } from './bridge';
@@ -34,6 +34,9 @@ const MARKS = [
   { name: 'Discarded', colour: 'var(--u-color-danger)', moments: (l: Lifecycle) => l.discarded.map((d) => d.discarded) },
   { name: 'Confirmed', colour: 'var(--u-color-success)', moments: (l: Lifecycle) => l.events.map((e) => e.confirmed) },
 ] as const;
+/** Time advanced without a Sample (advanceTo), marked just above the lanes; a restart is a line. */
+const ADVANCE_COLOUR = 'var(--u-color-text-muted)';
+const RESTART_COLOUR = 'var(--u-color-text-secondary)';
 /** The chart palette without the Events' colour, so a Channel never looks like a band. */
 const CHANNEL_COLOURS = [1, 3, 4, 5, 6].map((n) => `var(--uc-series-${n})`);
 const channelColour = (scenario: Scenario, channel: string) =>
@@ -97,7 +100,16 @@ function ruleState(lifecycle: Lifecycle, t: number, millis: number): string {
   return 'no Event';
 }
 
-type Shown = { scenario: Scenario; rows: Row[]; lifecycle: Lifecycle; channels: string[]; rules: string[] };
+type Shown = {
+  scenario: Scenario;
+  rows: Row[];
+  lifecycle: Lifecycle;
+  channels: string[];
+  rules: string[];
+  /** Timestamps time was advanced to without a Sample, and the restart, if any (ms). */
+  advances: number[];
+  restart?: number;
+};
 
 /** The tooltip: every shown Channel's value and Rule's state at the hovered time. */
 function Readout({ shown, t }: { shown: Shown; t: number }) {
@@ -132,7 +144,7 @@ function EventChart({
   selected?: Event;
   select: (key: string | undefined) => void;
 }) {
-  const { scenario, rows, lifecycle, channels, rules } = shown;
+  const { scenario, rows, lifecycle, channels, rules, advances, restart } = shown;
   const { name: unit, millis } = scenario.timeUnit;
   // A click (or Enter) on the chart selects the Event under it, if any.
   const { Chart, XAxis, YAxis, Line, Scatter, StateBand } = useChart(rows, {
@@ -167,6 +179,7 @@ function EventChart({
       {selected && (
         <LimitBand orientation="x" from={selected.start / millis} to={selected.end / millis} color="var(--u-color-accent)" />
       )}
+      {restart !== undefined && <LimitLine orientation="x" value={restart / millis} label="Restart" color={RESTART_COLOUR} />}
       {rules.map((rule, i) => (
         <StateBand<BandRow>
           key={rule}
@@ -190,6 +203,16 @@ function EventChart({
           radius={4}
         />
       ))}
+      {advances.length > 0 && (
+        <Scatter<MarkRow>
+          data={advances.map((t) => ({ t: t / millis, y: lanes + 0.15 }))}
+          value="y"
+          yAxisId="lanes"
+          name="Time advance"
+          color={ADVANCE_COLOUR}
+          radius={3}
+        />
+      )}
       {/* A Pulse Channel has no value between its Samples, so it is drawn as marks, not a line. */}
       {channels.map((c) =>
         scenario.pulse.includes(c) ? (
@@ -204,7 +227,7 @@ function EventChart({
 }
 
 /** What the bands' colours and the marks mean; the text alternative says it in words. */
-function LifecycleKey() {
+function LifecycleKey({ advances }: { advances: boolean }) {
   const item = (label: string, colour: string, mark: boolean) => (
     <span key={label}>
       <span className={mark ? 'swatch mark' : 'swatch'} style={{ background: colour }} />
@@ -217,12 +240,15 @@ function LifecycleKey() {
       {EVENT_STATES.map((s) => item(s.label, s.color, false))}
       <span>Marks:</span>
       {MARKS.map((m) => item(m.name, m.colour, true))}
+      {advances && item('Time advance', ADVANCE_COLOUR, true)}
     </div>
   );
 }
 
-/** The chart's text alternative: its Events and Discarded Pending Events in words. */
-function EventSummary({ scenario, lifecycle }: { scenario: Scenario; lifecycle: Lifecycle }) {
+/** The chart's text alternative: its Events and Discarded Pending Events in words, then the time
+    advances and the restart, if any. */
+function EventSummary({ shown }: { shown: Shown }) {
+  const { scenario, lifecycle, advances, restart } = shown;
   const { name: unit, millis } = scenario.timeUnit;
   const { events, discarded } = lifecycle;
   const at = (ms: number) => `${ms / millis} ${unit}`;
@@ -247,6 +273,9 @@ function EventSummary({ scenario, lifecycle }: { scenario: Scenario; lifecycle: 
             ...discarded.map((d) => `${d.name} Pending from ${at(d.start)}, Discarded at ${at(d.discarded)}`),
           ].join('; ') +
           '.'}
+      {advances.length > 0 &&
+        ` Time is advanced without a Sample ${count(advances.length, 'time', 'times')}, from ${at(advances[0])} to ${at(advances[advances.length - 1])}.`}
+      {restart !== undefined && ` The Detector is restarted at ${at(restart)}.`}
     </VisuallyHidden>
   );
 }
@@ -454,6 +483,8 @@ export function ScenarioView({ scenario }: { scenario: Scenario }) {
       lifecycle: result,
       channels: scenario.channels.filter((c) => !hidden.includes(c)),
       rules: scenario.rules.filter((r) => !hidden.includes(r)),
+      advances: result.advances,
+      restart: result.restart,
     };
     const event = result.events.find((e) => eventKey(e) === selected);
     stage = (
@@ -464,8 +495,8 @@ export function ScenarioView({ scenario }: { scenario: Scenario }) {
           selected={event}
           select={select}
         />
-        <LifecycleKey />
-        <EventSummary scenario={scenario} lifecycle={result} />
+        <LifecycleKey advances={result.advances.length > 0} />
+        <EventSummary shown={shown} />
         {event && <AggregatesPanel scenario={scenario} event={event} />}
       </>
     );
@@ -482,7 +513,16 @@ export function ScenarioView({ scenario }: { scenario: Scenario }) {
               Reset
             </Button>
           </div>
-          {scenario.parameters.map((p) => (
+          {scenario.parameters.map((p) =>
+            p.toggle ? (
+              <Switch
+                key={p.id}
+                name={p.id}
+                label={p.label}
+                checked={parameters[p.id] !== 0}
+                onChange={(e) => setParameters({ ...parameters, [p.id]: e.currentTarget.checked ? 1 : 0 })}
+              />
+            ) : (
             <FormField key={p.id} label={p.label}>
               <Slider
                 name={p.id}
@@ -495,7 +535,8 @@ export function ScenarioView({ scenario }: { scenario: Scenario }) {
                 showValue
               />
             </FormField>
-          ))}
+            ),
+          )}
           <fieldset className="configuratorShow">
             <legend>Show</legend>
             {visibility(scenario.rules, () => EVENT_COLOUR)}

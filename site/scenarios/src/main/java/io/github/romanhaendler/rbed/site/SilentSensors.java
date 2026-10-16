@@ -1,0 +1,85 @@
+package io.github.romanhaendler.rbed.site;
+
+import io.github.romanhaendler.rbed.Channel;
+import io.github.romanhaendler.rbed.Condition;
+import io.github.romanhaendler.rbed.Detector;
+import io.github.romanhaendler.rbed.Rule;
+import io.github.romanhaendler.rbed.Sample;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * The README's silent sensor: a heart rate reported every second, high from 12 s, that falls
+ * silent from 25 to 44 s. A timer advances the Detector every second of the silence, so the high
+ * reading goes stale and SensorLost is Confirmed without a Sample; without the timer, the
+ * Detector notices nothing until the sensor reports again.
+ */
+final class SilentSensors extends Scenario {
+  static final Channel HR = Channel.named("hr");
+
+  SilentSensors() {
+    super("silent-sensors", "Silent sensors: advancing time", "s", 1_000, List.of(HR),
+        List.of(
+            Parameter.toggle("advance", "Timer advances time", true),
+            new Parameter("limit", "Silent after", 5, 1, 15, 1, "s")),
+        """
+        Channel hr = Channel.named("hr");
+
+        Condition silent = hr.age().above(${limit} * 1_000);
+        Rule highHeartRate = Rule.named("HighHeartRate").when(hr.above(120).and(silent.not()));
+        Rule sensorLost = Rule.named("SensorLost").when(silent);
+        Detector detector = Detector.builder()
+            .rules(highHeartRate, sensorLost)
+            .build();
+
+        // every second: a Sample, or, while the sensor is silent from 25 to 44 s, the timer
+        boolean timer = ${advance};
+        if (reading != null) detector.push(now, Map.of(hr, reading));
+        else if (timer) detector.advanceTo(now);
+        """);
+  }
+
+  static boolean silent(long s) {
+    return s >= 25 && s < 45;
+  }
+
+  /** The Samples that arrive, one a second from 0 to 60 s, none during the silence. */
+  @Override
+  List<Sample> samples() {
+    List<Sample> samples = new ArrayList<>();
+    for (long s = 0; s <= 60; s++) {
+      if (silent(s)) continue;
+      double hr = s < 12 ? 78 + s % 3 : s < 25 ? 128 + s % 4 : 92 - s % 3;
+      samples.add(new Sample(s * 1_000, Map.of(HR, hr)));
+    }
+    return samples;
+  }
+
+  @Override
+  Rule[] rules(Map<String, Double> values) {
+    Condition silent = HR.age().above(values.get("limit") * 1_000);
+    return new Rule[] {
+      Rule.named("HighHeartRate").when(HR.above(120).and(silent.not())),
+      Rule.named("SensorLost").when(silent)
+    };
+  }
+
+  /** Pushes the Samples and, if the timer is on, advances time every second of the silence. */
+  @Override
+  void detect(Rule[] rules, Map<String, Double> values, Lifecycle lifecycle) {
+    Detector detector = Detector.builder().rules(rules).listener(lifecycle).build();
+    List<Sample> samples = samples();
+    int next = 0;
+    for (long s = 0; s <= 60; s++) {
+      if (silent(s)) {
+        if (on(values, "advance")) lifecycle.advance(detector, s * 1_000);
+      } else {
+        Sample sample = samples.get(next++);
+        lifecycle.now = sample.timestamp();
+        detector.push(sample.timestamp(), sample.values());
+      }
+    }
+    detector.close();
+  }
+}

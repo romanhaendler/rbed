@@ -36,6 +36,15 @@ abstract class Scenario {
 
   abstract List<Sample> samples();
 
+  /**
+   * The Samples as the Detector sees them at the given parameter values, for the chart: by
+   * default {@link #samples()}. A Scenario whose parameters change the timestamps, such as a
+   * sampling rate, overrides it.
+   */
+  List<Sample> samples(Map<String, Double> values) {
+    return samples();
+  }
+
   /** Those of its Channels that are Pulse Channels; rbed does not tell a Channel's kind. */
   List<Channel> pulseChannels() {
     return List.of();
@@ -60,6 +69,20 @@ abstract class Scenario {
   }
 
   /**
+   * Like {@link #detect(Rule[], Lifecycle)}, for a Scenario whose feeding depends on its
+   * parameters (a sampling rate, time advances, a restart switched on or off). The bridge calls
+   * this one.
+   */
+  void detect(Rule[] rules, Map<String, Double> values, Lifecycle lifecycle) {
+    detect(rules, lifecycle);
+  }
+
+  /** Whether a toggle parameter is on. */
+  static boolean on(Map<String, Double> values, String id) {
+    return values.get(id) != 0;
+  }
+
+  /**
    * What the Scenario's listener makes of an Event at the given parameter values, such as the
    * class of a lifted load; or null.
    */
@@ -67,7 +90,19 @@ abstract class Scenario {
     return null;
   }
 
-  /** A number the reader can change, with its default and the limits of its control. */
+  /**
+   * A number the reader can change, with its default and the limits of its control; a toggle is
+   * 0 (off) or 1 (on), shown as a switch, and written into the source as false or true.
+   */
   record Parameter(String id, String label, double defaultValue, double min, double max,
-      double step, String unit) {}
+      double step, String unit, boolean toggle) {
+    Parameter(String id, String label, double defaultValue, double min, double max, double step,
+        String unit) {
+      this(id, label, defaultValue, min, max, step, unit, false);
+    }
+
+    static Parameter toggle(String id, String label, boolean on) {
+      return new Parameter(id, label, on ? 1 : 0, 0, 1, 1, "", true);
+    }
+  }
 }
