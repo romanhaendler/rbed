@@ -1,6 +1,6 @@
 # Spec: bounded and observable retention
 
-Status: ready-for-agent
+Status: done
 
 ## Problem Statement
 
