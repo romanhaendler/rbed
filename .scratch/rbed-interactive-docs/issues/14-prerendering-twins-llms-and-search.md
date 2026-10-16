@@ -31,3 +31,4 @@
 - `tsconfig.json` has `allowImportingTsExtensions`: modules shared with Node (`pages.ts`, `markdown.ts`, `search.ts`) import each other with `.ts` extensions.
 - **umriss-ui gaps:** none found. `CommandPalette` keywords only match as a contiguous run of 3+ characters, which suits method names.
 
+- **Merged with 04:** `CodeBlock` now highlights for any case of `java` (`language.toLowerCase() === 'java'`), so ````java` fences in page Markdown are highlighted like the Scenario source; 04's `.installGrid` CSS was dropped with the front page's grid. The prerendered table still has 04's columns.
