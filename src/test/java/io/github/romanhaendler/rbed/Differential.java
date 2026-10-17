@@ -277,7 +277,7 @@ final class Differential {
     }
   }
 
-  private static Difference diff(int moment, String op, List<String> a, List<String> b) {
+  static Difference diff(int moment, String op, List<String> a, List<String> b) {
     int n = Math.max(a.size(), b.size());
     for (int i = 0; i < n; i++) {
       String x = i < a.size() ? a.get(i) : "<nothing>";
