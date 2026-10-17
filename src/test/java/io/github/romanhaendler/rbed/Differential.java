@@ -167,6 +167,59 @@ final class Differential {
     });
   }
 
+  /** How {@link #compareWithSnapshots} treats the Detector under test between ops. */
+  enum Mode {
+    /** Takes a Snapshot (twice, equal) and keeps using the same Detector. */
+    SNAPSHOT_ONLY,
+    /** Replaces the Detector by a restore of its own Snapshot. */
+    RESTORE
+  }
+
+  /**
+   * Runs an uninterrupted fresh Detector (A) against one (B) that, at the moments chosen by
+   * {@code every} (every moment) or by {@code rng} (each moment with probability {@code p}), takes
+   * a Snapshot and, in mode RESTORE, continues as a restore of it: with p = 1 a chain of restores
+   * after every single moment, including before the first op. Every Snapshot of a restored
+   * Detector must equal the one it was restored from.
+   */
+  static Result compareWithSnapshots(Consumer<Detector.Builder> config,
+      Consumer<Detector.Builder> restoreConfig, List<Expression> watched, List<Op> ops, Mode mode,
+      java.util.SplittableRandom rng, double p) {
+    return capturingWarnings(warnings -> {
+      Run a = new Run(FRESH, config, watched, warnings);
+      if (a.detector == null) return new Result(null, false, 0, a.stats);
+      Run b = new Run(FRESH, config, watched, warnings);
+      for (int i = 0; i <= ops.size(); i++) {
+        if (i > 0) {
+          Op op = ops.get(i - 1);
+          Difference d = diff(i, op.toString(), a.apply(op), b.apply(op));
+          if (d != null) return new Result(d, true, i, a.stats);
+        }
+        if (p < 1 && rng.nextDouble() >= p) continue;
+        byte[] bytes = b.detector.snapshot();
+        List<String> before = b.stateLines();
+        a.stats.merge("snapshot", 1, Integer::sum);
+        Difference d = null;
+        if (!java.util.Arrays.equals(bytes, b.detector.snapshot())) {
+          d = new Difference(i, "snapshot", "two Snapshots in a row differ", "first", "second",
+              before, b.stateLines());
+        } else if (mode == Mode.RESTORE) {
+          b.restoreFrom(restoreConfig, bytes);
+          a.stats.merge("restore", 1, Integer::sum);
+          d = diff(i, "restore", a.stateLines(), b.stateLines());
+          if (d == null && !java.util.Arrays.equals(bytes, b.detector.snapshot())) {
+            d = new Difference(i, "restore", "snapshot round trip", "original Snapshot",
+                "Snapshot of the restored differs at byte "
+                    + java.util.Arrays.mismatch(bytes, b.detector.snapshot()), before,
+                b.stateLines());
+          }
+        }
+        if (d != null) return new Result(d, true, i, a.stats);
+      }
+      return new Result(null, true, ops.size(), a.stats);
+    });
+  }
+
   private static Result capturingWarnings(java.util.function.Function<List<String>, Result> body) {
     Logger logger = Logger.getLogger("io.github.romanhaendler.rbed");
     List<String> warnings = new ArrayList<>();
@@ -251,6 +304,13 @@ final class Differential {
         buildOutcome.add("outcome: " + e.getClass().getName() + ": " + e.getMessage());
       }
       buildOutcome.addAll(observe());
+    }
+
+    /** Replaces the Detector by a restore of {@code bytes}, reporting to this Run. */
+    void restoreFrom(Consumer<Detector.Builder> restoreConfig, byte[] bytes) {
+      Detector.Builder builder = Detector.builder().listener(this);
+      restoreConfig.accept(builder);
+      detector = builder.restore(bytes).build();
     }
 
     /** What is observable between two moments: counters and watched values, no callbacks. */

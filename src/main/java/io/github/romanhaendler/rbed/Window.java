@@ -175,8 +175,7 @@ abstract class Window {
         times[i] = r.int64();
         values[i] = r.float64();
       }
-      head = 0;
-      size = n;
+      size = n; // a restore only happens in a Detector just built, so head is 0
       evictedSinceExactSum = r.int32();
       sum.load(r);
       started = r.bool();
