@@ -28,7 +28,7 @@ The small marks just above the lanes are the moments a timer advanced time, once
 
 <!-- scenario silent-sensors draw -->
 
-At the defaults, with the timer, the last reading at 24 s grows older with every advance: `hr.age()` grows by a second at every advance. At 30 s it is 6 s old, more than the limit of 5 s: `HighHeartRate` Ends there and `SensorLost` is Confirmed, both without a Sample. `SensorLost` Ends at 45 s, when the sensor reports again.
+At the defaults, with the timer, `hr.age()` grows by a second at every advance after the last reading at 24 s. At 30 s it is 6 s old, more than the limit of 5 s: `HighHeartRate` Ends there and `SensorLost` is Confirmed, both without a Sample. `SensorLost` Ends at 45 s, when the sensor reports again.
 
 ### Things to try
 
@@ -37,7 +37,7 @@ At the defaults, with the timer, the last reading at 24 s grows older with every
 
 ## What an advance does
 
-At an advance, every Rule is evaluated with each Channel holding its last value (a [Pulse Channel](../pulse-channels/) is absent): durations can be reached, `totalDuration` and `count(...).within(...)` move on, and a `maxGap` is noticed. An advance is not a Sample, though: it does not count for `forSamples`, nor for the Sample-based Aggregates `min`, `max`, `mean` and `count`. The time-weighted Aggregates do include the time up to it.
+At an advance, every Rule is evaluated with each Channel holding its last value (a [Pulse Channel](../pulse-channels/) is absent): durations can be reached, `totalDuration` and `count(...).within(...)` move on, and a `maxGap` is noticed. An advance is not a Sample, though: it does not count for [`forSamples`](../event-lifecycle/#the-start-lies-before-the-confirmation), nor for the Sample-based Aggregates `min`, `max`, `mean` and `count`. The time-weighted Aggregates do include the time up to it.
 
 An advance must lie after the previous Sample or advance, and a Detector with a sampling rate rejects it, because there time advances with the Samples.
 
