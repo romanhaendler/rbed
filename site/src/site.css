@@ -562,13 +562,19 @@ dialog[aria-label='Search the documentation'] [role='option'] > [class*='_group_
   padding: 0 var(--u-space-4);
 }
 
-/* The tab already names the language. */
+/* The tab already names the language, so the copy button stands in the row of the tabs. */
+.codeTabs {
+  position: relative;
+}
+
 .codeTabs .codeLanguage {
   display: none;
 }
 
 .codeTabs .codeBar {
-  justify-content: flex-end;
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 
 .codeBar {
@@ -839,7 +845,7 @@ dialog[aria-label='Search the documentation'] [role='option'] > [class*='_group_
 }
 
 /* Under the chart: what the bands' colors, the lines and the marks on them mean. A group keeps
-   its heading with its first item when it wraps. */
+   its heading with its first item, and its items wrap after the heading, not under it. */
 .lifecycleKey {
   display: flex;
   flex-wrap: wrap;
@@ -850,7 +856,14 @@ dialog[aria-label='Search the documentation'] [role='option'] > [class*='_group_
 }
 
 .keyGroup {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: var(--u-space-3);
+  max-width: 100%;
+}
+
+.keyItems {
+  display: flex;
   flex-wrap: wrap;
   gap: var(--u-space-1) var(--u-space-3);
 }

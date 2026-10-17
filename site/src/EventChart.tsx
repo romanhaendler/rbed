@@ -394,7 +394,7 @@ export function EventChart({
 }
 
 /** What the bands' colors, the lines and the marks mean; the text alternative says it in words.
-    Each group keeps its heading with its first item when the key wraps. */
+    Each group keeps its heading with its first item, and its items wrap under one another. */
 export function LifecycleKey({ model }: { model: ChartModel }) {
   const { scenario, lifecycle, expressions, windows, advances, restart, thresholds, channels } = model;
   const key = keyOf(lifecycle);
@@ -408,7 +408,7 @@ export function LifecycleKey({ model }: { model: ChartModel }) {
     items.some(Boolean) && (
       <span className="keyGroup">
         <span>{heading}</span>
-        {items}
+        <span className="keyItems">{items}</span>
       </span>
     );
   const truncated = lifecycle.events.some((e) => e.truncatedStart || e.truncatedEnd);
