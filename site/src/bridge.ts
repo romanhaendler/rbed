@@ -27,6 +27,8 @@ export type Scenario = {
   latest?: string;
   /** Names of the Rules, which are the names of their Events. */
   rules: string[];
+  /** Each Rule as Rule#toString writes it, at the default parameters. */
+  descriptions: string[];
   parameters: Parameter[];
   /** Java source with a placeholder such as ${threshold} per parameter. */
   source: string;
@@ -79,6 +81,8 @@ export type Window = { rule: string; after: string; millis: number };
 export type Resume = {
   stop: number;
   replayPoint: number | null;
+  /** The Snapshot taken at the stop, as hexadecimal text; null if the run took none. */
+  snapshot: string | null;
   memoryHorizon: { millis: number; samples: number };
   uninterrupted: Event[];
 };
@@ -114,7 +118,7 @@ export function run(
   parameters: Record<string, number>,
   drawn: Record<string, (number | null)[]> = {},
 ): Result {
-  return forDisplay(JSON.parse(compiled.run(scenarioId, JSON.stringify(parameters), JSON.stringify(drawn))));
+  return forDisplay(JSON.parse(compiled.run(scenarioId, JSON.stringify(parameters), JSON.stringify(drawn), '')));
 }
 
 /** The source with each placeholder replaced by its parameter's value. */

@@ -17,7 +17,7 @@ npm run test:browser  # after build: the Playwright smoke tests against dist/, e
 
 ## Where things are
 
-- `src/bridge.ts`: the compiled module's functions the app calls (`scenarios`, `run`), typed. `Bridge` exports two more for the parity test alone: `snapshot` and `resume` (see `Resuming`).
+- `src/bridge.ts`: the compiled module's functions the app calls (`scenarios`, `run`), typed.  `run` takes a Snapshot to restore as its last argument (see `Resuming`).
 - `src/ScenarioView.tsx`: one Scenario: chart and panel, tables, source.
 - `src/EventChart.tsx`: draws what `src/chartModel.ts` computes, with the umriss charts.
 - `src/chartModel.ts`: everything the chart computes (bands, axes, lanes, thresholds, windows, the readout), pure, tested in `test/chartModel.test.mjs`.

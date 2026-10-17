@@ -34,16 +34,16 @@ test('the JVM tests made bridge calls to compare', () => {
 for (const { function: name, arguments: args, result } of cases) {
   test(`${name}(${args.join(', ')}) equals the JVM`, () => {
     const actual = bridge[name](...args);
-    // a Snapshot is hexadecimal text, not JSON: it must be the same bytes
-    assertClose(name === 'snapshot' ? actual : JSON.parse(actual), result, 'result');
+    assertClose(JSON.parse(actual), result, 'result');
   });
 }
 
 test('a Snapshot the compiled module wrote restores in the compiled module and continues identically', () => {
   for (const stop of [1, 20, 45, 80, 119]) {
     const parameters = JSON.stringify({ stop, restart: 3 });
-    const own = bridge.snapshot('resuming', parameters);
-    assert.ok(own.length > 0);
-    assert.equal(bridge.resume('resuming', parameters, own), bridge.run('resuming', parameters, '{}'));
+    const own = bridge.run('resuming', parameters, '{}', '');
+    const snapshot = JSON.parse(own).resume.snapshot;
+    assert.ok(snapshot.length > 0);
+    assert.equal(bridge.run('resuming', parameters, '{}', snapshot), own);
   }
 });

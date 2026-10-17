@@ -60,9 +60,15 @@ class BridgeTest {
 
   @SuppressWarnings("unchecked")
   static Map<String, Object> run(String scenarioId, String parameters, String drawnChannels) {
-    String result = Bridge.run(scenarioId, parameters, drawnChannels);
+    return run(scenarioId, parameters, drawnChannels, "");
+  }
+
+  @SuppressWarnings("unchecked")
+  static Map<String, Object> run(String scenarioId, String parameters, String drawnChannels,
+      String restoreFrom) {
+    String result = Bridge.run(scenarioId, parameters, drawnChannels, restoreFrom);
     return (Map<String, Object>) Json.parse(
-        call("run", result, scenarioId, parameters, drawnChannels));
+        call("run", result, scenarioId, parameters, drawnChannels, restoreFrom));
   }
 
   @SuppressWarnings("unchecked")
@@ -74,7 +80,8 @@ class BridgeTest {
   void everyScenarioDescribesItsRulesAsTheyAreWrittenInJava() {
     for (Map<String, Object> s : scenarios()) {
       String id = (String) s.get("id");
-      List<?> rules = (List<?>) Json.parse(call("describeRules", Bridge.describeRules(id), id));
+      List<?> rules = (List<?>) s.get("descriptions");
+      assertEquals(((List<?>) s.get("rules")).size(), rules.size());
       for (Object rule : rules) {
         org.junit.jupiter.api.Assertions.assertTrue(
             ((String) rule).startsWith("Rule.named(\""), (String) rule);
@@ -1261,26 +1268,19 @@ class BridgeTest {
     assertEquals(List.of(true, true, true, true), equalAt(105));     // nothing left to lose
   }
 
-  /** The Snapshot (hexadecimal text, a JSON string in parity.json) a run takes at its stop. */
-  static String snapshot(String scenarioId, String parameters) {
-    String hex = Bridge.snapshot(scenarioId, parameters);
-    call("snapshot", Json.string(new StringBuilder(), hex).toString(), scenarioId, parameters);
-    return hex;
-  }
-
   @SuppressWarnings("unchecked")
   @Test
   void aSnapshotWrittenByTheRunRestoresInAnotherRun() {
-    assertEquals("", snapshot("history", "{}"));
+    assertNull(run("history", "{}").get("resume"));
     // parity.json repeats these against the compiled JavaScript: it must write the same bytes
     // and restore the JVM's Snapshot into the same result
     for (int stop : new int[] {1, 20, 45, 80, 119}) {
       String parameters = "{\"stop\": " + stop + ", \"restart\": 3}";
-      String snapshot = snapshot("resuming", parameters);
+      Map<String, Object> own = run("resuming", parameters);
+      String snapshot = (String) resume(own).get("snapshot");
       assertFalse(snapshot.isEmpty());
-      Map<String, Object> restored = (Map<String, Object>) Json.parse(call("resume",
-          Bridge.resume("resuming", parameters, snapshot), "resuming", parameters, snapshot));
-      assertEquals(run("resuming", parameters), restored);
+      Map<String, Object> restored = run("resuming", parameters, "{}", snapshot);
+      assertEquals(own, restored);
       if (stop == 45) assertEquals(UNINTERRUPTED, describe(restored, 1000));
     }
   }

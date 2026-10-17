@@ -18,7 +18,7 @@ test('pages let the reader draw', () => assert.ok(drawable.length > 0));
 for (const id of drawable) {
   test(`${id} has as many Samples at every parameter value, so drawn values fit`, () => {
     const scenario = catalogue.find((s) => s.id === id);
-    const run = (parameters, drawn = {}) => JSON.parse(bridge.run(id, JSON.stringify(parameters), JSON.stringify(drawn)));
+    const run = (parameters, drawn = {}) => JSON.parse(bridge.run(id, JSON.stringify(parameters), JSON.stringify(drawn), ''));
     const count = run({}).samples.length;
     const drawn = Object.fromEntries(
       scenario.channels.filter((c) => !scenario.pulse.includes(c)).map((c) => [c, Array(count).fill(1)]),
