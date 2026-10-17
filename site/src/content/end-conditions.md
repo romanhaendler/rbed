@@ -30,7 +30,7 @@ At the default End threshold of 500 kg the Rule flaps: four Events, the first on
 
 ## When does the next Event start?
 
-At an End threshold of 500 kg, the weight is above 500 again at 6 s and 7 s, yet no Event starts there. While an Event runs on its End Condition, `when` is not evaluated, and a new Event only starts once `when` has been seen not holding after the previous one Ended (or a [data gap](../data-gaps/) has passed): 489 kg at 8 s does that, and the next Event starts at 10 s. Each Rule has at most one Event in progress, and this is why a Rule with an End Condition does not flicker.
+At an End threshold of 500 kg, the weight is above 500 again at 6 s and 7 s, yet no Event starts there. While an Event runs on its End Condition, `when` is not evaluated, and a new Event only starts once `when` has been seen not holding at a Sample after the previous one Ended (or right after a [data gap](../data-gaps/) longer than `maxGap`): 489 kg at 8 s does that, and the next Event starts at 10 s. Each Rule has at most one Event in progress, and this is why a Rule with an End Condition does not flicker.
 
 ## A duration for the End Condition
 

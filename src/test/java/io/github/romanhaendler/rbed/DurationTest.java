@@ -56,6 +56,21 @@ class DurationTest {
   }
 
   @Test
+  void readmeTruncationExample() {
+    // "The Event lifecycle", Truncation: exactly as printed in the README.
+    Channel temp = Channel.named("temp");
+    Rule overheat = Rule.named("Overheat").when(temp.above(80)).forDuration(2_000);
+    Detector detector = Detector.builder().rules(overheat).listener(rec).build();
+    detector.push(0,     Map.of(temp, 90.0));
+    detector.push(1_000, Map.of(temp, 92.0));
+    detector.push(2_000, Map.of(temp, 91.0));
+    detector.push(3_000, Map.of(temp, 70.0));
+    assertEquals(List.of("pending Overheat 0", "confirmed Overheat 0",
+        "ended Overheat 0..3000 truncatedStart"), rec.log);
+    assertEquals(2_000, rec.ended.get(0).confirmed().getAsLong());
+  }
+
+  @Test
   void closeDiscardsPendingEvent() {
     Detector d = detector(r -> r.when(X.above(0)).forDuration(100));
     d.push(0, Map.of(X, 0.0));
