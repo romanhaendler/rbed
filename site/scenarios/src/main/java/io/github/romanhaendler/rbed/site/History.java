@@ -90,11 +90,11 @@ final class History extends Scenario {
   void detect(Rule[] rules, List<Sample> samples, Map<String, Double> values,
       Lifecycle lifecycle) {
     long restart = Math.round(values.get("restart")) * DAY;
-    Detector detector = Detector.builder().rules(rules).listener(lifecycle).build();
+    Detector detector = lifecycle.builder().rules(rules).build();
     for (Sample sample : samples) {
       if (sample.timestamp() == restart) {
         detector.close();
-        Detector.Builder builder = Detector.builder().rules(rules).listener(lifecycle);
+        Detector.Builder builder = lifecycle.builder().rules(rules);
         boolean withHistory = values.get("history") == 0;
         if (withHistory) builder.history(List.copyOf(lifecycle.ended));
         detector = builder.build();

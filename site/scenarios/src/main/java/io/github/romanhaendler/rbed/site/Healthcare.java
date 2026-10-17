@@ -105,7 +105,7 @@ final class Healthcare extends Scenario {
   @Override
   void detect(Rule[] rules, List<Sample> samples, Map<String, Double> values,
       Lifecycle lifecycle) {
-    Detector detector = Detector.builder().rules(rules).listener(lifecycle).build();
+    Detector detector = lifecycle.builder().rules(rules).build();
     int next = 0;
     for (long s = 0; s < 600; s++) {
       if (dropout(s)) lifecycle.advance(detector, s * 1_000);

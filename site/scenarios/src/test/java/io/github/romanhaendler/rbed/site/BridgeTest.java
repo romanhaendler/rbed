@@ -3,7 +3,6 @@ package io.github.romanhaendler.rbed.site;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.romanhaendler.rbed.Channel;
@@ -1027,7 +1026,7 @@ class BridgeTest {
         Json.parse("{\"a\\/\\\"\\\\\": [0, -0.5, 1.5e+3, 2E-2, 10]}"));
   }
 
-  /** A Scenario that plots its Channel {@code a} through a given Expression, for ExpressionValues. */
+  /** A Scenario that plots its Channels {@code a} and {@code b} through a given Expression. */
   static Scenario plotting(String name, BiFunction<Channel, Channel, Expression>
       expression, double[] a, double[] b) {
     Channel ca = Channel.named("a");
@@ -1075,8 +1074,10 @@ class BridgeTest {
     assertFalse(result.containsKey("by"), result.toString());
   }
 
+  /** An advance before the first Sample is a moment like any other: the plot is undefined there. */
   @Test
-  void aScenarioThatAdvancesTimeBeforeItsFirstSampleCannotBePlotted() {
+  @SuppressWarnings("unchecked")
+  void anAdvanceBeforeTheFirstSampleIsPlottedAsUndefined() {
     Channel a = Channel.named("a");
     Scenario early = new Scenario("early", "early", "s", 1000, List.of(a), List.of(), "") {
       @Override
@@ -1090,25 +1091,31 @@ class BridgeTest {
       }
 
       @Override
+      List<Plot> plots(Map<String, Double> values) {
+        return List.of(new Plot("a.age()", a.age()), new Plot("a", a));
+      }
+
+      @Override
       void detect(Rule[] rules, List<Sample> samples, Map<String, Double> values,
           Lifecycle lifecycle) {
-        Detector detector =
-            Detector.builder().rules(rules).listener(lifecycle).build();
+        Detector detector = lifecycle.builder().rules(rules).build();
         lifecycle.advance(detector, 1000);
         lifecycle.push(detector, samples.get(0));
+        lifecycle.advance(detector, 3500);
         detector.close();
       }
     };
-    IllegalStateException e = assertThrows(
-        IllegalStateException.class,
-        () -> ExpressionValues.of(early, a, Map.of(), early.samples(Map.of())));
-    assertEquals("Scenario early advances time before its first Sample", e.getMessage());
+    Map<String, Object> result = (Map<String, Object>) Json.parse(Bridge.run(early, "{}", "{}"));
+    List<Map<String, Object>> plots = (List<Map<String, Object>>) result.get("expressions");
+    assertEquals(List.of(0.0), plots.get(0).get("values"));
+    assertEquals(Arrays.asList(null, 1500.0), plots.get(0).get("atAdvances"));
+    assertEquals(List.of(1.0), plots.get(1).get("values"));
+    assertEquals(Arrays.asList(null, 1.0), plots.get(1).get("atAdvances"));  // held after
   }
 
   /**
-   * ExpressionValues finds rbed's value of an Expression by comparisons alone; it must give the
-   * double rbed computes bit for bit, for random and special values (negative, -0.0, subnormal,
-   * huge) and where the Expression is undefined (a division by zero).
+   * The bridge plots the double rbed computes bit for bit, for random and special values
+   * (negative, -0.0, subnormal, huge) and where the Expression is undefined (a division by zero).
    */
   @Test
   void plottedValuesAreExactlyTheDoublesRbedComputes() {
@@ -1137,13 +1144,16 @@ class BridgeTest {
         "-|a-b|", (x, y) -> x.minus(y).abs().times(-1));
     for (String name : expected.keySet()) {
       Scenario scenario = plotting(name, expressions.get(name), a, b);
-      double[] values = ExpressionValues.of(scenario, scenario.plots(Map.of()).get(0).expression(),
-          Map.of(), scenario.samples(Map.of())).atSamples();
+      @SuppressWarnings("unchecked")
+      List<Double> values = expressionValues(
+          (Map<String, Object>) Json.parse(Bridge.run(scenario, "{}", "{}")));
       for (int i = 0; i < n; i++) {
         double want = expected.get(name).apply(a[i], b[i]) + 0.0; // the site writes -0.0 as 0
         if (!Double.isFinite(want)) want = Double.NaN; // rbed: undefined
-        assertEquals(Double.doubleToLongBits(want), Double.doubleToLongBits(values[i]),
-            name + " at " + i + ": " + a[i] + ", " + b[i] + " gives " + values[i]);
+        Double got = values.get(i);
+        assertEquals(Double.doubleToLongBits(want),
+            Double.doubleToLongBits(got == null ? Double.NaN : got),
+            name + " at " + i + ": " + a[i] + ", " + b[i] + " gives " + got);
       }
     }
   }

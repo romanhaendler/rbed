@@ -11,6 +11,7 @@ import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -205,6 +206,53 @@ class SourceTest {
       }
     }
 
+    PrintStream stdout = System.out;
+    try (URLClassLoader loader = compile(units, out)) {
+      List<String> ended = (List<String>) loader.loadClass("Tee").getField("ended").get(null);
+      System.setOut(new PrintStream(new ByteArrayOutputStream()));
+      // at the defaults: other options may lead into rbed's rejections on purpose (Validation)
+      for (var expected : atDefaults.entrySet()) {
+        String name = expected.getKey();
+        Method main = loader.loadClass(name).getMethod("main", String[].class);
+        ended.clear();
+        try {
+          main.invoke(null, (Object) new String[0]);
+        } catch (InvocationTargetException e) {
+          throw new AssertionError(name + " throws " + e.getCause(), e.getCause());
+        }
+        assertEquals(expected.getValue(), ended, name + " finds the bridge's Events");
+      }
+    } finally {
+      System.setOut(stdout);
+    }
+  }
+
+  /**
+   * The snippet under "Read an Expression's value" on the Conditions and Expressions page is a
+   * source like a Scenario's: it compiles, runs and prints what its comment says.
+   */
+  @Test
+  void theReadAnExpressionsValueSnippetCompilesAndPrintsTheValues(@TempDir Path out)
+      throws Exception {
+    String page = Files.readString(Path.of("..", "src", "content", "conditions-and-expressions.md"));
+    int start = page.indexOf("```java\n", page.indexOf("## Read an Expression's value"))
+        + "```java\n".length();
+    String snippet = page.substring(start, page.indexOf("```", start));
+    PrintStream stdout = System.out;
+    ByteArrayOutputStream printed = new ByteArrayOutputStream();
+    try (URLClassLoader loader = compile(Map.of("Snippet", unit("Snippet", snippet)), out)) {
+      Method main = loader.loadClass("Snippet").getMethod("main", String[].class);
+      System.setOut(new PrintStream(printed));
+      main.invoke(null, (Object) new String[0]);
+    } finally {
+      System.setOut(stdout);
+    }
+    assertEquals(List.of("OptionalDouble.empty", "OptionalDouble.empty", "OptionalDouble[25.0]",
+        "OptionalDouble[26.0]"), printed.toString().lines().toList());
+  }
+
+  /** Compiles the units against rbed into {@code out} and loads them with rbed alone. */
+  static URLClassLoader compile(Map<String, String> units, Path out) throws Exception {
     List<JavaFileObject> files = new ArrayList<>();
     for (var unit : units.entrySet()) {
       files.add(new SimpleJavaFileObject(URI.create("string:///" + unit.getKey() + ".java"),
@@ -227,27 +275,7 @@ class SourceTest {
           .append(d.getLineNumber()).append(": ").append(d.getMessage(null)).append('\n');
     }
     assertTrue(compiled, errors.toString());
-
-    PrintStream stdout = System.out;
-    try (URLClassLoader loader = new URLClassLoader(
-        new URL[] {out.toUri().toURL(), rbed.toUri().toURL()}, null)) {
-      List<String> ended = (List<String>) loader.loadClass("Tee").getField("ended").get(null);
-      System.setOut(new PrintStream(new ByteArrayOutputStream()));
-      // at the defaults: other options may lead into rbed's rejections on purpose (Validation)
-      for (var expected : atDefaults.entrySet()) {
-        String name = expected.getKey();
-        Method main = loader.loadClass(name).getMethod("main", String[].class);
-        ended.clear();
-        try {
-          main.invoke(null, (Object) new String[0]);
-        } catch (InvocationTargetException e) {
-          throw new AssertionError(name + " throws " + e.getCause(), e.getCause());
-        }
-        assertEquals(expected.getValue(), ended, name + " finds the bridge's Events");
-      }
-    } finally {
-      System.setOut(stdout);
-    }
+    return new URLClassLoader(new URL[] {out.toUri().toURL(), rbed.toUri().toURL()}, null);
   }
 
   @SuppressWarnings("unchecked")
