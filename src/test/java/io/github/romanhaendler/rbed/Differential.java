@@ -125,7 +125,7 @@ final class Differential {
    */
   static Result compareRestoredAt(Consumer<Detector.Builder> config,
       Consumer<Detector.Builder> restoreConfig, List<Expression> watched, List<Op> ops, int k) {
-    return capturingWarnings(warnings -> {
+    return capturing(warnings -> {
       Run a = new Run(FRESH, config, watched, warnings);
       if (a.detector == null) return new Result(null, false, 0, a.stats);
       for (int i = 0; i < k; i++) a.apply(ops.get(i));
@@ -185,7 +185,7 @@ final class Differential {
   static Result compareWithSnapshots(Consumer<Detector.Builder> config,
       Consumer<Detector.Builder> restoreConfig, List<Expression> watched, List<Op> ops, Mode mode,
       java.util.SplittableRandom rng, double p) {
-    return capturingWarnings(warnings -> {
+    return capturing(warnings -> {
       Run a = new Run(FRESH, config, watched, warnings);
       if (a.detector == null) return new Result(null, false, 0, a.stats);
       Run b = new Run(FRESH, config, watched, warnings);
@@ -218,25 +218,6 @@ final class Differential {
       }
       return new Result(null, true, ops.size(), a.stats);
     });
-  }
-
-  private static Result capturingWarnings(java.util.function.Function<List<String>, Result> body) {
-    Logger logger = Logger.getLogger("io.github.romanhaendler.rbed");
-    List<String> warnings = new ArrayList<>();
-    Handler handler = new Handler() {
-      @Override public void publish(LogRecord r) { warnings.add(r.getLevel() + " " + r.getMessage()); }
-      @Override public void flush() {}
-      @Override public void close() {}
-    };
-    boolean parents = logger.getUseParentHandlers();
-    logger.setUseParentHandlers(false);
-    logger.addHandler(handler);
-    try {
-      return body.apply(warnings);
-    } finally {
-      logger.removeHandler(handler);
-      logger.setUseParentHandlers(parents);
-    }
   }
 
   static Result compare(Consumer<Detector.Builder> config, List<Expression> watched, List<Op> ops,
@@ -283,7 +264,8 @@ final class Differential {
       String x = i < a.size() ? a.get(i) : "<nothing>";
       String y = i < b.size() ? b.get(i) : "<nothing>";
       if (!x.equals(y)) {
-        String field = x.contains(":") ? x.substring(0, x.indexOf(':')) : y.substring(0, y.indexOf(':'));
+        String field = x.indexOf(':') >= 0 ? x.substring(0, x.indexOf(':'))
+            : y.substring(0, Math.max(0, y.indexOf(':')));
         return new Difference(moment, op, field, x, y, a, b);
       }
     }

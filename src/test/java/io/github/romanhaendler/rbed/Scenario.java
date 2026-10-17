@@ -87,25 +87,53 @@ record Scenario(
   }
 
   /**
+   * What a {@link Node} builds. {@code method} is the library method it calls on its first child
+   * (in the Java source of a tree); {@code constant}: its operand is the number {@code a}.
+   */
+  enum Construct {
+    CH, PULSE, AVG_S, AVG_D, RATE, AGE, RISING, FALLING, ABS, PLUS, MINUS, TIMES, DIV,
+    PLUS_C("plus"), MINUS_C("minus"), TIMES_C("times"), DIV_C("dividedBy"), ABOVE, BELOW,
+    ABOVE_C("above"), BELOW_C("below"), BETWEEN, AND, OR, NOT, DURING, AFTER, COUNT, TOTAL,
+    LATEST_MIN, LATEST_MAX, LATEST_MEAN, LATEST_DUR, CONST;
+
+    final String method;
+    final boolean constant;
+
+    Construct() {
+      this.method = name().toLowerCase(java.util.Locale.ROOT);
+      this.constant = false;
+    }
+
+    Construct(String method) {
+      this.method = method;
+      this.constant = true;
+    }
+
+    boolean isLatest() {
+      return this == LATEST_MIN || this == LATEST_MAX || this == LATEST_MEAN || this == LATEST_DUR;
+    }
+  }
+
+  /**
    * A Condition or Expression as a tree. {@code a} and {@code b} are numeric parameters, {@code
    * name} a Channel or Rule name, {@code names} further names. A tree of the wrong shape (for
    * example after the shrinker promoted a sub-tree) fails to build with the same exception
    * everywhere, which counts as "not a difference".
    */
-  record Node(String op, String name, double a, double b, List<Node> kids, List<String> names) {
-    static Node of(String op, Node... kids) {
+  record Node(Construct op, String name, double a, double b, List<Node> kids, List<String> names) {
+    static Node of(Construct op, Node... kids) {
       return new Node(op, null, 0, 0, List.of(kids), List.of());
     }
 
-    static Node ofA(String op, double a, Node... kids) {
+    static Node ofA(Construct op, double a, Node... kids) {
       return new Node(op, null, a, 0, List.of(kids), List.of());
     }
 
-    static Node ofAB(String op, double a, double b, Node... kids) {
+    static Node ofAB(Construct op, double a, double b, Node... kids) {
       return new Node(op, null, a, b, List.of(kids), List.of());
     }
 
-    static Node named(String op, String name, double a, String... names) {
+    static Node named(Construct op, String name, double a, String... names) {
       return new Node(op, name, a, 0, List.of(), List.of(names));
     }
 
@@ -144,33 +172,33 @@ record Scenario(
 
     Object build(Map<String, Rule> k) {
       return switch (op) {
-        case "ch" -> Channel.named(name);
-        case "pulse" -> Channel.pulse(name);
-        case "avgS" -> ce(0, k).averageOverSamples((int) a);
-        case "avgD" -> ce(0, k).averageOverDuration((long) a);
-        case "rate" -> ce(0, k).rate();
-        case "age" -> ce(0, k).age();
-        case "rising" -> ce(0, k).rising();
-        case "falling" -> ce(0, k).falling();
-        case "abs" -> ex(0, k).abs();
-        case "plus" -> ex(0, k).plus(ex(1, k));
-        case "minus" -> ex(0, k).minus(ex(1, k));
-        case "times" -> ex(0, k).times(ex(1, k));
-        case "div" -> ex(0, k).dividedBy(ex(1, k));
-        case "plusC" -> ex(0, k).plus(a);
-        case "minusC" -> ex(0, k).minus(a);
-        case "timesC" -> ex(0, k).times(a);
-        case "divC" -> ex(0, k).dividedBy(a);
-        case "above" -> ex(0, k).above(ex(1, k));
-        case "below" -> ex(0, k).below(ex(1, k));
-        case "aboveC" -> ex(0, k).above(a);
-        case "belowC" -> ex(0, k).below(a);
-        case "between" -> ex(0, k).between(a, b);
-        case "and" -> co(0, k).and(co(1, k));
-        case "or" -> co(0, k).or(co(1, k));
-        case "not" -> co(0, k).not();
-        case "during" -> Conditions.during(rule(k));
-        case "after" -> {
+        case CH -> Channel.named(name);
+        case PULSE -> Channel.pulse(name);
+        case AVG_S -> ce(0, k).averageOverSamples((int) a);
+        case AVG_D -> ce(0, k).averageOverDuration((long) a);
+        case RATE -> ce(0, k).rate();
+        case AGE -> ce(0, k).age();
+        case RISING -> ce(0, k).rising();
+        case FALLING -> ce(0, k).falling();
+        case ABS -> ex(0, k).abs();
+        case PLUS -> ex(0, k).plus(ex(1, k));
+        case MINUS -> ex(0, k).minus(ex(1, k));
+        case TIMES -> ex(0, k).times(ex(1, k));
+        case DIV -> ex(0, k).dividedBy(ex(1, k));
+        case PLUS_C -> ex(0, k).plus(a);
+        case MINUS_C -> ex(0, k).minus(a);
+        case TIMES_C -> ex(0, k).times(a);
+        case DIV_C -> ex(0, k).dividedBy(a);
+        case ABOVE -> ex(0, k).above(ex(1, k));
+        case BELOW -> ex(0, k).below(ex(1, k));
+        case ABOVE_C -> ex(0, k).above(a);
+        case BELOW_C -> ex(0, k).below(a);
+        case BETWEEN -> ex(0, k).between(a, b);
+        case AND -> co(0, k).and(co(1, k));
+        case OR -> co(0, k).or(co(1, k));
+        case NOT -> co(0, k).not();
+        case DURING -> Conditions.during(rule(k));
+        case AFTER -> {
           After after = Conditions.after(rule(k));
           if (!names.isEmpty()) {
             after = after.unless(names.stream().map(n -> {
@@ -181,13 +209,13 @@ record Scenario(
           }
           yield a >= 0 ? after.within((long) a) : after;
         }
-        case "count" -> a >= 0 ? Conditions.count(rule(k)).within((long) a) : Conditions.count(rule(k));
-        case "total" -> Conditions.totalDuration(rule(k));
-        case "latestMin" -> Conditions.latest(rule(k)).min(Channel.named(names.get(0)));
-        case "latestMax" -> Conditions.latest(rule(k)).max(Channel.named(names.get(0)));
-        case "latestMean" -> Conditions.latest(rule(k)).mean(Channel.named(names.get(0)));
-        case "latestDur" -> Conditions.latest(rule(k)).duration();
-        case "const" -> throw shape(); // only used as an operand through the "C" variants
+        case COUNT -> a >= 0 ? Conditions.count(rule(k)).within((long) a) : Conditions.count(rule(k));
+        case TOTAL -> Conditions.totalDuration(rule(k));
+        case LATEST_MIN -> Conditions.latest(rule(k)).min(Channel.named(names.get(0)));
+        case LATEST_MAX -> Conditions.latest(rule(k)).max(Channel.named(names.get(0)));
+        case LATEST_MEAN -> Conditions.latest(rule(k)).mean(Channel.named(names.get(0)));
+        case LATEST_DUR -> Conditions.latest(rule(k)).duration();
+        case CONST -> throw shape(); // only used as an operand through the "C" variants
         default -> throw new IllegalStateException("unknown op " + op);
       };
     }
@@ -198,30 +226,29 @@ record Scenario(
       String k1 = kids.size() < 2 ? "?" : kids.get(1).java();
       String r = name == null ? "?" : name.toLowerCase();
       return switch (op) {
-        case "ch" -> "Channel.named(\"" + name + "\")";
-        case "pulse" -> "Channel.pulse(\"" + name + "\")";
-        case "avgS" -> k0 + ".averageOverSamples(" + (int) a + ")";
-        case "avgD" -> k0 + ".averageOverDuration(" + (long) a + "L)";
-        case "rate", "age", "rising", "falling", "abs" -> k0 + "." + op + "()";
-        case "not" -> k0 + ".not()";
-        case "plus", "minus", "times", "above", "below", "and", "or" ->
-            k0 + "." + op + "(" + k1 + ")";
-        case "div" -> k0 + ".dividedBy(" + k1 + ")";
-        case "plusC", "minusC", "timesC", "aboveC", "belowC" ->
-            k0 + "." + op.substring(0, op.length() - 1) + "(" + lit(a) + ")";
-        case "divC" -> k0 + ".dividedBy(" + lit(a) + ")";
-        case "between" -> k0 + ".between(" + lit(a) + ", " + lit(b) + ")";
-        case "during" -> "Conditions.during(" + r + ")";
-        case "after" -> "Conditions.after(" + r + ")"
+        case CH -> "Channel.named(\"" + name + "\")";
+        case PULSE -> "Channel.pulse(\"" + name + "\")";
+        case AVG_S -> k0 + ".averageOverSamples(" + (int) a + ")";
+        case AVG_D -> k0 + ".averageOverDuration(" + (long) a + "L)";
+        case RATE, AGE, RISING, FALLING, ABS, NOT -> k0 + "." + op.method + "()";
+        case PLUS, MINUS, TIMES, ABOVE, BELOW, AND, OR ->
+            k0 + "." + op.method + "(" + k1 + ")";
+        case DIV -> k0 + ".dividedBy(" + k1 + ")";
+        case PLUS_C, MINUS_C, TIMES_C, ABOVE_C, BELOW_C ->
+            k0 + "." + op.method + "(" + lit(a) + ")";
+        case DIV_C -> k0 + ".dividedBy(" + lit(a) + ")";
+        case BETWEEN -> k0 + ".between(" + lit(a) + ", " + lit(b) + ")";
+        case DURING -> "Conditions.during(" + r + ")";
+        case AFTER -> "Conditions.after(" + r + ")"
             + (names.isEmpty() ? "" : ".unless("
                 + names.stream().map(String::toLowerCase).collect(Collectors.joining(", ")) + ")")
             + (a >= 0 ? ".within(" + (long) a + "L)" : "");
-        case "count" -> "Conditions.count(" + r + ")" + (a >= 0 ? ".within(" + (long) a + "L)" : "");
-        case "total" -> "Conditions.totalDuration(" + r + ")";
-        case "latestMin" -> "Conditions.latest(" + r + ").min(Channel.named(\"" + names.get(0) + "\"))";
-        case "latestMax" -> "Conditions.latest(" + r + ").max(Channel.named(\"" + names.get(0) + "\"))";
-        case "latestMean" -> "Conditions.latest(" + r + ").mean(Channel.named(\"" + names.get(0) + "\"))";
-        case "latestDur" -> "Conditions.latest(" + r + ").duration()";
+        case COUNT -> "Conditions.count(" + r + ")" + (a >= 0 ? ".within(" + (long) a + "L)" : "");
+        case TOTAL -> "Conditions.totalDuration(" + r + ")";
+        case LATEST_MIN -> "Conditions.latest(" + r + ").min(Channel.named(\"" + names.get(0) + "\"))";
+        case LATEST_MAX -> "Conditions.latest(" + r + ").max(Channel.named(\"" + names.get(0) + "\"))";
+        case LATEST_MEAN -> "Conditions.latest(" + r + ").mean(Channel.named(\"" + names.get(0) + "\"))";
+        case LATEST_DUR -> "Conditions.latest(" + r + ").duration()";
         default -> op + "?";
       };
     }
@@ -240,11 +267,11 @@ record Scenario(
     }
 
     void collectConstants(List<Double> into) {
-      if (op.endsWith("C") || op.equals("between")) {
+      if (op.constant || op == Construct.BETWEEN) {
         into.add(a);
-        if (op.equals("between")) into.add(b);
+        if (op == Construct.BETWEEN) into.add(b);
       }
-      if (op.equals("count") && a >= 0) into.add(a);
+      if (op == Construct.COUNT && a >= 0) into.add(a);
       kids.forEach(kid -> kid.collectConstants(into));
     }
   }

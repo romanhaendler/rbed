@@ -1,6 +1,7 @@
 package io.github.romanhaendler.rbed;
 
 import io.github.romanhaendler.rbed.Differential.Op;
+import io.github.romanhaendler.rbed.Scenario.Construct;
 import io.github.romanhaendler.rbed.Scenario.HistorySpec;
 import io.github.romanhaendler.rbed.Scenario.Node;
 import io.github.romanhaendler.rbed.Scenario.RuleSpec;
@@ -92,7 +93,7 @@ final class ScenarioGenerator {
   }
 
   private Node channel() {
-    return r.nextInt(6) == 0 ? Node.named("pulse", PULSE, 0) : Node.named("ch", CHANNELS[r.nextInt(3)], 0);
+    return r.nextInt(6) == 0 ? Node.named(Construct.PULSE, PULSE, 0) : Node.named(Construct.CH, CHANNELS[r.nextInt(3)], 0);
   }
 
   /** A Channel or a moving average over one. */
@@ -102,8 +103,8 @@ final class ScenarioGenerator {
       boolean samples = r.nextBoolean();
       int n = 1 + r.nextInt(6);
       if (limit > 0) n = Math.min(n, limit);
-      Node avg = samples ? Node.ofA("avgS", n, base) : Node.ofA("avgD", r.nextInt(8) == 0 ? 0 : timeConstant(1, 800), base);
-      return depth > 1 && r.nextInt(6) == 0 ? Node.ofA("avgS", Math.max(1, Math.min(3, limit == 0 ? 3 : limit)), avg) : avg;
+      Node avg = samples ? Node.ofA(Construct.AVG_S, n, base) : Node.ofA(Construct.AVG_D, r.nextInt(8) == 0 ? 0 : timeConstant(1, 800), base);
+      return depth > 1 && r.nextInt(6) == 0 ? Node.ofA(Construct.AVG_S, Math.max(1, Math.min(3, limit == 0 ? 3 : limit)), avg) : avg;
     }
     return base;
   }
@@ -111,48 +112,48 @@ final class ScenarioGenerator {
   private Node number(int depth, int rulesBefore) {
     int p = r.nextInt(100);
     if (depth == 0 || p < 35) return channelExpression(depth);
-    if (p < 43) return Node.of("rate", channelExpression(1));
-    if (p < 51) return Node.of("age", channelExpression(1));
+    if (p < 43) return Node.of(Construct.RATE, channelExpression(1));
+    if (p < 51) return Node.of(Construct.AGE, channelExpression(1));
     if (p < 61) {
-      String[] ops = {"plus", "minus", "times", "div"};
+      Construct[] ops = {Construct.PLUS, Construct.MINUS, Construct.TIMES, Construct.DIV};
       return Node.of(ops[r.nextInt(4)], number(depth - 1, rulesBefore), number(depth - 1, rulesBefore));
     }
     if (p < 71) {
-      String[] ops = {"plusC", "minusC", "timesC", "divC"};
+      Construct[] ops = {Construct.PLUS_C, Construct.MINUS_C, Construct.TIMES_C, Construct.DIV_C};
       double c = r.nextInt(12) == 0 ? 0 : threshold();
       return Node.ofA(ops[r.nextInt(4)], c, number(depth - 1, rulesBefore));
     }
-    if (p < 75) return Node.of("abs", number(depth - 1, rulesBefore));
+    if (p < 75) return Node.of(Construct.ABS, number(depth - 1, rulesBefore));
     if (rulesBefore == 0) return channelExpression(depth);
     String rule = ruleName(rulesBefore);
-    if (p < 81) return Node.named("count", rule, r.nextBoolean() ? -1 : timeConstant(1, 1500));
-    if (p < 85) return Node.named("total", rule, 0);
+    if (p < 81) return Node.named(Construct.COUNT, rule, r.nextBoolean() ? -1 : timeConstant(1, 1500));
+    if (p < 85) return Node.named(Construct.TOTAL, rule, 0);
     if (p < 99) {
-      String[] ops = {"latestMin", "latestMax", "latestMean"};
+      Construct[] ops = {Construct.LATEST_MIN, Construct.LATEST_MAX, Construct.LATEST_MEAN};
       return Node.named(ops[r.nextInt(3)], rule, 0, CHANNELS[r.nextInt(3)]);
     }
-    return Node.named("latestDur", rule, 0);
+    return Node.named(Construct.LATEST_DUR, rule, 0);
   }
 
   private Node condition(int depth, int rulesBefore) {
     int p = r.nextInt(100);
     if (depth == 0 || p < 40) {
       Node e = number(Math.min(depth, 1), rulesBefore);
-      return Node.ofA(r.nextBoolean() ? "aboveC" : "belowC", threshold(), e);
+      return Node.ofA(r.nextBoolean() ? Construct.ABOVE_C : Construct.BELOW_C, threshold(), e);
     }
-    if (p < 50) return Node.of(r.nextBoolean() ? "above" : "below", number(1, rulesBefore), number(1, rulesBefore));
+    if (p < 50) return Node.of(r.nextBoolean() ? Construct.ABOVE : Construct.BELOW, number(1, rulesBefore), number(1, rulesBefore));
     if (p < 58) {
       double lo = threshold();
-      return Node.ofAB("between", lo, lo + r.nextInt(4), number(1, rulesBefore));
+      return Node.ofAB(Construct.BETWEEN, lo, lo + r.nextInt(4), number(1, rulesBefore));
     }
-    if (p < 68) return Node.of(r.nextBoolean() ? "rising" : "falling", channelExpression(1));
-    if (p < 80) return Node.of(r.nextBoolean() ? "and" : "or", condition(depth - 1, rulesBefore), condition(depth - 1, rulesBefore));
-    if (p < 85) return Node.of("not", condition(depth - 1, rulesBefore));
-    if (rulesBefore == 0) return Node.ofA("aboveC", threshold(), channelExpression(1));
-    if (p < 93) return Node.named("during", ruleName(rulesBefore), 0);
+    if (p < 68) return Node.of(r.nextBoolean() ? Construct.RISING : Construct.FALLING, channelExpression(1));
+    if (p < 80) return Node.of(r.nextBoolean() ? Construct.AND : Construct.OR, condition(depth - 1, rulesBefore), condition(depth - 1, rulesBefore));
+    if (p < 85) return Node.of(Construct.NOT, condition(depth - 1, rulesBefore));
+    if (rulesBefore == 0) return Node.ofA(Construct.ABOVE_C, threshold(), channelExpression(1));
+    if (p < 93) return Node.named(Construct.DURING, ruleName(rulesBefore), 0);
     List<String> unless = new ArrayList<>();
     for (int i = r.nextInt(3); i > 0; i--) unless.add(ruleName(rulesBefore));
-    return new Node("after", ruleName(rulesBefore), r.nextBoolean() ? -1 : timeConstant(1, 1500), 0,
+    return new Node(Construct.AFTER, ruleName(rulesBefore), r.nextBoolean() ? -1 : timeConstant(1, 1500), 0,
         List.of(), unless);
   }
 
