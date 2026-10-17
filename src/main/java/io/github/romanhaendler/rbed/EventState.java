@@ -1,5 +1,7 @@
 package io.github.romanhaendler.rbed;
 
+import java.io.IOException;
+
 /**
  * What one Detector knows about the Events of one name, for during, after, unless, count and
  * totalDuration. History Events count like Events that Ended before the first Sample.
@@ -45,7 +47,7 @@ final class EventState {
     if (confirmations != null) confirmations.save(w);
   }
 
-  void load(StateReader r) throws java.io.IOException {
+  void load(StateReader r) throws IOException {
     confirmed = r.bool();
     hasEnded = r.bool();
     lastEnd = r.int64();
@@ -55,7 +57,7 @@ final class EventState {
     lastDuration = r.int64();
     runningStart = r.int64();
     endedDuration = r.int64();
-    if (r.bool() != (confirmations != null)) throw new java.io.IOException("count timestamps");
+    if (r.bool() != (confirmations != null)) throw new IOException("count timestamps");
     if (confirmations != null) confirmations.load(r);
   }
 
