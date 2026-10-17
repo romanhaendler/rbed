@@ -1,5 +1,6 @@
 package io.github.romanhaendler.rbed;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -101,7 +102,7 @@ final class Accumulator {
     w.bool(empty);
   }
 
-  void load(StateReader r) throws java.io.IOException {
+  void load(StateReader r) throws IOException {
     min = r.float64s();
     max = r.float64s();
     sum = r.float64s();
@@ -116,7 +117,7 @@ final class Accumulator {
     int n = count.length;
     if (min.length != n || max.length != n || sum.length != n || integral.length != n
         || lastValue.length != n || valued.length != n || firstTime.length != n) {
-      throw new java.io.IOException("inconsistent Aggregates");
+      throw new IOException("inconsistent Aggregates");
     }
   }
 

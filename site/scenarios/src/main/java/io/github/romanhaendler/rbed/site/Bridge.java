@@ -14,7 +14,7 @@ import org.teavm.jso.JSExport;
 
 /**
  * The only seam between the Scenarios and the web app: the two functions TeaVM exports to
- * JavaScript. Data crosses as JSON text. Keep {@code @JSExport} on this class alone; TeaVM
+ * JavaScript, {@code scenarios} and {@code run}. Data crosses as JSON text. Keep {@code @JSExport} on this class alone; TeaVM
  * exports every reachable class that has such methods.
  */
 public final class Bridge {
@@ -53,7 +53,7 @@ public final class Bridge {
   /**
    * The catalogue: a JSON array with, for each Scenario, its id, title, time unit, Channel names,
    * the names of its Pulse Channels, the Rule whose latest Event its Rules read (if any), Rule
-   * names, parameters (with default and limits) and source template.
+   * names, the descriptions (Rule#toString) of the Rules at the defaults, parameters (with default and limits) and source template.
    */
   @JSExport
   public static String scenarios() {
@@ -81,6 +81,11 @@ public final class Bridge {
       for (int i = 0; i < rules.length; i++) {
         if (i > 0) out.append(',');
         Json.string(out, rules[i].name());
+      }
+      out.append("],\"descriptions\":[");
+      for (int i = 0; i < rules.length; i++) {
+        if (i > 0) out.append(',');
+        Json.string(out, rules[i].toString());
       }
       out.append("],\"parameters\":[");
       for (int i = 0; i < s.parameters.size(); i++) {
@@ -117,6 +122,9 @@ public final class Bridge {
    * @param drawnChannels JSON object of Channel values the reader drew, by Channel name, one
    *     number per Sample of the Scenario (null: absent in that Sample); they replace that
    *     Channel's own values
+   * @param restoreFrom hexadecimal text of a Snapshot, as the {@code snapshot} of a previous
+   *     result gives it, which a resuming Scenario restores where it would restore the one it
+   *     took itself; empty: none
    * @return JSON object with the Samples, the Events (in the order they Ended, as rbed reports
    *     them), the Discarded Pending Events (with the timestamp they were Discarded), the
    *     timestamps time was advanced to without a Sample, the timestamp of the restart if the
@@ -129,35 +137,17 @@ public final class Bridge {
    *     message}} if the input was invalid
    */
   @JSExport
-  public static String run(String scenarioId, String parameters, String drawnChannels) {
+  public static String run(String scenarioId, String parameters, String drawnChannels,
+      String restoreFrom) {
     Scenario scenario;
+    byte[] given;
     try {
       scenario = scenario(scenarioId);
+      given = restoreFrom.isEmpty() ? null : unhex(restoreFrom);
     } catch (RuntimeException e) {
       return error(e, "");
     }
-    return run(scenario, parameters, drawnChannels, null);
-  }
-
-  /**
-   * The Snapshot a resuming Scenario takes at its stop, at the given parameters, as hexadecimal
-   * text; empty for a Scenario that takes none or a run rbed rejects. It lets the parity test
-   * restore a Snapshot written by the other runtime.
-   */
-  @JSExport
-  public static String snapshot(String scenarioId, String parameters) {
-    Lifecycle[] made = new Lifecycle[1];
-    run(scenario(scenarioId), parameters, "{}", null, made);
-    return made[0] == null || made[0].snapshot == null ? "" : hex(made[0].snapshot);
-  }
-
-  /**
-   * {@link #run} of a resuming Scenario that restores {@code snapshot} (hexadecimal text, as
-   * {@link #snapshot} writes it) where it would restore the one it took itself.
-   */
-  @JSExport
-  public static String resume(String scenarioId, String parameters, String snapshot) {
-    return run(scenario(scenarioId), parameters, "{}", unhex(snapshot));
+    return run(scenario, parameters, drawnChannels, given);
   }
 
   private static String hex(byte[] bytes) {
@@ -177,19 +167,18 @@ public final class Bridge {
     return bytes;
   }
 
-  /** {@link #run(String, String, String)} for a Scenario given, not looked up. */
+  /** {@link #run(String, String, String, String)} restoring nothing. */
+  static String run(String scenarioId, String parameters, String drawnChannels) {
+    return run(scenarioId, parameters, drawnChannels, "");
+  }
+
+  /** {@link #run(String, String, String, String)} for a Scenario given, not looked up. */
   static String run(Scenario scenario, String parameters, String drawnChannels) {
     return run(scenario, parameters, drawnChannels, null);
   }
 
   private static String run(Scenario scenario, String parameters, String drawnChannels,
       byte[] given) {
-    return run(scenario, parameters, drawnChannels, given, new Lifecycle[1]);
-  }
-
-  /** As above; {@code made[0]} receives the Lifecycle of the run, once it has one. */
-  private static String run(Scenario scenario, String parameters, String drawnChannels,
-      byte[] given, Lifecycle[] made) {
     Map<String, Double> values;
     List<Sample> samples;
     try {
@@ -204,7 +193,6 @@ public final class Bridge {
       for (Scenario.Plot plot : scenario.plots(values)) plotted.add(plot.expression());
       lifecycle = new Lifecycle(plotted);
       lifecycle.given = given;
-      made[0] = lifecycle;
     } catch (RuntimeException e) {
       return error(e, "");
     }
@@ -221,22 +209,6 @@ public final class Bridge {
     } catch (RuntimeException e) {
       return error(e, "");
     }
-  }
-
-  /**
-   * The descriptions (Rule#toString) of a Scenario's Rules at their default parameters, as a JSON
-   * array of strings; it lets the parity test compare them between the JVM and the compiled
-   * JavaScript.
-   */
-  @JSExport
-  public static String describeRules(String scenarioId) {
-    Scenario scenario = scenario(scenarioId);
-    StringBuilder out = new StringBuilder("[");
-    for (Rule rule : scenario.rules(values(scenario, "{}"))) {
-      if (out.length() > 1) out.append(',');
-      Json.string(out, rule.toString());
-    }
-    return out.append(']').toString();
   }
 
   private static String error(RuntimeException e, String by) {
@@ -369,6 +341,9 @@ public final class Bridge {
       out.append(",\"resume\":{\"stop\":").append(r.stop()).append(",\"replayPoint\":");
       if (r.replayPoint().isPresent()) out.append(r.replayPoint().getAsLong());
       else out.append("null");
+      out.append(",\"snapshot\":");
+      if (lifecycle.snapshot == null) out.append("null");
+      else out.append('"').append(hex(lifecycle.snapshot)).append('"');
       out.append(",\"memoryHorizon\":{\"millis\":").append(r.horizon().millis())
           .append(",\"samples\":").append(r.horizon().samples())
           .append("},\"uninterrupted\":[");

@@ -163,7 +163,7 @@ detector.push(3_000, Map.of(temp, 70.0));  // Overheat 0..3000, Confirmed at 200
 
 ## Events
 
-An `Event` is an immutable record. The listener receives a fresh snapshot at each stage.
+An `Event` is an immutable record. The listener receives a fresh `Event` value at each stage.
 
 | Field              | Meaning                                                                        |
 | ------------------ | ------------------------------------------------------------------------------ |
@@ -477,6 +477,8 @@ Rules are evaluated in the order they were added, so in a callback, `count`, `to
 
 Watching adds no allocation per Sample, and reading only looks the value up. Each moving average in a watched Expression keeps a window of its own, even if a Rule uses the same instance: it takes memory, is updated at each push and counts in `retainedValues()` and against the [Retention Limit](#memory). Everything else in a watched Expression adds no work per push. Watching `latest(a).min/max/mean(x)` makes Rule A aggregate `x`, so A's Events gain [Aggregates](#aggregates) of `x`; which Events are found, and when, is unchanged.
 
+Expressions, Conditions and Rules have a readable `toString()`: the code that builds them, such as `temp.averageOverSamples(5)`, `temp.above(80.0)` or `Rule.named("Hot").when(temp.above(80.0)).forSamples(3)`. Channels and Rules appear by name, constants as `double`, durations in milliseconds, aggregated Channels in the order given. Error messages use it, and so can your logs. Equal configuration gives equal text on every run and runtime; a [Snapshot](#resuming-a-stream) records a fingerprint of these descriptions to refuse a restore into other Rules.
+
 ## Referring to other Rules
 
 Rules can refer to the Events of Rules added before them, by passing the Rule itself. This composes simple Rules into sequences, combinations, counts and durations.
@@ -591,7 +593,7 @@ Every Event carries Aggregates of the Channels its Rule's Conditions use, plus t
 
 The plain `mean` treats every Sample alike, which is right for regularly sampled data. With irregular sampling, for example a sensor that reports more often when something happens, `timeWeightedMean` gives the true average over time. The time-weighted values are NaN if the Channel had no value during the Event, and the time-weighted mean also for an Event of zero length.
 
-Aggregates in the Pending and Confirmed snapshots cover the Event so far. Reading a Channel the Rule does not aggregate throws an `IllegalArgumentException` that names the missing `.aggregate(...)`, so a forgotten declaration is never mistaken for "no data".
+Aggregates of the Pending and Confirmed Event values cover the Event so far. Reading a Channel the Rule does not aggregate throws an `IllegalArgumentException` that names the missing `.aggregate(...)`, so a forgotten declaration is never mistaken for "no data".
 
 ## Batch processing and sampling rates
 

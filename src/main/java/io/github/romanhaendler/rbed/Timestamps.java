@@ -1,5 +1,7 @@
 package io.github.romanhaendler.rbed;
 
+import java.io.IOException;
+
 /** Ascending timestamps in a growable ring buffer; old ones are dropped from the front. */
 final class Timestamps {
   private final Detector detector;
@@ -44,9 +46,9 @@ final class Timestamps {
     w.int64(base);
   }
 
-  void load(StateReader r) throws java.io.IOException {
+  void load(StateReader r) throws IOException {
     int n = r.length();
-    if (n > detector.retentionLimit()) throw new java.io.IOException("too many timestamps");
+    if (n > detector.retentionLimit()) throw new IOException("too many timestamps");
     times = new long[Math.max(times.length, n)];
     for (int i = 0; i < n; i++) times[i] = r.int64();
     size = n; // a restore only happens in a Detector just built, so head is 0

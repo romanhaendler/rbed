@@ -8,7 +8,7 @@ An application that reads a message stream (a Kafka topic, say) wants to stop an
 
 ## A machine that overheats
 
-A machine reports its temperature and load once a second, 120 messages. `Overheat` holds while the temperature is above 80 for 3 seconds, and is over when the load drops below 10, which can happen while the temperature is still high. `Repeated` holds while more than one `Overheat` was Confirmed within the last minute.
+A machine reports its temperature and load once a second, 120 messages. `Overheat` holds while the temperature is above 80 for 3 seconds, and is over when the load drops below 10, which can happen while the temperature is still high. `Warm` holds while the average of the last five temperatures is above 60, for 3 Samples. `Repeated` holds while more than one `Overheat` was Confirmed within the last minute.
 
 The process dies after a message, and a new process takes over from the next one. Choose the stop and how the new process restarts, and compare its Events with those of a Detector that never stopped.
 
@@ -17,18 +17,18 @@ The shaded stretch before the stop is the Memory Horizon, the line left of the s
 
 <!-- scenario resuming -->
 
-At the defaults, the process dies after message 45, at 44 s, while the second `Overheat` is running (Pending since 40 s, Confirmed at 43 s). The uninterrupted Detector reports `Overheat` from 10 to 20 s and from 40 to 60 s, `Repeated` from 43 to 74 s, then `Overheat` from 90 to 100 s and `Repeated` from 93 to 104 s.
+At the defaults, the process dies after message 45, at 44 s, while the second `Overheat` is running (Pending since 40 s, Confirmed at 43 s) and so is `Warm` (since 41 s). The uninterrupted Detector reports `Overheat` from 10 to 20 s and from 40 to 60 s, `Warm` from 12 to 33 s and from 41 to 73 s, `Repeated` from 43 to 74 s, then `Overheat` from 90 to 100 s, `Warm` from 91 to 103 s and `Repeated` from 93 to 104 s.
 
-- **Snapshot** and **Replay Point** report exactly these Events. The Replay Point at the stop is 39 s: the replay has to start at the last Sample on which `Overheat` was seen not to hold, so that the Event starts at 40 s again and is not Truncated. The Memory Horizon is the minute of `count(...).within(...)`, 60 s and no Samples; the Replay Point is much closer.
-- **History only** knows the Events that Ended before the stop, but not the one in progress. The new Detector starts `Overheat` at 45 s with a Truncated start, and `Repeated` therefore starts at 48 s, not 43 s.
-- **Naive**, a fresh Detector, knows nothing: `Overheat` also starts at 45 s Truncated. It has lost the `Overheat` Confirmed at 13 s as well, so `Repeated` does not start at 48 s at all, and its second one, from 93 s, counts the `Overheat` of 45 s instead of 40 s and ends at 109 s, five seconds late.
+- **Snapshot** and **Replay Point** report exactly these Events. The Replay Point at the stop is 36 s: `Warm` started at 41 s because the average of the Samples from 37 to 41 s rose above 60, and the replay has to see that it was not above 60 at 40 s, which needs the Samples from 36 s on (`Overheat` alone would need only 39 s, the last Sample on which it was seen not to hold). The Memory Horizon is the minute of `count(...).within(...)` and the five Samples of the average, 60 s and 5 Samples; the Replay Point is much closer in time.
+- **History only** knows the Events that Ended before the stop, but not the one in progress. The new Detector starts `Overheat` at 45 s with a Truncated start, and `Repeated` therefore starts at 48 s, not 43 s. `Warm` starts at 49 s, also Truncated: its average begins again with an empty window.
+- **Naive**, a fresh Detector, knows nothing: `Overheat` also starts at 45 s Truncated, and `Warm` at 49 s. It has lost the `Overheat` Confirmed at 13 s as well, so `Repeated` does not start at 48 s at all, and its second one, from 93 s, counts the `Overheat` of 45 s instead of 40 s and ends at 109 s, five seconds late.
 
 ### Things to try
 
 - Move the stop to message 5, before anything happened: all four restarts equal the uninterrupted run, there is nothing to lose.
 - Move it to message 80, after the second `Overheat`: History only is exact too, since every Event has Ended. The naive restart loses the count of Events, so `Repeated` is missing at 93 s.
 - Move it to message 105, after the last `Overheat`: again nothing is left to lose.
-- Move it to message 100, while the third `Overheat` is running: History only fails again, and the Replay Point is 89 s, just before that `Overheat` went Pending.
+- Move it to message 100, while the third `Overheat` is running: History only fails again, and the Replay Point is 86 s: `Overheat` went Pending at 90 s, and `Warm` at 91 s on an average whose window starts at 86 s.
 
 ## What to persist, and how to restart
 

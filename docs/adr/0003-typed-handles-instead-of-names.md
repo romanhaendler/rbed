@@ -7,5 +7,5 @@ We kept strings only where data crosses the boundary: `Channel.named(...)` and `
 ## Consequences
 
 - `build()` fails if a Rule references a Rule that was not added, or if History contains an Event of an unknown Rule.
-- References resolve to the added Rule with the same name, since names are unique per Detector. A differently configured copy of a Rule therefore refers to the added one, and a self-reference is written as `during(Rule.named("A"))` inside Rule A.
+- References resolve to the added Rule with the same name, since names are unique per Detector. A differently configured copy of a Rule therefore refers to the added one. A Rule that refers to itself, or to a Rule added after it, is rejected by `build()`.
 - Values of Channels no Rule uses are still ignored, so a Sample may carry more Channels than the Rules need; a misspelled Channel name in the data is not detected.

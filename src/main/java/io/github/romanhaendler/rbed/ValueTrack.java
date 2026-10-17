@@ -1,5 +1,6 @@
 package io.github.romanhaendler.rbed;
 
+import java.io.IOException;
 import java.util.Arrays;
 
 /**
@@ -103,7 +104,7 @@ class ValueTrack {
     for (Averaged average : averages) average.save(w);
   }
 
-  void load(StateReader r) throws java.io.IOException {
+  void load(StateReader r) throws IOException {
     value = r.float64();
     previous = r.float64();
     time = r.int64();
@@ -154,7 +155,7 @@ class ValueTrack {
     }
 
     @Override
-    void load(StateReader r) throws java.io.IOException {
+    void load(StateReader r) throws IOException {
       super.load(r);
       window.load(r);
     }

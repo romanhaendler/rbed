@@ -116,15 +116,7 @@ final class ReplayHarness {
   private static Difference compare(int moment, String op, List<String> a, List<String> b) {
     List<String> x = a.stream().filter(ReplayHarness::compared).toList();
     List<String> y = b.stream().filter(ReplayHarness::compared).toList();
-    int n = Math.max(x.size(), y.size());
-    for (int i = 0; i < n; i++) {
-      String p = i < x.size() ? x.get(i) : "<nothing>";
-      String q = i < y.size() ? y.get(i) : "<nothing>";
-      if (!p.equals(q)) {
-        return new Difference(moment, op, p.substring(0, Math.max(0, p.indexOf(':'))), p, q, x, y);
-      }
-    }
-    return null;
+    return Differential.diff(moment, op, x, y);
   }
 
   /** Checks every stop of the input. */

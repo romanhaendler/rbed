@@ -1,5 +1,7 @@
 package io.github.romanhaendler.rbed;
 
+import java.io.IOException;
+
 /** How long a Phase's Condition has held so far. */
 final class Progress {
   private final Phase phase;
@@ -21,7 +23,7 @@ final class Progress {
     w.int32(count);
   }
 
-  void load(StateReader r) throws java.io.IOException {
+  void load(StateReader r) throws IOException {
     since = r.int64();
     count = r.int32();
   }

@@ -54,7 +54,7 @@ class DifferentialTest {
 
   @Test
   void generatedCasesCoverEveryConstructAndKindOfInput() {
-    Set<String> ops = new HashSet<>();
+    Set<Scenario.Construct> ops = new HashSet<>();
     Set<String> kinds = new HashSet<>();
     int sampling = 0, history = 0, smallLimit = 0, endConditions = 0, maxGaps = 0, aggregates = 0;
     int pulses = 0, durations = 0, samples = 0, watched = 0, atThreshold = 0;
@@ -91,10 +91,8 @@ class DifferentialTest {
         if (op.values().containsKey("p")) pulses++;
       }
     }
-    for (String op : List.of("ch", "pulse", "avgS", "avgD", "rate", "age", "rising", "falling", "abs",
-        "plus", "minus", "times", "div", "plusC", "minusC", "timesC", "divC", "above", "below",
-        "aboveC", "belowC", "between", "and", "or", "not", "during", "after", "count", "total",
-        "latestMin", "latestMax", "latestMean", "latestDur")) {
+    for (Scenario.Construct op : Scenario.Construct.values()) {
+      if (op == Scenario.Construct.CONST) continue;
       assertTrue(ops.contains(op), "never generated: " + op);
     }
     for (String kind : List.of("PUSH", "PUSH_VALUES", "ADVANCE", "CLOSE", "NON_INCREASING", "NAN",
@@ -107,7 +105,7 @@ class DifferentialTest {
     }
   }
 
-  private static void collect(Scenario.Node n, Set<String> into) {
+  private static void collect(Scenario.Node n, Set<Scenario.Construct> into) {
     into.add(n.op());
     n.kids().forEach(k -> collect(k, into));
   }
@@ -115,7 +113,7 @@ class DifferentialTest {
   @Test
   void aDroppedWindowAndItsWarningAreComparedToo() {
     Scenario.Built b = new Scenario(0, 0, 2, List.of(new Scenario.RuleSpec("R",
-        Scenario.Node.ofA("aboveC", 0, Scenario.Node.ofA("avgD", 1000, Scenario.Node.named("ch", "a", 0))),
+        Scenario.Node.ofA(Scenario.Construct.ABOVE_C, 0, Scenario.Node.ofA(Scenario.Construct.AVG_D, 1000, Scenario.Node.named(Scenario.Construct.CH, "a", 0))),
         0, -1, null, 0, -1, -1, List.of())), List.of(), List.of(), List.of()).build();
     Result r = Differential.compare(b.config(), b.watched(),
         List.of(Op.push(1, "a", 1.0), Op.push(2, "a", 1.0), Op.push(3, "a", 1.0)),

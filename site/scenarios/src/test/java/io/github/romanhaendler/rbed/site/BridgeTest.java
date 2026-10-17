@@ -60,9 +60,15 @@ class BridgeTest {
 
   @SuppressWarnings("unchecked")
   static Map<String, Object> run(String scenarioId, String parameters, String drawnChannels) {
-    String result = Bridge.run(scenarioId, parameters, drawnChannels);
+    return run(scenarioId, parameters, drawnChannels, "");
+  }
+
+  @SuppressWarnings("unchecked")
+  static Map<String, Object> run(String scenarioId, String parameters, String drawnChannels,
+      String restoreFrom) {
+    String result = Bridge.run(scenarioId, parameters, drawnChannels, restoreFrom);
     return (Map<String, Object>) Json.parse(
-        call("run", result, scenarioId, parameters, drawnChannels));
+        call("run", result, scenarioId, parameters, drawnChannels, restoreFrom));
   }
 
   @SuppressWarnings("unchecked")
@@ -74,7 +80,8 @@ class BridgeTest {
   void everyScenarioDescribesItsRulesAsTheyAreWrittenInJava() {
     for (Map<String, Object> s : scenarios()) {
       String id = (String) s.get("id");
-      List<?> rules = (List<?>) Json.parse(call("describeRules", Bridge.describeRules(id), id));
+      List<?> rules = (List<?>) s.get("descriptions");
+      assertEquals(((List<?>) s.get("rules")).size(), rules.size());
       for (Object rule : rules) {
         org.junit.jupiter.api.Assertions.assertTrue(
             ((String) rule).startsWith("Rule.named(\""), (String) rule);
@@ -1193,8 +1200,9 @@ class BridgeTest {
     return (Map<String, Object>) result.get("resume");
   }
 
-  static final List<String> UNINTERRUPTED = List.of("Overheat 10..20", "Overheat 40..60",
-      "Repeated 43..74", "Overheat 90..100", "Repeated 93..104");
+  static final List<String> UNINTERRUPTED = List.of("Overheat 10..20", "Warm 12..33",
+      "Overheat 40..60", "Warm 41..73", "Repeated 43..74", "Overheat 90..100", "Warm 91..103",
+      "Repeated 93..104");
 
   @Test
   void atTheDefaultsTheReplayPointAndSnapshotRestartsEqualTheUninterruptedRun() {
@@ -1208,11 +1216,13 @@ class BridgeTest {
   @Test
   void atTheDefaultsTheNaiveAndHistoryOnlyRestartsDoNot() {
     Map<String, Object> naive = resumed("45", NAIVE);
-    assertEquals(List.of("Overheat 10..20", "Overheat 45..60 truncatedStart", "Overheat 90..100",
-        "Repeated 93..109"), describe(naive, 1000));
+    assertEquals(List.of("Overheat 10..20", "Warm 12..33", "Overheat 45..60 truncatedStart",
+        "Warm 49..73 truncatedStart", "Overheat 90..100", "Warm 91..103", "Repeated 93..109"),
+        describe(naive, 1000));
     Map<String, Object> history = resumed("45", HISTORY_ONLY);
-    assertEquals(List.of("Overheat 10..20", "Overheat 45..60 truncatedStart", "Repeated 48..74",
-        "Overheat 90..100", "Repeated 93..109"), describe(history, 1000));
+    assertEquals(List.of("Overheat 10..20", "Warm 12..33", "Overheat 45..60 truncatedStart",
+        "Warm 49..73 truncatedStart", "Repeated 48..74", "Overheat 90..100", "Warm 91..103",
+        "Repeated 93..109"), describe(history, 1000));
     for (Map<String, Object> result : List.of(naive, history)) {
       assertEquals(UNINTERRUPTED, describe(Map.of("events", resume(result).get("uninterrupted")), 1000));
       assertFalse(bits(resume(result).get("uninterrupted")).equals(bits(result.get("events"))));
@@ -1223,8 +1233,8 @@ class BridgeTest {
   void theResultCarriesTheStopTheReplayPointAndTheMemoryHorizon() {
     Map<String, Object> resume = resume(resumed("45", SNAPSHOT));
     assertEquals(44_000.0, resume.get("stop"));
-    assertEquals(39_000.0, resume.get("replayPoint"));
-    assertEquals(Map.of("millis", 60_000.0, "samples", 0.0), resume.get("memoryHorizon"));
+    assertEquals(36_000.0, resume.get("replayPoint"));
+    assertEquals(Map.of("millis", 60_000.0, "samples", 5.0), resume.get("memoryHorizon"));
   }
 
   @SuppressWarnings("unchecked")
@@ -1257,30 +1267,23 @@ class BridgeTest {
     assertEquals(List.of(false, true, true, true), equalAt(80));     // only the count of Overheats is lost
     assertEquals(List.of(false, false, true, true), equalAt(45));    // an Overheat in progress is lost, too
     assertEquals(List.of(false, false, true, true), equalAt(100));   // another Overheat in progress
-    assertEquals(89_000.0, resume(resumed("100", SNAPSHOT)).get("replayPoint"));
+    assertEquals(86_000.0, resume(resumed("100", SNAPSHOT)).get("replayPoint"));
     assertEquals(List.of(true, true, true, true), equalAt(105));     // nothing left to lose
-  }
-
-  /** The Snapshot (hexadecimal text, a JSON string in parity.json) a run takes at its stop. */
-  static String snapshot(String scenarioId, String parameters) {
-    String hex = Bridge.snapshot(scenarioId, parameters);
-    call("snapshot", Json.string(new StringBuilder(), hex).toString(), scenarioId, parameters);
-    return hex;
   }
 
   @SuppressWarnings("unchecked")
   @Test
   void aSnapshotWrittenByTheRunRestoresInAnotherRun() {
-    assertEquals("", snapshot("history", "{}"));
+    assertNull(run("history", "{}").get("resume"));
     // parity.json repeats these against the compiled JavaScript: it must write the same bytes
     // and restore the JVM's Snapshot into the same result
     for (int stop : new int[] {1, 20, 45, 80, 119}) {
       String parameters = "{\"stop\": " + stop + ", \"restart\": 3}";
-      String snapshot = snapshot("resuming", parameters);
+      Map<String, Object> own = run("resuming", parameters);
+      String snapshot = (String) resume(own).get("snapshot");
       assertFalse(snapshot.isEmpty());
-      Map<String, Object> restored = (Map<String, Object>) Json.parse(call("resume",
-          Bridge.resume("resuming", parameters, snapshot), "resuming", parameters, snapshot));
-      assertEquals(run("resuming", parameters), restored);
+      Map<String, Object> restored = run("resuming", parameters, "{}", snapshot);
+      assertEquals(own, restored);
       if (stop == 45) assertEquals(UNINTERRUPTED, describe(restored, 1000));
     }
   }

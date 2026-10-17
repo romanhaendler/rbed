@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -253,5 +254,13 @@ class SnapshotTest {
   @Test
   void restoreRejectsNull() {
     assertThrows(NullPointerException.class, () -> Detector.builder().restore(null));
+  }
+
+  @Test
+  void restoreTakesACopyOfTheArray() {
+    byte[] snapshot = runningLift();
+    Detector.Builder builder = Detector.builder().rules(LIFT).restore(snapshot);
+    Arrays.fill(snapshot, (byte) 0);   // the caller reuses its buffer before build()
+    assertArrayEquals(runningLift(), builder.build().snapshot());
   }
 }

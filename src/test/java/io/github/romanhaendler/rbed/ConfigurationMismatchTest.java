@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.github.romanhaendler.rbed.Differential.Difference;
 import io.github.romanhaendler.rbed.Differential.Op;
 import io.github.romanhaendler.rbed.Differential.Run;
+import io.github.romanhaendler.rbed.Scenario.Construct;
 import io.github.romanhaendler.rbed.Scenario.Node;
 import io.github.romanhaendler.rbed.Scenario.RuleSpec;
 import java.util.ArrayList;
@@ -28,22 +29,23 @@ class ConfigurationMismatchTest {
   private static final int MUTATIONS_PER_CASE = 8;
   private static final boolean FRESH_SEEDS = Boolean.getBoolean("rbed.diff.fresh");
 
-  private static final Map<String, String> SWAPS = Map.ofEntries(
-      Map.entry("aboveC", "belowC"), Map.entry("belowC", "aboveC"),
-      Map.entry("above", "below"), Map.entry("below", "above"),
-      Map.entry("rising", "falling"), Map.entry("falling", "rising"),
-      Map.entry("and", "or"), Map.entry("or", "and"),
-      Map.entry("avgS", "avgD"), Map.entry("avgD", "avgS"),
-      Map.entry("plus", "minus"), Map.entry("minus", "plus"),
-      Map.entry("times", "div"), Map.entry("div", "times"),
-      Map.entry("plusC", "minusC"), Map.entry("minusC", "plusC"),
-      Map.entry("timesC", "divC"), Map.entry("divC", "timesC"),
-      Map.entry("latestMin", "latestMax"), Map.entry("latestMax", "latestMean"),
-      Map.entry("latestMean", "latestMin"), Map.entry("rate", "age"), Map.entry("age", "rate"),
-      Map.entry("during", "after"), Map.entry("after", "during"),
-      Map.entry("count", "total"), Map.entry("total", "count"));
-  private static final Set<String> CONDITIONS = Set.of("aboveC", "belowC", "above", "below",
-      "between", "rising", "falling", "and", "or", "not", "during", "after");
+  private static final Map<Construct, Construct> SWAPS = Map.ofEntries(
+      Map.entry(Construct.ABOVE_C, Construct.BELOW_C), Map.entry(Construct.BELOW_C, Construct.ABOVE_C),
+      Map.entry(Construct.ABOVE, Construct.BELOW), Map.entry(Construct.BELOW, Construct.ABOVE),
+      Map.entry(Construct.RISING, Construct.FALLING), Map.entry(Construct.FALLING, Construct.RISING),
+      Map.entry(Construct.AND, Construct.OR), Map.entry(Construct.OR, Construct.AND),
+      Map.entry(Construct.AVG_S, Construct.AVG_D), Map.entry(Construct.AVG_D, Construct.AVG_S),
+      Map.entry(Construct.PLUS, Construct.MINUS), Map.entry(Construct.MINUS, Construct.PLUS),
+      Map.entry(Construct.TIMES, Construct.DIV), Map.entry(Construct.DIV, Construct.TIMES),
+      Map.entry(Construct.PLUS_C, Construct.MINUS_C), Map.entry(Construct.MINUS_C, Construct.PLUS_C),
+      Map.entry(Construct.TIMES_C, Construct.DIV_C), Map.entry(Construct.DIV_C, Construct.TIMES_C),
+      Map.entry(Construct.LATEST_MIN, Construct.LATEST_MAX), Map.entry(Construct.LATEST_MAX, Construct.LATEST_MEAN),
+      Map.entry(Construct.LATEST_MEAN, Construct.LATEST_MIN), Map.entry(Construct.RATE, Construct.AGE), Map.entry(Construct.AGE, Construct.RATE),
+      Map.entry(Construct.DURING, Construct.AFTER), Map.entry(Construct.AFTER, Construct.DURING),
+      Map.entry(Construct.COUNT, Construct.TOTAL), Map.entry(Construct.TOTAL, Construct.COUNT));
+  private static final Set<Construct> CONDITIONS = Set.of(Construct.ABOVE_C, Construct.BELOW_C, Construct.ABOVE,
+      Construct.BELOW, Construct.BETWEEN, Construct.RISING, Construct.FALLING, Construct.AND,
+      Construct.OR, Construct.NOT, Construct.DURING, Construct.AFTER);
 
   private static Node with(Node n, double a, double b, List<Node> kids, List<String> names) {
     return new Node(n.op(), n.name(), a, b, kids, names);
@@ -52,28 +54,28 @@ class ConfigurationMismatchTest {
   /** All single-step variants of a tree. */
   static List<Node> variants(Node n, List<String> ruleNames) {
     List<Node> out = new ArrayList<>();
-    String op = n.op();
-    boolean hasA = op.endsWith("C") || op.equals("between") || op.equals("avgS")
-        || op.equals("avgD") || ((op.equals("after") || op.equals("count")) && n.a() >= 0);
+    Construct op = n.op();
+    boolean hasA = op.constant || op == Construct.BETWEEN || op == Construct.AVG_S
+        || op == Construct.AVG_D || ((op == Construct.AFTER || op == Construct.COUNT) && n.a() >= 0);
     if (hasA) {
       out.add(with(n, n.a() + 1, n.b(), n.kids(), n.names()));
       out.add(with(n, n.a() - 1, n.b(), n.kids(), n.names()));
       out.add(with(n, Math.nextUp(n.a()), n.b(), n.kids(), n.names()));
       out.add(with(n, -n.a(), n.b(), n.kids(), n.names()));
     }
-    if (op.equals("after") || op.equals("count")) { // toggle the window
+    if (op == Construct.AFTER || op == Construct.COUNT) { // toggle the window
       out.add(with(n, n.a() >= 0 ? -1 : 7, n.b(), n.kids(), n.names()));
     }
-    if (op.equals("between")) {
+    if (op == Construct.BETWEEN) {
       out.add(with(n, n.a(), n.b() + 1, n.kids(), n.names()));
       out.add(with(n, n.a(), Math.nextDown(n.b()), n.kids(), n.names()));
     }
-    String swapped = SWAPS.get(op);
+    Construct swapped = SWAPS.get(op);
     if (swapped != null) {
       out.add(new Node(swapped, n.name(), n.a(), n.b(), n.kids(), n.names()));
     }
-    if (op.equals("ch") || op.equals("pulse")) {
-      out.add(new Node(op.equals("ch") ? "pulse" : "ch", n.name(), 0, 0, n.kids(), n.names()));
+    if (op == Construct.CH || op == Construct.PULSE) {
+      out.add(new Node(op == Construct.CH ? Construct.PULSE : Construct.CH, n.name(), 0, 0, n.kids(), n.names()));
       for (String other : List.of("a", "b", "c", "p")) {
         if (!other.equals(n.name())) out.add(new Node(op, other, 0, 0, n.kids(), n.names()));
       }
@@ -85,12 +87,12 @@ class ConfigurationMismatchTest {
         }
       }
     }
-    if (op.startsWith("latest") && !op.equals("latestDur")) {
+    if (op.isLatest() && op != Construct.LATEST_DUR) {
       for (String c : List.of("a", "b", "c")) {
         if (!c.equals(n.names().get(0))) out.add(with(n, n.a(), n.b(), n.kids(), List.of(c)));
       }
     }
-    if (op.equals("after") && !ruleNames.isEmpty()) {
+    if (op == Construct.AFTER && !ruleNames.isEmpty()) {
       List<String> names = n.names();
       if (names.size() > 1) {
         List<String> reversed = new ArrayList<>(names);
@@ -105,8 +107,8 @@ class ConfigurationMismatchTest {
     if (n.kids().size() == 2) {
       out.add(with(n, n.a(), n.b(), List.of(n.kids().get(1), n.kids().get(0)), n.names()));
     }
-    if (CONDITIONS.contains(op)) out.add(Node.of("not", n));
-    if (op.equals("not") && n.kids().size() == 1) out.add(n.kids().get(0));
+    if (CONDITIONS.contains(op)) out.add(Node.of(Construct.NOT, n));
+    if (op == Construct.NOT && n.kids().size() == 1) out.add(n.kids().get(0));
     for (int i = 0; i < n.kids().size(); i++) {
       for (Node v : variants(n.kids().get(i), ruleNames)) {
         List<Node> kids = new ArrayList<>(n.kids());
@@ -159,7 +161,7 @@ class ConfigurationMismatchTest {
       if (r.maxGap() >= 0) v.add(spec(r, w, r.forSamples(), r.forDuration(), e, r.endSamples(), r.endDuration(), -1, agg));
       if (e == null) {
         v.add(spec(r, w, r.forSamples(), r.forDuration(), w, 0, -1, r.maxGap(), agg));
-        v.add(spec(r, w, r.forSamples(), r.forDuration(), Node.ofA("belowC", -3, Node.named("ch", "a", 0)), 0, -1, r.maxGap(), agg));
+        v.add(spec(r, w, r.forSamples(), r.forDuration(), Node.ofA(Construct.BELOW_C, -3, Node.named(Construct.CH, "a", 0)), 0, -1, r.maxGap(), agg));
       } else {
         v.add(spec(r, w, r.forSamples(), r.forDuration(), null, 0, -1, r.maxGap(), agg));
         v.add(spec(r, e, r.forSamples(), r.forDuration(), w, r.endSamples(), r.endDuration(), r.maxGap(), agg));
@@ -200,7 +202,7 @@ class ConfigurationMismatchTest {
       }
     }
     List<RuleSpec> more = new ArrayList<>(s.rules());
-    more.add(new RuleSpec("Extra", Node.ofA("aboveC", 1, Node.named("ch", "a", 0)), 0, -1, null, 0, -1, -1, List.of()));
+    more.add(new RuleSpec("Extra", Node.ofA(Construct.ABOVE_C, 1, Node.named(Construct.CH, "a", 0)), 0, -1, null, 0, -1, -1, List.of()));
     out.add(s.withRules(more));
     List<RuleSpec> reversed = new ArrayList<>(s.rules());
     Collections.reverse(reversed);
@@ -222,7 +224,7 @@ class ConfigurationMismatchTest {
       }
     }
     List<Node> extra = new ArrayList<>(watched);
-    extra.add(Node.named("ch", "a", 0));
+    extra.add(Node.named(Construct.CH, "a", 0));
     out.add(s.withWatched(extra));
     out.removeIf(m -> m.equals(s));
     return out;
@@ -236,9 +238,9 @@ class ConfigurationMismatchTest {
 
   private static Node rename(Node n, String from, String to) {
     List<Node> kids = n.kids().stream().map(k -> rename(k, from, to)).toList();
-    boolean channel = n.op().equals("ch") || n.op().equals("pulse");
+    boolean channel = n.op() == Construct.CH || n.op() == Construct.PULSE;
     String name = !channel && from.equals(n.name()) ? to : n.name();
-    List<String> names = n.op().startsWith("latest") ? n.names()
+    List<String> names = n.op().isLatest() ? n.names()
         : n.names().stream().map(x -> x.equals(from) ? to : x).toList();
     return new Node(n.op(), name, n.a(), n.b(), kids, names);
   }

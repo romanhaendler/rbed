@@ -1,5 +1,6 @@
 package io.github.romanhaendler.rbed;
 
+import java.io.IOException;
 import java.util.Arrays;
 
 /**
@@ -65,7 +66,7 @@ final class ExactSum {
       w.float64s(Arrays.copyOf(p, n));
     }
 
-    void load(StateReader r) throws java.io.IOException {
+    void load(StateReader r) throws IOException {
       double[] loaded = r.float64s();
       p = Arrays.copyOf(loaded, Math.max(8, loaded.length));
       n = loaded.length;
@@ -104,7 +105,7 @@ final class ExactSum {
     large.save(w);
   }
 
-  void load(StateReader r) throws java.io.IOException {
+  void load(StateReader r) throws IOException {
     small.load(r);
     large.load(r);
   }

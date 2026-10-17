@@ -4,7 +4,16 @@ import static io.github.romanhaendler.rbed.Conditions.after;
 import static io.github.romanhaendler.rbed.Conditions.count;
 import static io.github.romanhaendler.rbed.Conditions.latest;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import org.junit.jupiter.api.Test;
 
 class MemoryHorizonTest {
@@ -68,5 +77,46 @@ class MemoryHorizonTest {
     Rule b = Rule.named("B").when(X.above(1)).forDuration(300).forSamples(2);
     assertEquals(new MemoryHorizon(500, 20),
         horizon(new Rule[] {a, b}, Y.averageOverDuration(500), Y.averageOverSamples(10)));
+  }
+
+  /**
+   * A construct that takes a duration or a count must tell the Memory Horizon. The table lists
+   * every public method of the building blocks that takes one; a new such method fails the first
+   * assertion until it is added here, and a construct that forgets to report fails the second.
+   */
+  @Test
+  void everyConstructThatTakesADurationOrACountReportsItInTheMemoryHorizon() {
+    Rule a = Rule.named("A").when(X.above(1));
+    Map<String, MemoryHorizon> reported = new TreeMap<>();
+    reported.put("After.within", horizon(new Rule[] {a,
+        Rule.named("B").when(after(a).within(7_000))}));
+    reported.put("ChannelExpression.averageOverDuration",
+        horizon(new Rule[] {Rule.named("B").when(X.averageOverDuration(7_000).above(1))}));
+    reported.put("ChannelExpression.averageOverSamples",
+        horizon(new Rule[] {Rule.named("B").when(X.averageOverSamples(7).above(1))}));
+    reported.put("EventCount.within", horizon(new Rule[] {a,
+        Rule.named("B").when(count(a).within(7_000).above(1))}));
+    reported.put("Rule.forDuration",
+        horizon(new Rule[] {Rule.named("B").when(X.above(1)).forDuration(7_000)}));
+    reported.put("Rule.forSamples",
+        horizon(new Rule[] {Rule.named("B").when(X.above(1)).forSamples(7)}));
+    reported.put("Rule.maxGap",
+        horizon(new Rule[] {Rule.named("B").when(X.above(1)).maxGap(7_000)}));
+
+    Set<String> found = new TreeSet<>();
+    for (Class<?> type : List.of(After.class, ChannelExpression.class, Channel.class,
+        Condition.class, Conditions.class, EventCount.class, Expression.class, Rule.class)) {
+      for (Method m : type.getDeclaredMethods()) {
+        if (!Modifier.isPublic(m.getModifiers())) continue;
+        for (Class<?> p : m.getParameterTypes()) {
+          if (p == long.class || p == int.class || p == Duration.class) {
+            found.add(type.getSimpleName() + "." + m.getName());
+          }
+        }
+      }
+    }
+    assertEquals(reported.keySet(), found);
+    reported.forEach((construct, horizon) -> assertNotEquals(new MemoryHorizon(0, 0), horizon,
+        construct));
   }
 }

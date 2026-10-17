@@ -1,5 +1,7 @@
 package io.github.romanhaendler.rbed;
 
+import java.io.IOException;
+
 /**
  * The recent values of one Channel for a moving average. Memory is bounded by the window size and
  * nothing is allocated per value once the window is full. The sum is exact (see {@link
@@ -27,7 +29,7 @@ abstract class Window {
 
   abstract void save(StateWriter w);
 
-  abstract void load(StateReader r) throws java.io.IOException;
+  abstract void load(StateReader r) throws IOException;
 
   /** The last {@code n} values. */
   static final class OverSamples extends Window {
@@ -78,18 +80,18 @@ abstract class Window {
     }
 
     @Override
-    void load(StateReader r) throws java.io.IOException {
+    void load(StateReader r) throws IOException {
       double[] loaded = r.float64s();
-      if (loaded.length != values.length) throw new java.io.IOException("window size");
+      if (loaded.length != values.length) throw new IOException("window size");
       System.arraycopy(loaded, 0, values, 0, loaded.length);
       long[] loadedNeeds = r.int64s();
-      if (loadedNeeds.length != needs.length) throw new java.io.IOException("window size");
+      if (loadedNeeds.length != needs.length) throw new IOException("window size");
       System.arraycopy(loadedNeeds, 0, needs, 0, loadedNeeds.length);
       size = r.int32();
       next = r.int32();
       sum.load(r);
       if (size < 0 || size > values.length || next < 0 || next >= values.length) {
-        throw new java.io.IOException("window position");
+        throw new IOException("window position");
       }
     }
   }
@@ -179,9 +181,9 @@ abstract class Window {
     }
 
     @Override
-    void load(StateReader r) throws java.io.IOException {
+    void load(StateReader r) throws IOException {
       int n = r.length();
-      if (n > detector.retentionLimit()) throw new java.io.IOException("window size");
+      if (n > detector.retentionLimit()) throw new IOException("window size");
       times = new long[Math.max(times.length, n)];
       values = new double[times.length];
       needs = new long[times.length];
