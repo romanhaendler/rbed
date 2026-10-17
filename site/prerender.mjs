@@ -1,6 +1,6 @@
 // What the site is for a reader without JavaScript, a coding agent or a search engine, after the
 // umriss-ui Pages (ADR-0037 there): for every page of src/pages.ts its own index.html with the
-// head and the prerendered text, Java source and default Events, and its Markdown twin; then
+// head and the prerendered text, default Events and Java source, and its Markdown twin; then
 // llms.txt, llms-full.txt, sitemap.xml, 404.html and the Javadoc. vite.config.mjs runs prerender()
 // after `vite build`.
 //
@@ -91,8 +91,8 @@ function parametersText(parameters = []) {
 /** The Markdown without the blocks that speak of the live page's controls (<!-- live -->). */
 const withoutLive = (markdown) => markdown.replace(new RegExp(`^${LIVE_MARKER}\\n(?:[^\\n]+\\n?)*\\n*`, 'gm'), '');
 
-/** The Markdown twin: the page's Markdown, each Scenario marker replaced by its source, its
- *  parameters and its Events, and its links absolute. */
+/** The Markdown twin: the page's Markdown, each Scenario marker replaced by its parameters, its
+ *  Events and its source, in the live page's order, and its links absolute. */
 export function twin(markdown, facts, page) {
   return absolutePageLinks(withoutLive(markdown), page).replace(new RegExp(SCENARIO_MARKER.source, 'gm'), (_, id) => {
     const fact = factOf(facts, id);
@@ -102,7 +102,7 @@ export function twin(markdown, facts, page) {
         ? t
         : `${t.caption}:\n\n` + [t.rows[0], t.rows[0].map(() => '---'), ...t.rows.slice(1)].map(row).join('\n'),
     );
-    return '```java\n' + fact.source + '\n```\n\n' + parametersText(fact.parameters) + text.join('\n\n');
+    return parametersText(fact.parameters) + text.join('\n\n') + '\n\nJava source at the default parameters:\n\n```java\n' + fact.source + '\n```';
   });
 }
 
@@ -162,7 +162,7 @@ function scenarioHtml(fact) {
           .join('') +
         '</tbody></table>',
   );
-  return `<pre><code>${escape(fact.source)}</code></pre>\n${NO_SCRIPT}\n${html.join('\n')}`;
+  return `${NO_SCRIPT}\n${html.join('\n')}\n<pre><code>${escape(fact.source)}</code></pre>`;
 }
 
 function checkTemplate(template) {
