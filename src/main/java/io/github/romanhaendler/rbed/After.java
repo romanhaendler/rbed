@@ -16,9 +16,20 @@ public final class After extends Condition {
   private final long within;
 
   After(Rule rule, List<Rule> unless, long within) {
-    this.rule = Objects.requireNonNull(rule, "rule");
+    super(describe(Objects.requireNonNull(rule, "rule"), unless, within));
+    this.rule = rule;
     this.unless = unless;
     this.within = within;
+  }
+
+  private static String describe(Rule rule, List<Rule> unless, long within) {
+    StringBuilder text = new StringBuilder("after(").append(rule.name()).append(")");
+    if (!unless.isEmpty()) {
+      text.append(".unless(")
+          .append(String.join(", ", unless.stream().map(Rule::name).toList())).append(")");
+    }
+    if (within != Long.MAX_VALUE) text.append(".within(").append(within).append(")");
+    return text.toString();
   }
 
   /** No Event of any of these Rules may have been Confirmed since the most recent one Ended. */

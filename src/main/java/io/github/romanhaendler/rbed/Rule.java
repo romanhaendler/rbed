@@ -20,6 +20,7 @@ public final class Rule {
   final long maxGap;
   final Set<Channel> aggregated;
   private final boolean durationsApplyToEnd;
+  private final String text;
 
   private Rule(String name, Phase when, Phase end, long maxGap, Set<Channel> aggregated,
       boolean durationsApplyToEnd) {
@@ -29,6 +30,29 @@ public final class Rule {
     this.maxGap = maxGap;
     this.aggregated = aggregated;
     this.durationsApplyToEnd = durationsApplyToEnd;
+    this.text = describe(name, when, end, maxGap, aggregated);
+  }
+
+  private static String describe(
+      String name, Phase when, Phase end, long maxGap, Set<Channel> aggregated) {
+    StringBuilder text = new StringBuilder("Rule.named(\"").append(name).append("\")");
+    if (when != null) {
+      text.append(".when(").append(when.condition()).append(")").append(timing(when));
+    }
+    if (end != null) {
+      text.append(".endWhen(").append(end.condition()).append(")").append(timing(end));
+    }
+    if (maxGap != Long.MAX_VALUE) text.append(".maxGap(").append(maxGap).append(")");
+    if (!aggregated.isEmpty()) {
+      text.append(".aggregate(").append(String.join(", ",
+          aggregated.stream().map(Channel::toString).sorted().toList())).append(")");
+    }
+    return text.toString();
+  }
+
+  private static String timing(Phase phase) {
+    return (phase.samples() > 0 ? ".forSamples(" + phase.samples() + ")" : "")
+        + (phase.millis() > 0 ? ".forDuration(" + phase.millis() + ")" : "");
   }
 
   /** A Rule without Conditions yet; its name becomes the name of the Events it produces. */
@@ -112,8 +136,14 @@ public final class Rule {
     return new Rule(name, change.apply(when), end, maxGap, aggregated, false);
   }
 
+  /**
+   * Everything that defines this Rule's behaviour, written as in Java and in a fixed order, such
+   * as {@code Rule.named("Hot").when(temp.above(80.0)).forSamples(3).maxGap(5000)}. Equal
+   * configuration gives equal text (aggregated Channels sorted by name), on every run and
+   * runtime. Expressions and Conditions name a Rule by {@link #name()} alone.
+   */
   @Override
   public String toString() {
-    return name;
+    return text;
   }
 }

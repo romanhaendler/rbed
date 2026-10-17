@@ -15,7 +15,7 @@ public final class LatestEvent {
 
   LatestEvent(Rule rule) {
     this.rule = Objects.requireNonNull(rule, "rule");
-    prefix = "latest(" + rule + ").";
+    prefix = "latest(" + rule.name() + ").";
   }
 
   /** The mean of a Channel over the latest Event (so far, if it is running). */
