@@ -67,6 +67,10 @@ class PerformanceTest {
    * age.
    */
   static Detector realisticRuleSet() {
+    return realisticBuilder().build();
+  }
+
+  static Detector.Builder realisticBuilder() {
     Rule lift = Rule.named("Lift")
         .when(WEIGHT.above(500)).forDuration(2_000)
         .endWhen(WEIGHT.below(50)).forDuration(1_000)
@@ -91,8 +95,7 @@ class PerformanceTest {
         .rules(Rule.named("PartialSetDown")
             .when(during(lift)
                 .and(WEIGHT.below(latest(lift).max(WEIGHT).times(0.5)))))
-        .rules(Rule.named("AngleSensorSilent").when(ANGLE.age().above(5_000)))
-        .build();
+        .rules(Rule.named("AngleSensorSilent").when(ANGLE.age().above(5_000)));
   }
 
   /** 50 Rules over 20 Channels, each with a duration and an End Condition. */
@@ -204,6 +207,37 @@ class PerformanceTest {
     report("realistic steady state allocation", perSample, "bytes/Sample");
     assertTrue(perSample <= ACCEPTED_BYTES_PER_SAMPLE,
         "allocated " + perSample + " bytes per Sample");
+  }
+
+  /**
+   * Snapshot and restore of the realistic Rule set after a million Samples (its 10 s moving
+   * average holds 10000 entries at 1 ms spacing): time and size are reported, and a Snapshot must
+   * stay far below a second and a few hundred kilobytes.
+   */
+  @Test
+  void snapshotAndRestoreOfTheRealisticRuleSet() {
+    Detector detector = realisticRuleSet();
+    Feed feed = new Feed(200, i -> {
+      boolean loaded = (i / 50) % 2 == 1;
+      return Map.of(WEIGHT, loaded ? 1_200.0 + i : 10.0, LIMIT, 5_000.0, ANGLE, (i % 23) - 11.0);
+    });
+    feed.push(detector, 1_000_000);
+    byte[] snapshot = detector.snapshot();
+    long snapshotNanos = Long.MAX_VALUE;
+    long restoreNanos = Long.MAX_VALUE;
+    for (int run = 0; run < 20; run++) {
+      long start = System.nanoTime();
+      snapshot = detector.snapshot();
+      snapshotNanos = Math.min(snapshotNanos, System.nanoTime() - start);
+      start = System.nanoTime();
+      realisticBuilder().restore(snapshot).build();
+      restoreNanos = Math.min(restoreNanos, System.nanoTime() - start);
+    }
+    report("realistic Snapshot size", snapshot.length / 1024.0, "KiB");
+    report("realistic Snapshot time", snapshotNanos / 1e6, "ms");
+    report("realistic restore time", restoreNanos / 1e6, "ms");
+    assertTrue(snapshot.length < 512 * 1024, "Snapshot of " + snapshot.length + " bytes");
+    assertTrue(snapshotNanos < 1e9 && restoreNanos < 1e9, "slower than a second");
   }
 
   // ----------------------------------------------------------------------------------------------

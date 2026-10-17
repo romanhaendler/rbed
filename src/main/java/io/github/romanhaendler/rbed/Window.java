@@ -222,8 +222,7 @@ abstract class Window {
         needs[i] = r.int64();
       }
       expiredNeed = r.int64();
-      head = 0;
-      size = n;
+      size = n; // a restore only happens in a Detector just built, so head is 0
       evictedSinceExactSum = r.int32();
       sum.load(r);
       started = r.bool();

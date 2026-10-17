@@ -49,8 +49,7 @@ final class Timestamps {
     if (n > detector.retentionLimit()) throw new java.io.IOException("too many timestamps");
     times = new long[Math.max(times.length, n)];
     for (int i = 0; i < n; i++) times[i] = r.int64();
-    head = 0;
-    size = n;
+    size = n; // a restore only happens in a Detector just built, so head is 0
     base = r.int64();
   }
 
