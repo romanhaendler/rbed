@@ -872,13 +872,13 @@ Runnable end-to-end examples from different domains, each a test with its expect
 
 Conditions are bound to the Detector once, in `build()`. After that, Rules read Channel state directly, and pushing a Sample costs one hash lookup per value. In steady state (no Event starting or ending) it allocates nothing, so memory stays bounded however long an Event lasts. Moving averages use fixed ring buffers with exact sums (a fixed-width integer accumulator over the whole range of `double`, rounded once), so they neither allocate nor drift, whatever magnitudes pass through; 0.3.0 used a running compensated sum, so from 0.4.0 the last bit of an average can differ.
 
-Measured with `mvn test -Pperformance` (Apple M2, JDK 21):
+Measured with `mvn test -Pperformance` (Apple M2, JDK 21.0.1, 17 October 2026, nothing else running):
 
 | Scenario                                                  | Throughput             |
 | --------------------------------------------------------- | ---------------------- |
-| One threshold Rule, Events every 100 Samples              | ~40-45 million Samples/s |
-| Realistic Rule set: 11 Rules using every feature           | ~5.7 million Samples/s |
-| 50 Rules x 20 Channels, Events every 40 Samples           | ~1.2-1.5 million Samples/s |
+| One threshold Rule, Events every 100 Samples              | ~29 million Samples/s |
+| Realistic Rule set: 11 Rules using every feature           | ~2.9 million Samples/s |
+| 50 Rules x 20 Channels, Events every 40 Samples           | ~0.9 million Samples/s |
 
 A running Event keeps Aggregates only for the Channels its Rule uses (plus those requested with `.aggregate(...)`), at about 1 ns per Channel per Sample.
 
