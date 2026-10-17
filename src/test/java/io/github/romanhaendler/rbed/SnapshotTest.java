@@ -263,4 +263,25 @@ class SnapshotTest {
     Arrays.fill(snapshot, (byte) 0);   // the caller reuses its buffer before build()
     assertArrayEquals(runningLift(), builder.build().snapshot());
   }
+
+  /** Names that differ only in an unpaired surrogate must not share a fingerprint. */
+  @Test
+  void rulesNamedByDifferentLoneSurrogatesDoNotSwapSilently() {
+    Detector a = Detector.builder().rules(Rule.named("\uD800").when(WEIGHT.above(1)),
+        Rule.named("\uD801").when(WEIGHT.above(5))).build();
+    a.push(1, Map.of(WEIGHT, 3.0));
+    Detector.Builder swapped = Detector.builder().restore(a.snapshot())
+        .rules(Rule.named("\uD801").when(WEIGHT.above(1)), Rule.named("\uD800").when(WEIGHT.above(5)));
+    assertThrows(IllegalArgumentException.class, swapped::build);
+  }
+
+  @Test
+  void aChannelNamedByALoneSurrogateIsNotAChannelNamedByAQuestionMark() {
+    Channel lone = Channel.named("\uD800");
+    Channel mark = Channel.named("?");
+    Detector a = Detector.builder().rules(Rule.named("R").when(lone.above(1))).build();
+    a.push(1, Map.of(lone, 3.0));
+    assertThrows(IllegalArgumentException.class, Detector.builder().restore(a.snapshot())
+        .rules(Rule.named("R").when(mark.above(1)))::build);
+  }
 }

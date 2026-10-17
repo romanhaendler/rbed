@@ -1,7 +1,6 @@
 package io.github.romanhaendler.rbed;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.zip.CRC32;
@@ -108,15 +107,18 @@ final class Snapshots {
     long a = 0xcbf29ce484222325L;
     long b = 0x84222325cbf29ce4L;
     for (String line : lines) {
-      byte[] utf8 = line.getBytes(StandardCharsets.UTF_8);
+      // UTF-16 code units, no charset: an encoder would turn every lone surrogate into '?'
       for (int shift = 24; shift >= 0; shift -= 8) {
-        a = (a ^ ((utf8.length >>> shift) & 0xFF)) * 0x100000001b3L;
-        b = (b ^ ((utf8.length >>> shift) & 0xFF)) * 0x9E3779B97F4A7C15L;
+        a = (a ^ ((line.length() >>> shift) & 0xFF)) * 0x100000001b3L;
+        b = (b ^ ((line.length() >>> shift) & 0xFF)) * 0x9E3779B97F4A7C15L;
       }
-      for (byte x : utf8) {
-        a = (a ^ (x & 0xFF)) * 0x100000001b3L;
-        b = (b ^ (x & 0xFF)) * 0x9E3779B97F4A7C15L;
-        b ^= b >>> 29;
+      for (int i = 0; i < line.length(); i++) {
+        char c = line.charAt(i);
+        for (int shift = 8; shift >= 0; shift -= 8) {
+          a = (a ^ ((c >>> shift) & 0xFF)) * 0x100000001b3L;
+          b = (b ^ ((c >>> shift) & 0xFF)) * 0x9E3779B97F4A7C15L;
+          b ^= b >>> 29;
+        }
       }
     }
     byte[] out = new byte[HASH_BYTES];
