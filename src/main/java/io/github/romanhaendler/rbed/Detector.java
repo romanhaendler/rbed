@@ -165,7 +165,8 @@ public final class Detector implements AutoCloseable {
     if (dropped++ == 0) {
       System.getLogger("io.github.romanhaendler.rbed").log(System.Logger.Level.WARNING,
           what + ": a window reached the Retention Limit of " + retentionLimit
-              + " entries; its oldest entries are dropped, so results deviate from the Rule."
+              + " entries; its oldest entries are dropped, so results of " + what
+              + " deviate from an unlimited window."
               + " Raise the limit with Detector.builder().retentionLimit(...).");
     }
   }
