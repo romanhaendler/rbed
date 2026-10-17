@@ -22,8 +22,6 @@ final class ExactSum {
   private final long[] limbs = new long[LIMBS];
   private int lo = LIMBS; // limbs outside lo..hi are zero; only speeds up value()
   private int hi = -1;
-  private boolean cached; // value() only changes when a value is added or removed
-  private double cache;
   private final long[] work = new long[LIMBS + 3]; // scratch for value(), not state
 
   void add(double value) {
@@ -47,7 +45,6 @@ final class ExactSum {
     int shift = position & 31;
     long low = (mant & ((1L << (32 - shift)) - 1)) << shift;
     long rest = mant >>> (32 - shift);
-    cached = false;
     lo = Math.min(lo, i);
     hi = Math.max(hi, i + 2);
     limbs[i] += sign * low;
@@ -57,14 +54,6 @@ final class ExactSum {
 
   /** The exact sum rounded to the nearest double, ties to even; infinite on overflow. */
   double value() {
-    if (!cached) {
-      cache = compute();
-      cached = true;
-    }
-    return cache;
-  }
-
-  private double compute() {
     if (hi < lo) return 0.0;
     long[] w = work;
     int from = Math.max(0, lo - 3); // a rounding window reaches two limbs below and above
@@ -85,8 +74,7 @@ final class ExactSum {
       }
       carry = borrow - carry;
     }
-    w[hi + 1] = carry & MASK;
-    w[hi + 2] = carry >> 32;
+    w[hi + 1] = carry; // below 2^32 for fewer than 2^31 values
     int top = hi + 2;
     while (top >= 0 && w[top] == 0) top--;
     if (top < 0) return 0.0;
@@ -129,7 +117,6 @@ final class ExactSum {
     int count = r.int32();
     if (count < 0 || count > LIMBS) throw new IOException("sum");
     Arrays.fill(limbs, 0);
-    cached = false;
     lo = LIMBS;
     hi = -1;
     int previous = -1;

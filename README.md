@@ -477,7 +477,7 @@ Rules are evaluated in the order they were added, so in a callback, `count`, `to
 
 Watching adds no allocation per Sample, and reading only looks the value up. Each moving average in a watched Expression keeps a window of its own, even if a Rule uses the same instance: it takes memory, is updated at each push and counts in `retainedValues()` and against the [Retention Limit](#memory). Everything else in a watched Expression adds no work per push. Watching `latest(a).min/max/mean(x)` makes Rule A aggregate `x`, so A's Events gain [Aggregates](#aggregates) of `x`; which Events are found, and when, is unchanged.
 
-Expressions, Conditions and Rules have a readable `toString()`: the code that builds them, such as `temp.averageOverSamples(5)`, `temp.above(80.0)` or `Rule.named("Hot").when(temp.above(80.0)).forSamples(3)`. Channels and Rules appear by name, constants as `double`, durations in milliseconds, aggregated Channels in the order given. Error messages use it, and so can your logs. Equal configuration gives equal text on every run and runtime; a [Snapshot](#resuming-a-stream) records a fingerprint of these descriptions to refuse a restore into other Rules.
+Expressions, Conditions and Rules have a readable `toString()`: the code that builds them, such as `temp.averageOverSamples(5)`, `temp.above(80.0)` or `Rule.named("Hot").when(temp.above(80.0)).forSamples(3)`. Channels and Rules appear by name, constants as `double`, durations in milliseconds, aggregated Channels in the order given. Error messages use it, and so can your logs. Equal configuration gives equal text on every run and runtime; names are printed as they are, so two different configurations can print alike (a Channel named `x.abs()` and `x.abs()` on Channel `x`). A [Snapshot](#resuming-a-stream) therefore records a fingerprint of a separate, unambiguous encoding of the configuration, not of this text, to refuse a restore into other Rules.
 
 ## Referring to other Rules
 
@@ -870,7 +870,7 @@ Runnable end-to-end examples from different domains, each a test with its expect
 
 ## Performance
 
-Conditions are bound to the Detector once, in `build()`. After that, Rules read Channel state directly, and pushing a Sample costs one hash lookup per value. In steady state (no Event starting or ending) it allocates nothing, so memory stays bounded however long an Event lasts. Moving averages use fixed ring buffers with exact sums (rounded once), so they neither allocate nor drift; 0.3.0 used a running compensated sum, so from 0.4.0 the last bit of an average can differ.
+Conditions are bound to the Detector once, in `build()`. After that, Rules read Channel state directly, and pushing a Sample costs one hash lookup per value. In steady state (no Event starting or ending) it allocates nothing, so memory stays bounded however long an Event lasts. Moving averages use fixed ring buffers with exact sums (a fixed-width integer accumulator over the whole range of `double`, rounded once), so they neither allocate nor drift, whatever magnitudes pass through; 0.3.0 used a running compensated sum, so from 0.4.0 the last bit of an average can differ.
 
 Measured with `mvn test -Pperformance` (Apple M2, JDK 21):
 
