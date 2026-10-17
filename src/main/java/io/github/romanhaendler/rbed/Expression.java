@@ -146,9 +146,11 @@ public abstract class Expression {
   }
 
   /**
-   * How this Expression is written in Java, such as {@code temp.averageOverSamples(5)} or
-   * {@code count(Run).within(60000)}: a Channel by its name, a Rule by its name, a duration in
-   * milliseconds. Error messages use it to name the Expression.
+   * How this Expression is written in Java, such as {@code temp.averageOverSamples(5)},
+   * {@code temp.minus(5.0)} or {@code count(Run).within(60000)}: a Channel and a Rule by their
+   * names, a constant as a {@code double} ({@code plus(5)} reads {@code plus(5.0)}), a duration
+   * in milliseconds (also when given as a {@link java.time.Duration}). Error messages use it to
+   * name the Expression.
    */
   @Override
   public String toString() {

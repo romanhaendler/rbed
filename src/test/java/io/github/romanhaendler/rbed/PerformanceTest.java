@@ -112,8 +112,9 @@ class PerformanceTest {
 
   /**
    * Inside one long Event, with moving-average windows full and every Rule idle or Confirmed,
-   * pushing must not allocate beyond the map iterator, watched Expressions included. Covers bounded memory: a window over a
-   * minute at 1 kHz keeps only that minute, and an Event's Aggregates do not grow with its length.
+   * pushing must not allocate beyond the map iterator, watched Expressions included. Covers
+   * bounded memory: a window over a minute at 1 kHz keeps only that minute, and an Event's
+   * Aggregates do not grow with its length.
    */
   @Test
   void steadyStateSamplesDoNotAllocate() {

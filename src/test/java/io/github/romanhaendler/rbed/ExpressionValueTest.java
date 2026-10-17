@@ -143,7 +143,9 @@ class ExpressionValueTest {
     assertEquals("x.minus(y).times(2.5).dividedBy(y.plus(1.0))",
         X.minus(Y).times(2.5).dividedBy(Y.plus(1)).toString());
     assertEquals("count(Run)", count(run).toString());
+    assertEquals("x.plus(5.0)", X.plus(5).toString());
     assertEquals("count(Run).within(60000)", count(run).within(60_000).toString());
+    assertEquals("count(Run).within(60000)", count(run).within(Duration.ofMinutes(1)).toString());
     assertEquals("totalDuration(Run)", totalDuration(run).toString());
     assertEquals("latest(Run).duration()", latest(run).duration().toString());
     assertEquals("latest(Run).max(x)", latest(run).max(X).toString());

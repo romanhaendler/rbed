@@ -10,9 +10,12 @@ import java.util.Objects;
  */
 public final class LatestEvent {
   private final Rule rule;
+  /** The text every Expression of this starts with: "latest(R)." */
+  private final String prefix;
 
   LatestEvent(Rule rule) {
     this.rule = Objects.requireNonNull(rule, "rule");
+    prefix = "latest(" + rule + ").";
   }
 
   /** The mean of a Channel over the latest Event (so far, if it is running). */
@@ -32,7 +35,7 @@ public final class LatestEvent {
 
   /** The latest Event's duration in milliseconds; for a running Event, up to now. */
   public Expression duration() {
-    return new Expression("latest(" + rule + ").duration()") {
+    return new Expression(prefix + "duration()") {
       @Override Bound bind(Detector detector) {
         EventState events = detector.referencedEvent(rule);
         return () -> events.latestDuration(detector.now());
@@ -43,7 +46,7 @@ public final class LatestEvent {
   private Expression aggregate(Channel channel, Accumulator.Aggregate aggregate) {
     Objects.requireNonNull(channel, "channel");
     String call = aggregate.name().toLowerCase(Locale.ROOT) + "(" + channel + ")";
-    return new Expression("latest(" + rule + ")." + call) {
+    return new Expression(prefix + call) {
       @Override Bound bind(Detector detector) {
         // not a Channel lookup of the reading Rule: the referenced Rule aggregates it
         return detector.referencedEvent(rule).latest(channel.state(detector), aggregate);
