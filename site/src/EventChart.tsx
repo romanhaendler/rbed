@@ -288,7 +288,6 @@ export function EventChart({
                 value={x.threshold}
                 // As a Channel threshold's: the comparison and the value; the key names the Rule.
                 label={expressionLabel(x)}
-                color={narrow ? THRESHOLD_COLOR : undefined}
               />
             ),
         )}
