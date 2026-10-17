@@ -12,6 +12,7 @@ import {
   keyOf,
   latestEvent,
   lineRows,
+  markersOf,
   readoutValue,
   ruleState,
   stateColor,
@@ -303,4 +304,13 @@ test('latest(...) reads nothing before the first Confirmed Event, then the runni
     [5, 10, 25, 40, 50, 60, 95].map((t) => latestEvent([first, second], t, 1000)),
     [undefined, first, first, first, first, second, second],
   );
+});
+
+test("a Channel's line has a marker at each Sample only while its Samples are few, counted per Channel", () => {
+  const rows = Array.from({ length: 50 }, (_, i) => ({ t: i, temp: i, humidity: i % 7 === 0 ? 50 : null }));
+  assert.equal(markersOf(rows, 'humidity', true), 'always', '8 values');
+  assert.equal(markersOf(rows, 'temp', false), 'never', '50 values on a desktop');
+  assert.equal(markersOf(rows.slice(0, 40), 'temp', false), 'always', '40 values on a desktop');
+  assert.equal(markersOf(rows.slice(0, 31), 'temp', true), 'never', '31 values on a phone');
+  assert.equal(markersOf(rows.slice(0, 30), 'temp', true), 'always', '30 values on a phone');
 });

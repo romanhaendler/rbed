@@ -37,7 +37,7 @@ At the defaults, with the timer, `hr.age()` grows by a second at every advance a
 
 ## What an advance does
 
-At an advance, every Rule is evaluated with each Channel holding its last value (a [Pulse Channel](../pulse-channels/) is absent): durations can be reached, `totalDuration` and `count(...).within(...)` move on, and a `maxGap` is noticed. An advance is not a Sample, though: it does not count for [`forSamples`](../event-lifecycle/#the-start-lies-before-the-confirmation), nor for the Sample-based Aggregates `min`, `max`, `mean` and `count`. The time-weighted Aggregates do include the time up to it.
+At an advance, every Rule is evaluated with each Channel holding its last value (a [Pulse Channel](../pulse-channels/) is absent): durations can be reached, `totalDuration` and `count(...).within(...)` move on, and a `maxGap` is noticed. An advance is not a Sample, though: it does not count for [`forSamples`](../event-lifecycle/#durations-forduration-and-forsamples), nor for the Sample-based Aggregates `min`, `max`, `mean` and `count`. The time-weighted Aggregates do include the time up to it.
 
 An advance must lie after the previous Sample or advance, and a Detector with a sampling rate rejects it, because there time advances with the Samples.
 

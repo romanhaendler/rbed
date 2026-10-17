@@ -6,10 +6,11 @@
 
 :root {
   color-scheme: light dark;
-  /* An Event's bands (chartModel.ts): Pending a lighter tone of Confirmed in light, a darker one
-     in dark; each at least 3:1 against the surface (WCAG 1.4.11), about 2:1 against each other. */
+  /* An Event's bands (chartModel.ts): Pending a lighter tone of Confirmed in light, a darker and
+     duller one in dark, so it never reads as the louder of the two; each at least 3:1 against the
+     surface (WCAG 1.4.11), and about 2:1 (light) or 3:1 (dark) against each other. */
   --event-confirmed: light-dark(#be185d, #f9a8d4);
-  --event-pending: light-dark(#e668a0, #db2777);
+  --event-pending: light-dark(#e668a0, #a14d74);
 }
 
 /* An element scrolled or tabbed to stops below the sticky header, not under it. */
@@ -367,11 +368,10 @@ dialog[aria-label='Search the documentation'] [role='option'] > [class*='_group_
   max-width: 68ch;
 }
 
+/* Inline code is plain mono in the text, as on the umriss-ui Pages: a chip on every identifier
+   made the prose look spotted. Only code blocks (and the tiles' class names) are set off. */
 .page :not(pre) > code {
-  padding: 1px var(--u-space-1);
-  border-radius: var(--u-radius-xs);
-  background: var(--u-color-surface-sunken);
-  font-size: 0.9em;
+  font-size: 0.92em;
 }
 
 .page > * {
@@ -446,6 +446,52 @@ dialog[aria-label='Search the documentation'] [role='option'] > [class*='_group_
   color: var(--u-color-text-secondary);
 }
 
+/* The pager at a page's foot, as the umriss-ui demo's (page.css, MIT): two cards side by side; the
+   next one keeps the right half where it stands alone, as on the front page. */
+.pageTurn {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--u-space-4);
+  margin-top: var(--u-space-6);
+}
+
+.pageTurn a {
+  display: flex;
+  flex-direction: column;
+  gap: var(--u-space-1);
+  padding: var(--u-space-3) var(--u-space-4);
+  border-radius: var(--u-radius-md);
+  box-shadow: var(--u-edge);
+  background: var(--u-color-surface);
+  text-decoration: none;
+  transition: box-shadow var(--u-transition);
+}
+
+.pageTurn a[rel='next'] {
+  grid-column: 2;
+  text-align: right;
+}
+
+.pageTurn a:hover {
+  box-shadow: 0 0 0 1px var(--u-edge-color-strong);
+}
+
+.pageTurn a:focus-visible {
+  box-shadow: var(--u-focus-ring);
+}
+
+.pageTurnLabel {
+  font-size: var(--u-text-xs);
+  color: var(--u-color-text-secondary);
+}
+
+.pageTurnName {
+  font-size: var(--u-text-md);
+  font-weight: var(--u-weight-medium);
+  color: var(--u-color-accent-text);
+  overflow-wrap: anywhere;
+}
+
 /* The front page's tagline on one line at desktop width, and the hero tight, so the first live
    chart shows above the fold at 1280 x 800. */
 .page.front {
@@ -514,6 +560,21 @@ dialog[aria-label='Search the documentation'] [role='option'] > [class*='_group_
 
 .codeTabs [role='tablist'] {
   padding: 0 var(--u-space-4);
+}
+
+/* The tab already names the language, so the copy button stands in the row of the tabs. */
+.codeTabs {
+  position: relative;
+}
+
+.codeTabs .codeLanguage {
+  display: none;
+}
+
+.codeTabs .codeBar {
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 
 .codeBar {
@@ -784,7 +845,7 @@ dialog[aria-label='Search the documentation'] [role='option'] > [class*='_group_
 }
 
 /* Under the chart: what the bands' colors, the lines and the marks on them mean. A group keeps
-   its heading with its first item when it wraps. */
+   its heading with its first item, and its items wrap after the heading, not under it. */
 .lifecycleKey {
   display: flex;
   flex-wrap: wrap;
@@ -795,7 +856,14 @@ dialog[aria-label='Search the documentation'] [role='option'] > [class*='_group_
 }
 
 .keyGroup {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: var(--u-space-3);
+  max-width: 100%;
+}
+
+.keyItems {
+  display: flex;
   flex-wrap: wrap;
   gap: var(--u-space-1) var(--u-space-3);
 }
@@ -973,7 +1041,9 @@ dialog[aria-label='Search the documentation'] [role='option'] > [class*='_group_
 .tile code {
   align-self: flex-start;
   max-width: 100%;
-  font-size: var(--u-text-xs);
+  padding: 1px var(--u-space-1);
+  border-radius: var(--u-radius-xs);
+  background: var(--u-color-surface-sunken);
   color: var(--u-color-text-secondary);
   overflow-wrap: anywhere;
 }

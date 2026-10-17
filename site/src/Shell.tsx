@@ -4,7 +4,7 @@
 import { CommandPalette, useCommandPaletteShortcut } from '@umriss-ui/core';
 import { useEffect, useId, useRef, useState } from 'react';
 import { CATALOGUE, MarkdownPage, markdownOf } from './MarkdownPage';
-import { markdownFile, PAGES, pageAt, REPOSITORY, titleOf } from './pages.ts';
+import { markdownFile, PAGES, pageAt, REPOSITORY, RUBRICS, rubricOf, titleOf } from './pages.ts';
 import { searchItems } from './search.ts';
 
 const BASE = import.meta.env.BASE_URL;
@@ -86,8 +86,8 @@ function Rail({ current }: { current?: string }) {
   return (
     <nav className="rail" aria-label="Pages" ref={nav}>
       {entry('/', 'Overview')}
-      {(['Guide', 'Examples'] as const).map((rubric) => {
-        const pages = PAGES.filter((p) => p.rubric === rubric);
+      {RUBRICS.slice(1).map((rubric) => {
+        const pages = PAGES.filter((p) => rubricOf(p) === rubric);
         return (
           pages.length > 0 && (
             <div className="railRubric" key={rubric}>

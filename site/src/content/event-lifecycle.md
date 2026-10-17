@@ -34,9 +34,13 @@ At the default duration of two seconds:
 
 ## The start lies before the confirmation
 
-An Event's `start()` is where its Conditions started holding, not where it was Confirmed: the first Event starts at 3 s, although it is only known at 5 s. `confirmed()` returns the moment of confirmation, which the Event table shows in a column of its own. `forDuration` measures from the start, so the required duration is reached at `start()` plus the duration, and the Event is Confirmed at the first Sample from then on. `forSamples(n)` instead requires at least `n` consecutive Samples; with both, both must be met. Each applies to what comes right before it: `when(...)`, or `endWhen(...)` for an [End Condition](../end-conditions/#a-duration-for-the-end-condition). Without either, an Event is Pending and Confirmed at the same moment.
+An Event's `start()` is where its Conditions started holding, not where it was Confirmed: the first Event starts at 3 s, although it is only known at 5 s. `confirmed()` returns the moment of confirmation, which the Event table shows in a column of its own.
 
 A Detector only sees what its Samples show. The Discarded moment on this page is the Sample at which the Conditions were found no longer holding. The `Event` passed to `onDiscarded` has no such timestamp, only its start.
+
+## Durations: forDuration and forSamples
+
+`forDuration` measures from the Event's start, so the required duration is reached at `start()` plus the duration, and the Event is Confirmed at the first Sample or [advance](../silent-sensors/) from then on. `forSamples(n)` instead requires at least `n` consecutive Samples; with both, both must be met. Each applies to what comes right before it: `when(...)`, or `endWhen(...)` for an [End Condition](../end-conditions/#a-duration-for-the-end-condition). Without either, an Event is Pending and Confirmed at the same moment.
 
 ## One Event at a time
 
@@ -64,7 +68,7 @@ Two flags mark Events whose true extent is not known. The Event table shows both
 - `truncatedEnd()`: observation stopped while the Event was running. `close()` Ends a Confirmed Event this way (and Discards a Pending one), and so does a data gap.
 - `truncatedStart()`: the Event may have begun before its `start()`, because its Rule had not yet seen its Conditions *not* holding: the very first Sample already satisfies them, a moving average is still warming up, or a data gap has just ended.
 
-The first Rule on the front page shows a Truncated start: lower its threshold to 70, and its Event starts at the very first Sample.
+The [first Rule](../#a-first-rule) on the front page shows a Truncated start: lower its threshold to 70, and its Event starts at the very first Sample.
 
 ## Reference
 

@@ -18,8 +18,8 @@ export type MarkRow = { t: number; y: number };
     between the Channels and the lanes. */
 const CHANNEL_UNITS = 3;
 const SEPARATE_UNITS = 2;
-/** The Events' colors (site.css): Pending a lighter tone of Confirmed in light, a darker one in
-    dark, each at least 3:1 against the surface. */
+/** The Events' colors (site.css): Pending a lighter tone of Confirmed in light, a darker and
+    duller one in dark, each at least 3:1 against the surface. */
 export const EVENT_COLOR = 'var(--event-confirmed)';
 export const EVENT_STATES = [
   { label: 'Pending', color: 'var(--event-pending)' },
@@ -190,6 +190,13 @@ export const hasGaps = (rows: Row[], channel: string) => rows.some((r) => r[chan
     running straight across. */
 export const lineRows = (rows: Row[], advances: number[]): Row[] =>
   advances.length === 0 ? rows : [...rows, ...advances.map((t) => ({ t }) as Row)].sort((a, b) => a.t - b.t);
+
+/** A Channel's line has a marker at each of its Samples while they are few enough to read apart
+    (fewer on a phone), and none otherwise: counted per Channel, so a slow sensor keeps its dots
+    beside a fast one. The held step line and the readout still show a lone value between gaps. */
+export function markersOf(rows: Row[], channel: string, narrow: boolean): 'always' | 'never' {
+  return rows.filter((r) => r[channel] != null).length <= (narrow ? 30 : 40) ? 'always' : 'never';
+}
 
 /** The Channel's value where rbed holds it (in rbed, a Channel keeps its last value): in a
     Sample that lacks it, and at a time advance (in the Scenario's unit), from the Sample

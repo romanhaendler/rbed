@@ -56,7 +56,7 @@ A division by zero, or any other operation without a finite result, is undefined
 
 A threshold tells you *where* a Channel is; a trend tells you *where it is going*, so a Rule can react before a threshold is reached.
 
-- `rising()` and `falling()` are Conditions: the Channel's latest value is greater, or less, than its previous one. An unchanged value is neither. Combine them with [`forSamples`](../event-lifecycle/#the-start-lies-before-the-confirmation) for a sustained trend, or with `and` and a level, so that a high value that is still climbing counts and one that is already falling does not.
+- `rising()` and `falling()` are Conditions: the Channel's latest value is greater, or less, than its previous one. An unchanged value is neither. Combine them with [`forSamples`](../event-lifecycle/#durations-forduration-and-forsamples) for a sustained trend, or with `and` and a level, so that a high value that is still climbing counts and one that is already falling does not.
 - `rate()` is an Expression: the change per second between the two latest values, `(latest - previous) / seconds between them`, so irregular sampling is handled correctly.
 
 ```java

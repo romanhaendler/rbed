@@ -1,6 +1,6 @@
 // What the site is for a reader without JavaScript, a coding agent or a search engine, after the
 // umriss-ui Pages (ADR-0037 there): for every page of src/pages.ts its own index.html with the
-// head and the prerendered text, Java source and default Events, and its Markdown twin; then
+// head and the prerendered text, default Events and Java source, and its Markdown twin; then
 // llms.txt, llms-full.txt, sitemap.xml, 404.html and the Javadoc. vite.config.mjs runs prerender()
 // after `vite build`.
 //
@@ -12,7 +12,7 @@ import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { aggregatesText, discardedCells, discardedHead, eventCells, eventHead, forDisplay, hasNotes } from './src/events.ts';
 import { escape, LIVE_MARKER, parse, SCENARIO_MARKER } from './src/markdown.ts';
-import { markdownFile, PAGES, REPOSITORY, RUBRICS, rubricOf, titleOf } from './src/pages.ts';
+import { markdownFile, PAGES, REPOSITORY, RUBRICS, rubricOf, titleOf, turnsOf } from './src/pages.ts';
 import { defaultsOf, fillSource } from './src/parameters.ts';
 
 export const SITE = 'https://romanhaendler.github.io/rbed/';
@@ -91,8 +91,8 @@ function parametersText(parameters = []) {
 /** The Markdown without the blocks that speak of the live page's controls (<!-- live -->). */
 const withoutLive = (markdown) => markdown.replace(new RegExp(`^${LIVE_MARKER}\\n(?:[^\\n]+\\n?)*\\n*`, 'gm'), '');
 
-/** The Markdown twin: the page's Markdown, each Scenario marker replaced by its source, its
- *  parameters and its Events, and its links absolute. */
+/** The Markdown twin: the page's Markdown, each Scenario marker replaced by its parameters, its
+ *  Events and its source, in the live page's order, and its links absolute. */
 export function twin(markdown, facts, page) {
   return absolutePageLinks(withoutLive(markdown), page).replace(new RegExp(SCENARIO_MARKER.source, 'gm'), (_, id) => {
     const fact = factOf(facts, id);
@@ -102,7 +102,7 @@ export function twin(markdown, facts, page) {
         ? t
         : `${t.caption}:\n\n` + [t.rows[0], t.rows[0].map(() => '---'), ...t.rows.slice(1)].map(row).join('\n'),
     );
-    return '```java\n' + fact.source + '\n```\n\n' + parametersText(fact.parameters) + text.join('\n\n');
+    return parametersText(fact.parameters) + text.join('\n\n') + '\n\nJava source at the default parameters:\n\n```java\n' + fact.source + '\n```';
   });
 }
 
@@ -123,14 +123,25 @@ function railHtml(pages, current) {
   return `<nav class="rail" aria-label="Pages">${entry(pages.find((p) => p.path === '/'), 'Overview')}${rubrics.join('')}</nav>`;
 }
 
-/** #root as a reader without JavaScript sees it: the header, the navigation and the content. */
-function rootHtml(pages, current, content) {
+/** The pager to the pages before and after, as the app ends a page (MarkdownPage). */
+function pagerHtml(page) {
+  const turns = turnsOf(page).map(
+    (t) =>
+      `<a href="${BASE}${t.path.slice(1)}" rel="${t.rel}"><span class="pageTurnLabel">${escape(t.label)}</span>` +
+      `<span class="pageTurnName">${escape(t.name)}</span></a>`,
+  );
+  return `<nav class="pageTurn" aria-label="Previous and next page">${turns.join('')}</nav>`;
+}
+
+/** #root as a reader without JavaScript sees it: the header, the navigation and the content, and
+ *  after it whatever ends the page (the pager). */
+function rootHtml(pages, current, content, end = '') {
   return (
     '<div id="root"><div class="prerendered">' +
     `<header class="shellHead"><a class="shellMark" href="${BASE}">rbed</a></header>` +
     `<div class="shellBody">${railHtml(pages, current)}<main class="shellContent"><article class="page"><div class="flow">\n` +
     content +
-    '\n</div></article></main></div></div></div>'
+    `\n</div>${end}</article></main></div></div></div>`
   );
 }
 
@@ -162,7 +173,7 @@ function scenarioHtml(fact) {
           .join('') +
         '</tbody></table>',
   );
-  return `<pre><code>${escape(fact.source)}</code></pre>\n${NO_SCRIPT}\n${html.join('\n')}`;
+  return `${NO_SCRIPT}\n${html.join('\n')}\n<pre><code>${escape(fact.source)}</code></pre>`;
 }
 
 function checkTemplate(template) {
@@ -199,7 +210,9 @@ export function pageHtml(template, page, markdown, facts, pages = PAGES) {
       b.kind === 'html' ? b.html : b.kind === 'code' ? `<pre><code>${escape(b.source)}</code></pre>` : scenarioHtml(factOf(facts, b.id)),
     )
     .join('\n');
-  return template.replace('<title>rbed</title>', () => head).replace('<div id="root"></div>', () => rootHtml(pages, page.path, body));
+  return template
+    .replace('<title>rbed</title>', () => head)
+    .replace('<div id="root"></div>', () => rootHtml(pages, page.path, body, pagerHtml(page)));
 }
 
 /** 404.html, which GitHub Pages serves for any other path: the app's "no page" view, and the

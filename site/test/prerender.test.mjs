@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { javadocLinkErrors, llmsFull, llmsTxt, notFoundHtml, pageHtml, sitemap, twin } from '../prerender.mjs';
+import { PAGES } from '../src/pages.ts';
 
 const pages = [
   { path: '/', title: 'rbed', description: 'Rule-based event detection.' },
@@ -42,14 +43,15 @@ const facts = new Map([
 const template =
   '<!doctype html>\n<html lang="en">\n  <head>\n    <title>rbed</title>\n  </head>\n  <body>\n    <div id="root"></div>\n  </body>\n</html>\n';
 
-test('the twin is the Markdown with each Scenario as its Java source and its default Events', () => {
+test('the twin is the Markdown with each Scenario as its parameters, its default Events, then its Java source', () => {
   assert.equal(
     twin(markdown, facts, pages[1]),
     '# Data gaps\n\nA gap <ends> an Event.\n\n' +
-      '```java\nRule.named("Run").when(speed.above(5)).maxGap(Duration.ofSeconds(10));\n```\n\n' +
       'Events at the default parameters:\n\n' +
       '| Name | Start (s) | Confirmed (s) | End (s) | Truncated | Aggregates |\n| --- | --- | --- | --- | --- | --- |\n' +
       '| Run | 2 | 2 | 7.5 | end | speed: min 5.5, max 9, mean 7.12; load: no value |\n\n' +
+      'Java source at the default parameters:\n\n' +
+      '```java\nRule.named("Run").when(speed.above(5)).maxGap(Duration.ofSeconds(10));\n```\n\n' +
       'That is all.\n',
   );
 });
@@ -71,7 +73,7 @@ test('Discarded Pending Events at the defaults get a table of their own, after t
     twin(markdown, discarded, pages[1]).includes(
       '| Run | 2 | 2 | 7.5 | end | speed: min 5.5, max 9, mean 7.12; load: no value |\n\n' +
         'Discarded Pending Events at the default parameters:\n\n' +
-        '| Name | Start (s) | Discarded (s) |\n| --- | --- | --- |\n| Run | 9 | 9.5 |\n\nThat is all.',
+        '| Name | Start (s) | Discarded (s) |\n| --- | --- | --- |\n| Run | 9 | 9.5 |\n\nJava source at the default parameters:',
     ),
   );
   const html = pageHtml(template, pages[1], markdown, discarded);
@@ -117,8 +119,9 @@ test("the twin's links to other pages are absolute, since it is read away from t
   assert.equal(twin('[Cranes](cranes/)', facts, pages[0]), '[Cranes](https://romanhaendler.github.io/rbed/cranes/)');
 });
 
-test("a page's HTML holds its head, its text, its Java source and its default Events before any script", () => {
+test("a page's HTML holds its head, its text, its default Events and its Java source before any script", () => {
   const html = pageHtml(template, pages[1], markdown, facts);
+  assert.ok(html.indexOf('<table') < html.indexOf('<pre>'), 'the Events before the source, as on the live page');
   for (const part of [
     '<title>Data gaps · rbed</title>',
     '<meta name="description" content="What maxGap does." />',
@@ -144,7 +147,7 @@ test('the twin and the prerendered page leave out what speaks of the live contro
   assert.ok(!html.includes('Drag'));
 });
 
-test("the twin lists a Scenario's parameters under its source, as the address names them", () => {
+test("the twin lists a Scenario's parameters before its Events, as the address names them", () => {
   const parameters = [
     { id: 'maxGap', label: 'Gap over', default: 10, min: 1, max: 60, step: 1, unit: 's' },
     { id: 'push', label: 'Push', default: 1, min: 0, max: 1, step: 1, unit: '', options: [{ label: 'Each Sample' }, { label: 'Values only' }] },
@@ -152,7 +155,7 @@ test("the twin lists a Scenario's parameters under its source, as the address na
   const withParameters = new Map([['gaps', { ...facts.get('gaps'), parameters }]]);
   assert.ok(
     twin(markdown, withParameters, pages[1]).includes(
-      '```\n\nParameters (in the page address as ?maxGap=…):\n\n' +
+      'A gap <ends> an Event.\n\nParameters (in the page address as ?maxGap=…):\n\n' +
         '- Gap over (`maxGap`): 1 to 60 s in steps of 1, default 10\n' +
         '- Push (`push`): 0 for Each Sample, 1 for Values only (default)\n\nEvents at the default parameters:',
     ),
@@ -241,4 +244,16 @@ test('the sitemap lists every page, without a date that would change on every bu
       '  <url><loc>https://romanhaendler.github.io/rbed/data-gaps/</loc></url>\n' +
       '</urlset>\n',
   );
+});
+
+test('without JavaScript, a page ends with the pager to the pages before and after it', () => {
+  const html = pageHtml(template, PAGES[1], markdown, facts);
+  assert.ok(
+    html.includes(
+      '<nav class="pageTurn" aria-label="Previous and next page">' +
+        '<a href="/rbed/" rel="prev"><span class="pageTurnLabel">Previous</span><span class="pageTurnName">Overview</span></a>' +
+        '<a href="/rbed/event-lifecycle/" rel="next"><span class="pageTurnLabel">Next · Guide</span><span class="pageTurnName">The Event lifecycle</span></a></nav>',
+    ),
+  );
+  assert.ok(!twin(markdown, facts, PAGES[1]).includes('Previous'), 'not in the twin');
 });

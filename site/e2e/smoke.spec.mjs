@@ -4,8 +4,9 @@
 // on a phone, the Event tables fit without sideways scrolling, every plot keeps about 200 px, and
 // the chart stays in view while a control moves; the front page's chart is above the fold, and an
 // Event table stands between its chart and its source; logistics starts with door hidden; an
-// address with a fragment lands on its section; Tab first reaches the skip link; a chosen search
-// result closes the search; Reset keeps the focus in the panel.
+// address with a fragment lands on its section; the pager turns to the next page; Tab first
+// reaches the skip link; a chosen search result closes the search; Reset keeps the focus in the
+// panel.
 import { expect, test } from '@playwright/test';
 import { PAGES } from '../src/pages.ts';
 
@@ -81,6 +82,16 @@ test('a link to another page moves without a reload, and Back restores the page 
   expect(await page.evaluate(() => window.loadedOnce)).toBe(true);
 });
 
+test("a page's pager turns to the next page in the reading order without a reload", async ({ page }) => {
+  await page.goto('');
+  await page.evaluate(() => (window.loadedOnce = true));
+  await expect(page.locator('.pageTurn a')).toHaveCount(1);
+  await page.locator('.pageTurn a[rel="next"]').click();
+  await expect(page.locator('.shellContent h1')).toHaveText(PAGES[1].title);
+  expect(await page.evaluate(() => window.loadedOnce)).toBe(true);
+  await expect(page.locator('.pageTurn a[rel="prev"]')).toContainText('Overview');
+});
+
 test.describe('without JavaScript', () => {
   test.use({ javaScriptEnabled: false });
 
@@ -90,6 +101,7 @@ test.describe('without JavaScript', () => {
     await expect(page.locator('.shellHead')).toBeVisible();
     await expect(page.locator('.rail .railEntry')).toHaveCount(PAGES.length);
     await expect(page.getByText('The live chart and its controls need JavaScript.')).toBeVisible();
+    await expect(page.locator('.pageTurn a[rel="next"]')).toContainText(PAGES[PAGES.findIndex((p) => p.path === '/end-conditions/') + 1].title);
   });
 
   test('404.html says there is no page and lists the pages', async ({ page }) => {
