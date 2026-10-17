@@ -1,6 +1,6 @@
 # Spec: resuming a stream after a restart
 
-Status: ready-for-agent
+Status: done
 
 ## Problem Statement
 
