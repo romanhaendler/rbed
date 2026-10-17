@@ -106,6 +106,36 @@ class ReplayPointTest {
   }
 
   @Test
+  void nestedMovingAverages() {
+    ChannelExpression nested = A.averageOverSamples(3).averageOverSamples(2);
+    ChannelExpression nestedDuration = B.averageOverDuration(80).averageOverDuration(60);
+    Rule up = Rule.named("Up").when(nested.above(5)).forSamples(2);
+    Rule down = Rule.named("Down").when(nestedDuration.below(3));
+    List<Expression> watched = List.of(nested, nestedDuration.rate());
+    checkMany("nested averages", b -> b.rules(up, down).watch(watched.toArray(Expression[]::new)),
+        watched, 30, 0, 0.1);
+  }
+
+  @Test
+  void aPulseDetectorWithMaxGapNeedsThePreviousSample() {
+    // the pulse is absent in a time advance, so only the previous Sample tells about the gap
+    Rule beat = Rule.named("Beat").when(P.above(0.5)).forSamples(1).maxGap(100);
+    checkMany("pulse and maxGap", b -> b.rules(beat), List.of(), 40, 150, 0.3);
+  }
+
+  @Test
+  void expiredConfirmationTimesDoNotDependOnWhoReadTheCount() {
+    // found by the extended run: R2 only reads the count when the pulse is there, so the
+    // expired confirmation of R1 used to be dropped later in one Detector than in another
+    Rule r1 = Rule.named("R1").when(B.above(10.0));
+    Rule r2 = Rule.named("R2").when(P.above(Conditions.count(r1).within(1366L)));
+    Outcome o = ReplayHarness.check(b -> b.rules(r1, r2), List.of(),
+        List.of(Op.push(5796, "b", 10.000000000000002), Op.push(7977, "b", 0.0, "p", -0.0),
+            Op.push(9375, "b", 3.0)));
+    assertNull(o.failure(), () -> o.failure().report());
+  }
+
+  @Test
   void eventsAcrossRules() {
     Rule hot = Rule.named("Hot").when(A.above(6)).forSamples(2);
     Rule alarm = Rule.named("Alarm").when(Conditions.after(hot).within(300).and(B.above(3)));
@@ -215,6 +245,18 @@ class ReplayPointTest {
     d.push(50, Map.of(A, 1.0)); // when stops holding: free again
     d.push(60, Map.of(A, 1.0));
     assertEquals(OptionalLong.of(60), d.replayPoint());
+  }
+
+  @Test
+  void aGapInTheDataStartsFreshAtTheGap() {
+    Rule hot = Rule.named("Hot").when(A.above(4)).forSamples(3).maxGap(100);
+    Detector d = Detector.builder().rules(hot).build();
+    d.push(0, Map.of(A, 5.0));
+    d.push(10, Map.of(A, 5.0));
+    d.push(20, Map.of(A, 5.0)); // Confirmed
+    assertEquals(OptionalLong.of(0), d.replayPoint());
+    d.push(500, Map.of(A, 1.0)); // the gap Ends the Event at 20, truncated
+    assertEquals(OptionalLong.of(500), d.replayPoint());
   }
 
   @Test

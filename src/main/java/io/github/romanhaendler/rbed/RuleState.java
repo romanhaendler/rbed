@@ -135,7 +135,6 @@ final class RuleState {
    */
   long replayNeed() {
     long need = ValueTrack.NONE;
-    if (running()) need = runStart;
     if (seenFalse) need = Math.min(need, falseSeen);
     return Math.min(need, latestNeed());
   }

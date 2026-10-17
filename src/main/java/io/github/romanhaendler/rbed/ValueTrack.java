@@ -44,8 +44,7 @@ class ValueTrack {
     previousNeed = lastNeed;
     lastNeed = NONE; // until settled
     touched = true;
-    long windowNeed = windowNeed();
-    for (Averaged average : averages) average.follow(t, v, windowNeed);
+    for (Averaged average : averages) average.follow(t, v);
   }
 
   /** What the window of a moving average needs; NONE for a Channel. */
@@ -158,9 +157,9 @@ class ValueTrack {
 
     private boolean added;
 
-    void follow(long t, double source, long sourceNeed) {
+    void follow(long t, double source) {
       added = source == source; // skip NaN
-      if (added) window.add(t, source, sourceNeed);
+      if (added) window.add(t, source);
       update(t, window.average());
     }
 

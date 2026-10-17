@@ -289,7 +289,8 @@ public final class Detector implements AutoCloseable {
    * the number of Channels, moving averages and Rules, not to the history, and allocates only the
    * result.
    *
-   * <p>Preconditions: the replay gets the same input, Rules and options; the Detector has
+   * <p>Preconditions: the replay gets the same input, Rules and options, and its listener's side
+   * effects are suppressed up to the stop; the Detector has
    * not dropped entries because of the Retention Limit ({@link #droppedValues} is 0), which would
    * make windows depend on the dropped entries; and {@code droppedValues()}, a count since the
    * Detector was built, and the warning logged with the first drop are not reproduced by a replay.
@@ -348,7 +349,8 @@ public final class Detector implements AutoCloseable {
   /**
    * The number of entries this Detector currently holds: one per Channel a Rule or watched
    * Expression uses, one per value in each moving-average window and one per timestamp kept for
-   * {@code count(...).within(...)}. A plain counter read, cheap to poll between pushes.
+   * {@code count(...).within(...)} (timestamps older than the window are dropped at every
+   * moment). A plain counter read, cheap to poll between pushes.
    */
   public long retainedValues() {
     return channels.size() + retained;

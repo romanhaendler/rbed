@@ -14,16 +14,12 @@ abstract class Window {
     this.detector = detector;
   }
 
-  /**
-   * Adds a value; {@code need} is the earliest timestamp a replay must start at to reproduce it
-   * (see {@link Detector#replayPoint}).
-   */
-  abstract void add(long time, double value, long need);
+  abstract void add(long time, double value);
 
   /** The earliest timestamp a replay must start at to reproduce this window; NONE if empty. */
   abstract long need();
 
-  /** The value added in this moment also needs the moment's replay start, {@code closed}. */
+  /** The value added in this moment needs a replay to start at {@code closed}, no later. */
   abstract void settleNewest(long closed);
 
   /** The mean of the window, or NaN while it is warming up. */
@@ -57,11 +53,11 @@ abstract class Window {
     @Override
     void settleNewest(long closed) {
       int newest = (next + values.length - 1) % values.length;
-      needs[newest] = Math.min(needs[newest], closed);
+      needs[newest] = closed;
     }
 
     @Override
-    void add(long time, double value, long need) {
+    void add(long time, double value) {
       if (size == values.length) {
         sum.add(-values[next]);
         evictedSinceExactSum++;
@@ -70,7 +66,7 @@ abstract class Window {
         detector.retain();
       }
       values[next] = value;
-      needs[next] = need;
+      needs[next] = ValueTrack.NONE; // until settled
       sum.add(value);
       next = (next + 1) % values.length;
       if (evictedSinceExactSum == values.length) {
@@ -148,11 +144,11 @@ abstract class Window {
     @Override
     void settleNewest(long closed) {
       int newest = (head + size - 1) % needs.length;
-      needs[newest] = Math.min(needs[newest], closed);
+      needs[newest] = closed;
     }
 
     @Override
-    void add(long time, double value, long need) {
+    void add(long time, double value) {
       if (!started) {
         started = true;
         first = time;
@@ -178,7 +174,7 @@ abstract class Window {
       int tail = (head + size) % times.length;
       times[tail] = time;
       values[tail] = value;
-      needs[tail] = need;
+      needs[tail] = ValueTrack.NONE; // until settled
       size++;
       detector.retain();
       sum.add(value);
