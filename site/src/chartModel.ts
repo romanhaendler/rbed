@@ -191,6 +191,13 @@ export const hasGaps = (rows: Row[], channel: string) => rows.some((r) => r[chan
 export const lineRows = (rows: Row[], advances: number[]): Row[] =>
   advances.length === 0 ? rows : [...rows, ...advances.map((t) => ({ t }) as Row)].sort((a, b) => a.t - b.t);
 
+/** A Channel's line has a marker at each of its Samples while they are few enough to read apart
+    (fewer on a phone), and none otherwise: counted per Channel, so a slow sensor keeps its dots
+    beside a fast one. The held step line and the readout still show a lone value between gaps. */
+export function markersOf(rows: Row[], channel: string, narrow: boolean): 'always' | 'never' {
+  return rows.filter((r) => r[channel] != null).length <= (narrow ? 30 : 40) ? 'always' : 'never';
+}
+
 /** The Channel's value where rbed holds it (in rbed, a Channel keeps its last value): in a
     Sample that lacks it, and at a time advance (in the Scenario's unit), from the Sample
     before. For a Channel some Samples lack, at every Sample and advance (none before the

@@ -35,6 +35,7 @@ import {
   laneMarks,
   latestEvent,
   lineRows,
+  markersOf,
   MARKS,
   type MarkRow,
   plotUnits,
@@ -211,9 +212,6 @@ export function EventChart({
   // Room for the labels of a band with more than two threshold lines.
   const crowded = channelAxes.reduce((sum, a) => sum + Math.max(0, lines.filter((l) => l.axis === a.id && l.label !== '').length - 2), 0) * 30;
   const windows = windowRows(model.windows, lifecycle, millis, forgetsAt(model));
-  // A Channel's line with a marker at every Sample, unless the Samples lie too close for markers
-  // to read (on a phone sooner). An Expression's line has none: its dash says it is derived.
-  const markers = rows.length <= (narrow ? 30 : 100) ? 'always' : 'auto';
   // On a phone, smaller lifecycle marks, so a short Event's band still shows between them.
   const radius = narrow ? { mark: 3.5, ring: 4.5, truncated: 6 } : { mark: 4, ring: 5.5, truncated: 9 };
   // Few Samples: a tick at each, written as the Samples' times are.
@@ -361,12 +359,13 @@ export function EventChart({
             radius={2.5}
           />
         )}
-        {/* A Pulse Channel has no value between its Samples, so it is drawn as marks, not a line. */}
+        {/* A Pulse Channel has no value between its Samples, so it is drawn as marks, not a line. An
+            Expression's line has no markers: its dash says it is derived. */}
         {channels.map((c) =>
           scenario.pulse.includes(c) ? (
             <Scatter key={c} value={c} name={c} color={channelColor(scenario, c)} radius={5} yAxisId={axisOf(c).id} />
           ) : (
-            <Line key={c} value={c} name={c} color={channelColor(scenario, c)} markers={markers} yAxisId={axisOf(c).id} />
+            <Line key={c} value={c} name={c} color={channelColor(scenario, c)} markers={markersOf(rows, c, narrow)} yAxisId={axisOf(c).id} />
           ),
         )}
         {/* A Channel some Samples lack keeps its last value in rbed: a held step line under the
