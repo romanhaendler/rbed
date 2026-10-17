@@ -1,6 +1,6 @@
 # Spec: reading an Expression's value, and two README corrections
 
-Status: ready-for-agent
+Status: done
 
 ## Problem Statement
 
