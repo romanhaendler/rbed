@@ -73,6 +73,16 @@ class MovingAverageExactnessTest {
   }
 
   @Test
+  void aSumBeyondTheRangeOfADoubleIsInfiniteNotNaN() {
+    assertEquals(Double.POSITIVE_INFINITY,
+        lastOf(X.averageOverSamples(2), new double[] {1.7e308, 1.7e308}, 1));
+    assertEquals(Double.NEGATIVE_INFINITY,
+        lastOf(X.averageOverSamples(2), new double[] {-1.7e308, -1.7e308}, 1));
+    // and it recovers once the large values have left
+    assertEquals(0.5, lastOf(X.averageOverSamples(2), new double[] {1.7e308, 1.7e308, 0, 1}, 1));
+  }
+
+  @Test
   void randomWindowsMatchExactArithmeticBitForBit() {
     SplittableRandom r = new SplittableRandom(42);
     for (int round = 0; round < 300; round++) {

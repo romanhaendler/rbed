@@ -56,6 +56,20 @@ class SnapshotValidationTest {
   }
 
   @Test
+  void moreRunsThanTheDetectorKeepsAreRejected() throws IOException {
+    Detector d = detector(10);
+    StateWriter w = new StateWriter();
+    d.saveState(w);
+    byte[] ok = w.toByteArray();
+    d.loadState(new StateReader(ok, ok.length)); // control: the intact state loads
+    // started, now, closed, lastSample, samples, retained, dropped, hasHistory, latestHistoryEnd
+    int at = 1 + 8 + 1 + 8 + 8 + 8 + 8 + 1 + 8;
+    byte[] bytes = java.util.Arrays.copyOf(ok, ok.length + 65 * 16); // room for all 65 pairs
+    bytes[at + 3] = 65; // 65 runs, but at most 64 are kept
+    assertThrows(IOException.class, () -> d.loadState(new StateReader(bytes, bytes.length)));
+  }
+
+  @Test
   void anAccumulatorWhoseArraysDiffInLengthIsRejected() {
     for (int odd = 0; odd < 7; odd++) {
       final int which = odd;
