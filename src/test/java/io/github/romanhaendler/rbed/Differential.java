@@ -116,6 +116,76 @@ final class Differential {
     if (r.difference() != null) throw new AssertionError(r.difference().report());
   }
 
+  /**
+   * Runs the original through the first {@code k} ops, takes a Snapshot there, restores it into a
+   * twin (built with {@code restoreConfig}, which must not set History) and compares the two from
+   * the next op on, exactly as {@link #compare} does. Also checks that the twin starts with the
+   * same {@code retainedValues}, {@code droppedValues} and watched values, that a Snapshot of
+   * the twin equals the one it came from, and that the original is unchanged by taking one.
+   */
+  static Result compareRestoredAt(Consumer<Detector.Builder> config,
+      Consumer<Detector.Builder> restoreConfig, List<Expression> watched, List<Op> ops, int k) {
+    return capturingWarnings(warnings -> {
+      Run a = new Run(FRESH, config, watched, warnings);
+      if (a.detector == null) return new Result(null, false, 0, a.stats);
+      for (int i = 0; i < k; i++) a.apply(ops.get(i));
+      byte[] bytes = a.detector.snapshot();
+      List<String> before = a.stateLines();
+      Run b = new Run((c, listener) -> {
+        Detector.Builder builder = Detector.builder().listener(listener);
+        restoreConfig.accept(builder);
+        return builder.restore(bytes).build();
+      }, config, watched, warnings);
+      if (b.detector == null) {
+        return new Result(new Difference(k, "restore", "build", "ok", b.buildOutcome.toString(),
+            before, b.buildOutcome), true, k, a.stats);
+      }
+      Difference d = diff(k, "restore", before, b.stateLines());
+      if (d == null && !java.util.Arrays.equals(bytes, b.detector.snapshot())) {
+        byte[] again = b.detector.snapshot();
+        int at = java.util.Arrays.mismatch(bytes, again);
+        d = new Difference(k, "restore", "snapshot round trip",
+            "Snapshot of the original (" + bytes.length + " bytes)",
+            "Snapshot of the restored (" + again.length + " bytes), first difference at byte " + at
+                + " " + java.util.HexFormat.of().formatHex(bytes, Math.max(0, at - 8), Math.min(bytes.length, at + 16))
+                + " vs " + java.util.HexFormat.of().formatHex(again, Math.max(0, at - 8), Math.min(bytes.length, at + 16)),
+            before, b.stateLines());
+      }
+      if (d == null && !java.util.Arrays.equals(bytes, a.detector.snapshot())) {
+        d = new Difference(k, "snapshot", "snapshot changed the Detector", "first", "second",
+            before, a.stateLines());
+      }
+      if (d != null) return new Result(d, true, k, a.stats);
+      for (int i = k; i < ops.size(); i++) {
+        Op op = ops.get(i);
+        List<String> oa = a.apply(op);
+        List<String> ob = b.apply(op);
+        d = diff(i + 1, op.toString(), oa, ob);
+        if (d != null) return new Result(d, true, i + 1, a.stats);
+      }
+      return new Result(null, true, ops.size(), a.stats);
+    });
+  }
+
+  private static Result capturingWarnings(java.util.function.Function<List<String>, Result> body) {
+    Logger logger = Logger.getLogger("io.github.romanhaendler.rbed");
+    List<String> warnings = new ArrayList<>();
+    Handler handler = new Handler() {
+      @Override public void publish(LogRecord r) { warnings.add(r.getLevel() + " " + r.getMessage()); }
+      @Override public void flush() {}
+      @Override public void close() {}
+    };
+    boolean parents = logger.getUseParentHandlers();
+    logger.setUseParentHandlers(false);
+    logger.addHandler(handler);
+    try {
+      return body.apply(warnings);
+    } finally {
+      logger.removeHandler(handler);
+      logger.setUseParentHandlers(parents);
+    }
+  }
+
   static Result compare(Consumer<Detector.Builder> config, List<Expression> watched, List<Op> ops,
       Side sideA, Side sideB) {
     return capturing(warnings -> {
@@ -194,6 +264,12 @@ final class Differential {
       buildOutcome.addAll(observe());
     }
 
+    /** What is observable between two moments: counters and watched values, no callbacks. */
+    List<String> stateLines() {
+      return observe().stream().filter(l -> l.startsWith("retainedValues")
+          || l.startsWith("droppedValues") || l.startsWith("value(")).toList();
+    }
+
     List<String> apply(Op op) {
       heard.clear();
       warnings.clear();
@@ -222,6 +298,7 @@ final class Differential {
       if (detector != null) {
         lines.add("retainedValues: " + detector.retainedValues());
         lines.add("droppedValues: " + detector.droppedValues());
+        lines.add("replayPoint: " + detector.replayPoint());
         for (Expression e : watched) lines.add("value(" + e + "): " + value(e));
       }
       return lines;

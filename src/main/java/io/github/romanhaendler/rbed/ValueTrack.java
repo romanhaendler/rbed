@@ -86,6 +86,33 @@ class ValueTrack {
     return need;
   }
 
+  /** Writes this track's state and, in order, that of the moving averages derived from it. */
+  void save(StateWriter w) {
+    w.float64(value);
+    w.float64(previous);
+    w.int64(time);
+    w.float64(latestUpdate);
+    w.int64(previousTime);
+    w.bool(updated);
+    w.int64(lastNeed);
+    w.int64(previousNeed);
+    w.int32(averages.length);
+    for (Averaged average : averages) average.save(w);
+  }
+
+  void load(StateReader r) throws java.io.IOException {
+    value = r.float64();
+    previous = r.float64();
+    time = r.int64();
+    latestUpdate = r.float64();
+    previousTime = r.int64();
+    updated = r.bool();
+    lastNeed = r.int64();
+    previousNeed = r.int64();
+    r.expect(averages.length);
+    for (Averaged average : averages) average.load(r);
+  }
+
   /** True for a Pulse Channel in a moment that does not carry it. */
   boolean absent() {
     return false;
@@ -115,6 +142,18 @@ class ValueTrack {
 
     Averaged(Window window) {
       this.window = window;
+    }
+
+    @Override
+    void save(StateWriter w) {
+      super.save(w);
+      window.save(w);
+    }
+
+    @Override
+    void load(StateReader r) throws java.io.IOException {
+      super.load(r);
+      window.load(r);
     }
 
     private boolean added;

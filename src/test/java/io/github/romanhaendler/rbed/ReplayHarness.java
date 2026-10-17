@@ -108,9 +108,14 @@ final class ReplayHarness {
     });
   }
 
+  /** The replayed Detector has a Replay Point of its own, and does not reproduce the dropped count. */
+  private static boolean compared(String line) {
+    return !line.startsWith("droppedValues:") && !line.startsWith("replayPoint:");
+  }
+
   private static Difference compare(int moment, String op, List<String> a, List<String> b) {
-    List<String> x = a.stream().filter(l -> !l.startsWith("droppedValues:")).toList();
-    List<String> y = b.stream().filter(l -> !l.startsWith("droppedValues:")).toList();
+    List<String> x = a.stream().filter(ReplayHarness::compared).toList();
+    List<String> y = b.stream().filter(ReplayHarness::compared).toList();
     int n = Math.max(x.size(), y.size());
     for (int i = 0; i < n; i++) {
       String p = i < x.size() ? x.get(i) : "<nothing>";

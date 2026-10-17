@@ -81,3 +81,11 @@ _Avoid_: Lookback, retention (Retention Limit is a different concept)
 **Retention Limit**:
 The maximum number of entries a single window of a Detector keeps; beyond it, the oldest entries are dropped.
 _Avoid_: Cap, max size, buffer limit
+
+**Snapshot**:
+The complete state of a Detector between two moments, as a versioned byte array that a Detector built with the same Rules and options can be restored from.
+_Avoid_: Checkpoint, dump, savepoint
+
+**Replay Point**:
+The earliest timestamp from which replaying a Detector's input into a fresh Detector, with the Events Ended before it supplied as History, reproduces the Detector's state.
+_Avoid_: Checkpoint, watermark

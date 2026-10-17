@@ -29,6 +29,10 @@ abstract class Window {
   /** The mean of the window, or NaN while it is warming up. */
   abstract double average();
 
+  abstract void save(StateWriter w);
+
+  abstract void load(StateReader r) throws java.io.IOException;
+
   /** The last {@code n} values. */
   static final class OverSamples extends Window {
     private final double[] values;
@@ -79,6 +83,33 @@ abstract class Window {
     @Override
     double average() {
       return size == values.length ? sum.value() / size : Double.NaN;
+    }
+
+    @Override
+    void save(StateWriter w) {
+      w.float64s(values);
+      w.int64s(needs);
+      w.int32(size);
+      w.int32(next);
+      w.int32(evictedSinceExactSum);
+      sum.save(w);
+    }
+
+    @Override
+    void load(StateReader r) throws java.io.IOException {
+      double[] loaded = r.float64s();
+      if (loaded.length != values.length) throw new java.io.IOException("window size");
+      System.arraycopy(loaded, 0, values, 0, loaded.length);
+      long[] loadedNeeds = r.int64s();
+      if (loadedNeeds.length != needs.length) throw new java.io.IOException("window size");
+      System.arraycopy(loadedNeeds, 0, needs, 0, loadedNeeds.length);
+      size = r.int32();
+      next = r.int32();
+      evictedSinceExactSum = r.int32();
+      sum.load(r);
+      if (size < 0 || size > values.length || next < 0 || next >= values.length) {
+        throw new java.io.IOException("window position");
+      }
     }
   }
 
@@ -164,6 +195,43 @@ abstract class Window {
         sum.reset();
         for (int i = 0; i < size; i++) sum.add(values[(head + i) % values.length]);
       }
+    }
+
+    /** Writes the entries oldest first; the ring's position and capacity are not state. */
+    @Override
+    void save(StateWriter w) {
+      w.int32(size);
+      for (int i = 0; i < size; i++) {
+        w.int64(times[(head + i) % times.length]);
+        w.float64(values[(head + i) % values.length]);
+        w.int64(needs[(head + i) % needs.length]);
+      }
+      w.int64(expiredNeed);
+      w.int32(evictedSinceExactSum);
+      sum.save(w);
+      w.bool(started);
+      w.int64(first);
+    }
+
+    @Override
+    void load(StateReader r) throws java.io.IOException {
+      int n = r.length();
+      if (n > detector.retentionLimit()) throw new java.io.IOException("window size");
+      times = new long[Math.max(times.length, n)];
+      values = new double[times.length];
+      needs = new long[times.length];
+      for (int i = 0; i < n; i++) {
+        times[i] = r.int64();
+        values[i] = r.float64();
+        needs[i] = r.int64();
+      }
+      expiredNeed = r.int64();
+      head = 0;
+      size = n;
+      evictedSinceExactSum = r.int32();
+      sum.load(r);
+      started = r.bool();
+      first = r.int64();
     }
 
     @Override

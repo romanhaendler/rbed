@@ -97,6 +97,130 @@ class ReplayPointTest {
   void movingAveragesRateAndAge() {
     ChannelExpression smooth = A.averageOverSamples(4);
     ChannelExpression slow = B.averageOverDuration(200);
+    Rule warm = Rule.named("Warm").when(smooth.above(5)).forSamples(2);
+    Rule steep = Rule.named("Steep").when(A.rate().above(0.05)).forSamples(2);
+    Rule silent = Rule.named("Silent").when(slow.rate().below(0.0).and(B.age().above(30)));
+    List<Expression> watched = List.of(smooth.averageOverSamples(3), slow, A.age(), B.rate());
+    checkMany("windows", b -> b.rules(warm, steep, silent).watch(watched.toArray(Expression[]::new)),
+        watched, 40, 0, 0.2);
+  }
+
+  @Test
+  void eventsAcrossRules() {
+    Rule hot = Rule.named("Hot").when(A.above(6)).forSamples(2);
+    Rule alarm = Rule.named("Alarm").when(Conditions.after(hot).within(300).and(B.above(3)));
+    Rule busy = Rule.named("Busy").when(Conditions.count(hot).within(400).above(1));
+    Rule fine = Rule.named("Fine").when(Conditions.after(hot).unless(alarm).and(A.below(4)));
+    Rule long_ = Rule.named("Long").when(Conditions.totalDuration(hot).above(150));
+    List<Expression> watched = List.of(Conditions.count(hot), Conditions.count(busy).within(300),
+        Conditions.totalDuration(alarm), Conditions.latest(hot).duration());
+    checkMany("events across rules", b -> b.rules(hot, alarm, busy, fine, long_)
+        .watch(watched.toArray(Expression[]::new)), watched, 30, 0, 0.1);
+  }
+
+  @Test
+  void latestAggregatesOfAnEndedEvent() {
+    Rule hot = Rule.named("Hot").when(A.above(6)).forSamples(2).aggregate(A);
+    Rule next = Rule.named("Next").when(Conditions.latest(hot).max(A).above(8).and(A.below(5)));
+    List<Expression> watched =
+        List.of(Conditions.latest(hot).mean(B), Conditions.latest(hot).min(A));
+    checkMany("latest", b -> b.rules(hot, next).watch(watched.toArray(Expression[]::new)), watched,
+        30, 0, 0.1);
+  }
+
+  @Test
+  void pulseChannels() {
+    Rule beat = Rule.named("Beat").when(P.above(0.5)).forSamples(1);
+    Rule quiet = Rule.named("Quiet").when(P.rising().not().and(A.above(2))).forDuration(60);
+    Expression since = P.age();
+    Rule gap = Rule.named("Gap").when(since.above(100));
+    checkMany("pulse", b -> b.rules(beat, quiet, gap).watch(since), List.of(since), 30, 0, 0.1);
+  }
+
+  @Test
+  void historySuppliedAtTheFirstBuild() {
+    Rule hot = Rule.named("Hot").when(A.above(6)).forSamples(2);
+    Rule after = Rule.named("After").when(Conditions.after(hot).within(500).and(A.below(5)));
+    Event old = new Event("Hot", -300, OptionalLong.of(-250), OptionalLong.of(-100), false, false,
+        Map.of());
+    checkMany("history", b -> b.rules(hot, after).history(List.of(old)), List.of(), 30, 0, 0.1);
+  }
+
+  @Test
+  void generatedCases() {
+    String one = System.getProperty("rbed.diff.seed");
+    long first = one != null ? Long.parseLong(one) : FRESH_SEEDS ? System.nanoTime() : 1;
+    int cases = one != null ? 1 : CASES;
+    Stats total = Stats.NONE;
+    for (long seed = first; seed < first + cases; seed++) {
+      Scenario s = ScenarioGenerator.generate(seed);
+      Scenario.Built built;
+      try {
+        built = s.build();
+      } catch (RuntimeException e) {
+        continue;
+      }
+      Outcome o = ReplayHarness.check(built.config(), built.watched(), s.ops());
+      if (o.failure() != null) {
+        Scenario small = Differential.shrink(s, c -> {
+          try {
+            Scenario.Built b = c.build();
+            return ReplayHarness.check(b.config(), b.watched(), c.ops()).failure() != null;
+          } catch (RuntimeException e) {
+            return false;
+          }
+        });
+        Scenario.Built b = small.build();
+        Outcome so = ReplayHarness.check(b.config(), b.watched(), small.ops());
+        throw new AssertionError("Seed " + seed + " (rerun with -Drbed.diff.seed=" + seed + ")\n"
+            + so.failure().report() + "\n\nShrunk scenario:\n" + small.toJava("replay_seed_" + seed));
+      }
+      total = total.plus(o.stats());
+    }
+    System.out.println("replay point: " + cases + " cases, " + total);
+    if (one == null) {
+      assertTrue(total.checked() > total.stops() / 4, "few stops checked: " + total);
+      assertTrue(total.teeth() > total.checked() / 20, "replay from one Sample later rarely differs: " + total);
+      assertTrue(total.skippedDropped() > 0, "no case dropped entries: " + total);
+    }
+  }
+
+  @Test
+  void emptyBeforeTheFirstSampleAndInSamplingRateMode() {
+    Rule hot = Rule.named("Hot").when(A.above(5));
+    Detector d = Detector.builder().rules(hot).build();
+    assertTrue(d.replayPoint().isEmpty());
+    d.advanceTo(10);
+    assertTrue(d.replayPoint().isEmpty());
+    d.push(20, Map.of(A, 1.0));
+    assertEquals(OptionalLong.of(20), d.replayPoint());
+    Detector sampled = Detector.builder().rules(hot).samplingRate(10).build();
+    assertTrue(sampled.replayPoint().isEmpty());
+    sampled.push(Map.of(A, 9.0));
+    sampled.push(Map.of(A, 9.0));
+    assertTrue(sampled.replayPoint().isEmpty());
+  }
+
+  @Test
+  void aRuleThatHasNotSeenWhenStopHoldingReachesBackToIt() {
+    Rule run = Rule.named("Run").when(A.above(3)).forSamples(1).endWhen(A.above(7)).forSamples(1);
+    Detector d = Detector.builder().rules(run).build();
+    d.push(0, Map.of(A, 1.0)); // when is false
+    d.push(10, Map.of(A, 5.0)); // Event starts
+    d.push(20, Map.of(A, 8.0)); // Event ends on its End Condition at 20; when still holds
+    d.push(30, Map.of(A, 8.0));
+    d.push(40, Map.of(A, 8.0));
+    assertNotNull(d.replayPoint());
+    assertEquals(OptionalLong.of(0), d.replayPoint());
+    d.push(50, Map.of(A, 1.0)); // when stops holding: free again
+    d.push(60, Map.of(A, 1.0));
+    assertEquals(OptionalLong.of(60), d.replayPoint());
+  }
+
+  @Test
+  void aSmallRetentionLimitThatDroppedEntriesIsAPrecondition() {
+    // once a window dropped entries, a replay (which drops at other moments) can differ; the
+    // harness skips such stops, so show that the difference is real
     Rule warm = Rule.named("Warm").when(A.averageOverDuration(522).above(-1.0));
     Consumer<Detector.Builder> config = b -> b.rules(warm).retentionLimit(1);
     List<Op> ops = List.of(Op.push(4108, "a", 8.0), Op.push(4158, "a", 11.0), Op.push(4258, "a", 11.0));
