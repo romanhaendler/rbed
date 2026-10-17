@@ -74,6 +74,7 @@ export function ScenarioView({ scenario, draw = false, hidden: hiddenAtFirst = [
           })),
     [result, scenario.timeUnit.millis],
   );
+  const event = 'error' in result ? undefined : result.events.find((e) => eventKey(e) === selected);
   useAddress(scenario, parameters);
   // The chart describes itself (its series and ranges); the Events in words are ours, and its API
   // has no way to add them, so they join its description here.
@@ -120,7 +121,6 @@ export function ScenarioView({ scenario, draw = false, hidden: hiddenAtFirst = [
       restart: result.restart,
       restartForgets: result.restartForgets,
     };
-    const event = result.events.find((e) => eventKey(e) === selected);
     const channelAxes = frozen ?? channelAxesOf(model);
     const penAxis = channelAxes.find((a) => a.channels.includes(pen)) ?? channelAxes[0];
     const times = rows.map((r) => r.t);
@@ -197,9 +197,7 @@ export function ScenarioView({ scenario, draw = false, hidden: hiddenAtFirst = [
       {!('error' in result) && (
         <>
           {/* An Event whose Rule reads no Channel has no Aggregates to show in full. */}
-          {selected && Object.keys(result.events.find((e) => eventKey(e) === selected)?.aggregates ?? {}).length > 0 && (
-            <AggregatesPanel scenario={scenario} event={result.events.find((e) => eventKey(e) === selected)!} />
-          )}
+          {event && Object.keys(event.aggregates).length > 0 && <AggregatesPanel scenario={scenario} event={event} />}
           <EventTable scenario={scenario} events={result.events} selected={selected} select={select} />
           <DiscardedTable scenario={scenario} discarded={result.discarded} />
         </>

@@ -6,8 +6,9 @@
 // shown as tiles), ``` fenced code (```lang Label), and a Scenario marker on a line of its own:
 // <!-- scenario first-rule -->, or <!-- scenario first-rule draw --> to let the reader draw its
 // Channels, and ending in hide <names> (comma-separated) for Channels or Rules the chart hides
-// at first (<!-- scenario logistics hide door -->). A line <!-- live --> makes the paragraph or list after it a block of its own, marked
-// live: it speaks of the live page's controls, so the prerendered page and the twin leave it out.
+// at first (<!-- scenario logistics hide door -->). A line <!-- live --> makes the paragraph or
+// list after it a block of its own, marked live: it speaks of the live page's controls, so the
+// prerendered page and the twin leave it out.
 // Inline: `code`, **strong**, *em*, [text](url). Nothing else, and no raw HTML: every character
 // of the text is escaped.
 
