@@ -103,7 +103,7 @@ final class Snapshots {
    * configuration, not against an adversary, and needs no JDK class beyond java.lang (the
    * compiled browser module has no MessageDigest).
    */
-  private static byte[] hash(List<String> lines) {
+  static byte[] hash(List<String> lines) {
     long a = 0xcbf29ce484222325L;
     long b = 0x84222325cbf29ce4L;
     for (String line : lines) {

@@ -106,10 +106,4 @@ final class ExactSum {
         low == 0 ? mant : ((long) (low + 1) << 52) + (mant - (1L << 52)));
     return negative ? -magnitude : magnitude;
   }
-
-  void clear() {
-    Arrays.fill(limbs, 0);
-    lo = LIMBS;
-    hi = -1;
-  }
 }

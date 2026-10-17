@@ -284,4 +284,20 @@ class SnapshotTest {
     assertThrows(IllegalArgumentException.class, Detector.builder().restore(a.snapshot())
         .rules(Rule.named("R").when(mark.above(1)))::build);
   }
+
+  /** Both 64-bit lanes see every UTF-16 code unit (both bytes) and every length. */
+  @Test
+  void bothLanesOfTheFingerprintSeeEveryCodeUnitAndLength() {
+    List<List<String>> different = List.of(List.of("\u0100"), List.of("\u0200"), List.of("a", "bc"),
+        List.of("ab", "c"), List.of("\uD800"), List.of("?"));
+    for (int i = 0; i < different.size(); i++) {
+      for (int j = i + 1; j < different.size(); j++) {
+        byte[] x = Snapshots.hash(different.get(i));
+        byte[] y = Snapshots.hash(different.get(j));
+        assertTrue(!Arrays.equals(Arrays.copyOf(x, 8), Arrays.copyOf(y, 8)), "lane one " + i + "," + j);
+        assertTrue(!Arrays.equals(Arrays.copyOfRange(x, 8, 16), Arrays.copyOfRange(y, 8, 16)),
+            "lane two " + i + "," + j);
+      }
+    }
+  }
 }

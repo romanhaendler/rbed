@@ -92,7 +92,7 @@ abstract class Window {
           || (size < values.length && next != size)) {
         throw new IOException("window position");
       }
-      sum.clear(); // the sum is a function of the entries: recomputed, never read from the Snapshot
+      // the sum is a function of the entries: recomputed, never read from the Snapshot
       for (int i = 0; i < size; i++) sum.add(values[i]);
     }
   }
@@ -196,7 +196,6 @@ abstract class Window {
       size = n; // a restore only happens in a Detector just built, so head is 0
       started = r.bool();
       first = r.int64();
-      sum.clear();
       for (int i = 0; i < n; i++) sum.add(values[i]);
     }
 
