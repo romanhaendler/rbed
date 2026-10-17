@@ -74,6 +74,10 @@ _Avoid_: Closed, finished, completed
 A Pending Event whose Conditions stopped holding before it was Confirmed.
 _Avoid_: Cancelled, aborted, rejected
 
+**Memory Horizon**:
+The longest time window and the largest Sample count the Rules and watched Expressions of a Detector use by configuration; a configuration bound, not a guarantee about Events in progress.
+_Avoid_: Lookback, retention (Retention Limit is a different concept)
+
 **Retention Limit**:
 The maximum number of entries a single window of a Detector keeps; beyond it, the oldest entries are dropped.
 _Avoid_: Cap, max size, buffer limit

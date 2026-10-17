@@ -29,6 +29,7 @@ abstract class Window {
 
     OverSamples(Detector detector, int n) {
       super(detector);
+      detector.windowSamples(n);
       values = new double[n];
     }
 
@@ -72,6 +73,7 @@ abstract class Window {
 
     OverDuration(Detector detector, long millis) {
       super(detector);
+      detector.windowMillis(millis);
       this.millis = millis;
       binding = detector.binding;
       int initial = Math.min(16, detector.retentionLimit());
