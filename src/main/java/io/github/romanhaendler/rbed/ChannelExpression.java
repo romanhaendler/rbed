@@ -65,7 +65,7 @@ public abstract class ChannelExpression extends Expression {
     if (n < 1) throw new IllegalArgumentException("averageOverSamples needs n >= 1: " + n);
     return average(d -> {
       if (n > d.retentionLimit()) {
-        throw new IllegalArgumentException("Rule " + d.bindingRule + ": averageOverSamples(" + n
+        throw new IllegalArgumentException(d.binding + ": averageOverSamples(" + n
             + ") exceeds the Retention Limit of " + d.retentionLimit()
             + ". Raise it with Detector.builder().retentionLimit(...).");
       }
