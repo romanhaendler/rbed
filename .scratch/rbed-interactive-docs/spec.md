@@ -1,6 +1,7 @@
 # Spec: interactive documentation site
 
-Status: ready-for-agent
+Status: done
+The live deployment waits for GitHub Pages to be enabled (Source "GitHub Actions", see site/README.md, "Deployment").
 
 ## Problem Statement
 

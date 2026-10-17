@@ -2,7 +2,7 @@
 # Built from the rbed sources of the same commit, with its Javadoc at /rbed/api/; deployed on every
 # push to main, or by hand. On a pull request it is built and tested, not deployed, so a library
 # change the site cannot compile shows up before the merge.
-# rbed's own tests run first, then the JUnit, Node parity and browser tests of the site; a failing
+# rbed's own tests run first, then the JUnit, Node and browser tests of the site; a failing
 # one stops the deployment.
 name: Pages
 

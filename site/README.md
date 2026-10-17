@@ -68,3 +68,7 @@ From these, `npm run build` (`prerender.mjs`, run at the end of `vite build`) wr
 `node version.mjs` prints the rbed version of the root pom, which the scripts pass to the Scenario module (`-Drbed.version`; it has no default). `PORT=4391 npm run test:browser` serves the site on another port than 4173.
 
 The app reads the same Markdown for the page itself and for the search (Ctrl/Cmd+K), which finds a page by its title, its text, its inline code and the methods its Java source calls, and a section by its heading. `public/og-image.png` is the sharing image of every page.
+
+## Deployment
+
+`.github/workflows/pages.yml` builds and tests the site on every pull request, and on a push to main or a manual run also deploys it to https://romanhaendler.github.io/rbed/. It needs GitHub Pages with Source "GitHub Actions", set once before the first push to main: Settings → Pages → Source, or `gh api -X POST repos/romanhaendler/rbed/pages -f build_type=workflow`. Without it the deploy job fails; the workflow's token cannot enable Pages itself.
