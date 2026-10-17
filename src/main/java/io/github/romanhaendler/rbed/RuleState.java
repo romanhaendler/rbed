@@ -1,5 +1,6 @@
 package io.github.romanhaendler.rbed;
 
+import java.io.IOException;
 import java.util.Map;
 import java.util.OptionalLong;
 
@@ -68,7 +69,7 @@ final class RuleState {
     this.latestReads = detector.recordedLatestReads();
     for (Channel channel : spec.aggregated) aggregate(channel.state(detector));
     this.maxGap = spec.maxGap;
-    detector.windowMillis(maxGap);
+    if (maxGap != Long.MAX_VALUE) detector.windowMillis(maxGap); // MAX_VALUE: no maxGap
     detector.windowSamples(spec.when.samples());
     detector.windowMillis(spec.when.millis());
     if (spec.end != null) {
@@ -98,9 +99,9 @@ final class RuleState {
     events.save(w);
   }
 
-  void load(StateReader r) throws java.io.IOException {
+  void load(StateReader r) throws IOException {
     int ordinal = r.int32();
-    if (ordinal < 0 || ordinal >= State.values().length) throw new java.io.IOException("state");
+    if (ordinal < 0 || ordinal >= State.values().length) throw new IOException("state");
     state = State.values()[ordinal];
     armed = r.bool();
     seenFalse = r.bool();

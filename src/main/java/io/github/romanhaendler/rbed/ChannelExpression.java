@@ -9,8 +9,8 @@ import java.util.function.Function;
  * Samples in which it was absent) and are undefined until enough of them exist.
  */
 public abstract class ChannelExpression extends Expression {
-  ChannelExpression(String text) {
-    super(text);
+  ChannelExpression(String text, String key) {
+    super(text, key);
   }
 
   /** Resolves the track in a Detector; each call on a moving average creates its own window. */
@@ -49,7 +49,7 @@ public abstract class ChannelExpression extends Expression {
 
   /** Change per second between the last two values. */
   public Expression rate() {
-    return new Expression(this + ".rate()") {
+    return new Expression(this + ".rate()", Key.node("rate", key())) {
       @Override Bound bind(Detector detector) {
         ValueTrack t = read(detector, ValueTrack.PREVIOUS);
         t.needsPrevious = true;
@@ -63,7 +63,7 @@ public abstract class ChannelExpression extends Expression {
    * the first value. Together with {@link Detector#advanceTo} this detects silent sensors.
    */
   public Expression age() {
-    return new Expression(this + ".age()") {
+    return new Expression(this + ".age()", Key.node("age", key())) {
       @Override Bound bind(Detector detector) {
         ValueTrack t = read(detector, ValueTrack.AGE);
         t.needsAge = true;
@@ -75,7 +75,8 @@ public abstract class ChannelExpression extends Expression {
   /** Mean of the last {@code n} values; undefined until {@code n} values exist. */
   public ChannelExpression averageOverSamples(int n) {
     if (n < 1) throw new IllegalArgumentException("averageOverSamples needs n >= 1: " + n);
-    return average(".averageOverSamples(" + n + ")", d -> {
+    return average(".averageOverSamples(" + n + ")",
+        Key.node("averageOverSamples", key(), Key.number(n)), d -> {
       if (n > d.retentionLimit()) {
         throw new IllegalArgumentException(d.binding + ": averageOverSamples(" + n
             + ") exceeds the Retention Limit of " + d.retentionLimit()
@@ -92,7 +93,7 @@ public abstract class ChannelExpression extends Expression {
   public ChannelExpression averageOverDuration(long millis) {
     if (millis < 0) throw new IllegalArgumentException("averageOverDuration must be >= 0");
     return average(".averageOverDuration(" + millis + ")",
-        d -> new Window.OverDuration(d, millis));
+        Key.node("averageOverDuration", key(), Key.number(millis)), d -> new Window.OverDuration(d, millis));
   }
 
   /** See {@link #averageOverDuration(long)}. */
@@ -101,7 +102,8 @@ public abstract class ChannelExpression extends Expression {
   }
 
   private Condition trend(boolean rising) {
-    return new Condition(this + (rising ? ".rising()" : ".falling()")) {
+    return new Condition(this + (rising ? ".rising()" : ".falling()"),
+        Key.node(rising ? "rising" : "falling", key())) {
       @Override Bound bind(Detector detector) {
         ValueTrack t = read(detector, ValueTrack.PREVIOUS);
         t.needsPrevious = true;
@@ -113,9 +115,9 @@ public abstract class ChannelExpression extends Expression {
   }
 
   /** Each binding gets its own window, fed with every value of the source from the start. */
-  private ChannelExpression average(String call, Function<Detector, Window> newWindow) {
+  private ChannelExpression average(String call, String callKey, Function<Detector, Window> newWindow) {
     ChannelExpression source = this;
-    return new ChannelExpression(this + call) {
+    return new ChannelExpression(this + call, callKey) {
       @Override ValueTrack track(Detector detector) {
         return source.track(detector).average(newWindow.apply(detector));
       }

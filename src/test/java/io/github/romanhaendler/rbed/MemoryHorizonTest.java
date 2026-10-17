@@ -79,6 +79,22 @@ class MemoryHorizonTest {
         horizon(new Rule[] {a, b}, Y.averageOverDuration(500), Y.averageOverSamples(10)));
   }
 
+  @Test
+  void aWindowThatNeverForgetsIsUnbounded() {
+    MemoryHorizon never = new MemoryHorizon(Long.MAX_VALUE, 0);
+    assertEquals(never,
+        horizon(new Rule[] {Rule.named("A").when(X.averageOverDuration(Long.MAX_VALUE).above(1))}));
+    assertEquals(never, horizon(new Rule[] {Rule.named("A").when(X.above(1))},
+        Y.averageOverDuration(Long.MAX_VALUE)));
+    assertEquals(never,
+        horizon(new Rule[] {Rule.named("A").when(X.above(1)).forDuration(Long.MAX_VALUE)}));
+    Rule a = Rule.named("A").when(X.above(1));
+    assertEquals(never, horizon(new Rule[] {a}, count(a).within(Long.MAX_VALUE)));
+    // no gap limit, no window on after(...): nothing to report
+    assertEquals(new MemoryHorizon(0, 0), horizon(new Rule[] {a,
+        Rule.named("B").when(after(a)).maxGap(Long.MAX_VALUE)}));
+  }
+
   /**
    * A construct that takes a duration or a count must tell the Memory Horizon. The table lists
    * every public method of the building blocks that takes one; a new such method fails the first

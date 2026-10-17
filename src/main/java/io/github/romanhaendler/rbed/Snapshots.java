@@ -7,8 +7,8 @@ import java.util.List;
 import java.util.zip.CRC32;
 
 /**
- * The Snapshot format: magic "RBED", format version, a 128-bit hash of the Rule descriptions, one of
- * the watched Expressions, sampling rate, Retention Limit, then the Detector's state, then a CRC-32
+ * The Snapshot format: magic "RBED", format version, a 128-bit hash of the canonical encoding
+ * ({@link Key}) of the Rules, one of the watched Expressions, sampling rate, Retention Limit, then the Detector's state, then a CRC-32
  * of everything before it. See ADR-0007.
  */
 final class Snapshots {
@@ -23,8 +23,8 @@ final class Snapshots {
     StateWriter w = new StateWriter();
     w.raw(MAGIC);
     w.int32(FORMAT_VERSION);
-    w.raw(hash(detector.ruleDescriptions()));
-    w.raw(hash(detector.watchedDescriptions()));
+    w.raw(hash(detector.ruleKeys()));
+    w.raw(hash(detector.watchedKeys()));
     w.float64(detector.samplingRate());
     w.int32(detector.retentionLimit());
     detector.saveState(w);
@@ -56,12 +56,12 @@ final class Snapshots {
     StateReader r = new StateReader(bytes, bytes.length - 4);
     try {
       r.raw(MAGIC.length + 4);
-      if (!Arrays.equals(r.raw(HASH_BYTES), hash(detector.ruleDescriptions()))) {
+      if (!Arrays.equals(r.raw(HASH_BYTES), hash(detector.ruleKeys()))) {
         throw new IllegalArgumentException("Snapshot was taken with different Rules (a Rule that"
             + " was added, removed, renamed or changed, or a Channel used as another kind): a"
             + " Snapshot can only be restored into a Detector built with the same Rules.");
       }
-      if (!Arrays.equals(r.raw(HASH_BYTES), hash(detector.watchedDescriptions()))) {
+      if (!Arrays.equals(r.raw(HASH_BYTES), hash(detector.watchedKeys()))) {
         throw new IllegalArgumentException("Snapshot was taken with different watched Expressions"
             + " than this Builder watches.");
       }

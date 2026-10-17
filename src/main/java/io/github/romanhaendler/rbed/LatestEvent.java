@@ -35,7 +35,7 @@ public final class LatestEvent {
 
   /** The latest Event's duration in milliseconds; for a running Event, up to now. */
   public Expression duration() {
-    return new Expression(prefix + "duration()") {
+    return new Expression(prefix + "duration()", Key.node("latestDuration", Key.name(rule.name()))) {
       @Override Bound bind(Detector detector) {
         EventState events = detector.referencedEvent(rule);
         return () -> events.latestDuration(detector.now());
@@ -46,7 +46,8 @@ public final class LatestEvent {
   private Expression aggregate(Channel channel, Accumulator.Aggregate aggregate) {
     Objects.requireNonNull(channel, "channel");
     String call = aggregate.name().toLowerCase(Locale.ROOT) + "(" + channel + ")";
-    return new Expression(prefix + call) {
+    return new Expression(prefix + call, Key.node("latest", Key.name(rule.name()),
+        Key.name(aggregate.name()), channel.key())) {
       @Override Bound bind(Detector detector) {
         // not a Channel lookup of the reading Rule: the referenced Rule aggregates it
         return detector.referencedEvent(rule).latest(channel.state(detector), aggregate);
