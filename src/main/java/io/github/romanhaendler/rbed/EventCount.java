@@ -39,6 +39,7 @@ public final class EventCount extends Expression {
   Bound bind(Detector detector) {
     EventState events = detector.referencedEvent(rule);
     if (window < 0) return () -> events.count;
+    detector.windowMillis(window);
     events.countWithin(window);
     Timestamps.Counter counter = events.counter(window);
     return () -> {

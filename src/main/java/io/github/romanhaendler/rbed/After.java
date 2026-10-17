@@ -52,6 +52,7 @@ public final class After extends Condition {
 
   @Override
   Bound bind(Detector detector) {
+    detector.windowMillis(within);
     EventState predecessor = detector.referencedEvent(rule);
     EventState[] interrupters =
         unless.stream().map(detector::referencedEvent).toArray(EventState[]::new);
