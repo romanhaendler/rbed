@@ -68,3 +68,17 @@
 .top-nav {
   border-bottom: 1px solid var(--border-color);
 }
+
+/* The search field, which the Javadoc focuses on load: the site's edge and focus color instead
+   of the browser's blue outline. */
+#search-input,
+#page-search-input {
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+#search-input:focus,
+#page-search-input:focus {
+  outline: none;
+  border-color: var(--selected-background-color);
+  box-shadow: 0 0 0 1px var(--selected-background-color);
+}

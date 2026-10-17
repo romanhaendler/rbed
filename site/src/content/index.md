@@ -8,22 +8,6 @@ You describe *what* an Event is ("the weight is above 500 kg for 2 seconds"), an
 
 The terms (Sample, Channel, Condition, Rule, Event, Detector, Pending, Confirmed, Truncated, ...) are defined in the [glossary](https://github.com/romanhaendler/rbed/blob/main/CONTEXT.md).
 
-## Install
-
-rbed {{version}} is on Maven Central and needs Java 17 or later.
-
-```xml Maven
-<dependency>
-  <groupId>io.github.romanhaendler</groupId>
-  <artifactId>rbed</artifactId>
-  <version>{{version}}</version>
-</dependency>
-```
-
-```kotlin Gradle
-implementation("io.github.romanhaendler:rbed:{{version}}")
-```
-
 ## A first Rule
 
 `HighTemperature` is an Event while the Channel `temp` is above a threshold.
@@ -49,6 +33,22 @@ Every use of rbed takes the same three steps:
 3. **Close it** with `close()` when the data ends, so that an Event still in progress is reported, too.
 
 For a recorded series, [`detect`](sampling-rate/) does all three in one call, and a Detector is `AutoCloseable`, so try-with-resources works.
+
+## Install
+
+rbed {{version}} is on Maven Central and needs Java 17 or later.
+
+```xml Maven
+<dependency>
+  <groupId>io.github.romanhaendler</groupId>
+  <artifactId>rbed</artifactId>
+  <version>{{version}}</version>
+</dependency>
+```
+
+```kotlin Gradle
+implementation("io.github.romanhaendler:rbed:{{version}}")
+```
 
 ## The code on this site
 

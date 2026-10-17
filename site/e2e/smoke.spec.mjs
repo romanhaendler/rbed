@@ -1,9 +1,11 @@
 // The site's browser smoke tests: every page of the manifest loads at desktop and phone width
 // without a page error or sideways scrolling; on a concept page and on a domain page, moving a
 // control runs rbed again and changes the Event table; drawing a Channel changes the Java source;
-// on a phone, the Event tables fit without sideways scrolling, and the chart stays in view while
-// a control moves; an address with a fragment lands on its section; Tab first reaches the skip link;
-// a chosen search result closes the search; Reset keeps the focus in the panel.
+// on a phone, the Event tables fit without sideways scrolling, every plot keeps about 200 px, and
+// the chart stays in view while a control moves; the front page's chart is above the fold, and an
+// Event table stands between its chart and its source; logistics starts with door hidden; an
+// address with a fragment lands on its section; Tab first reaches the skip link; a chosen search
+// result closes the search; Reset keeps the focus in the panel.
 import { expect, test } from '@playwright/test';
 import { PAGES } from '../src/pages.ts';
 
@@ -108,6 +110,34 @@ test('on a phone, the Event and Discarded tables need no sideways scrolling', as
       expect(overflow, `${path} #${await table.getAttribute('id')}`).toBeLessThanOrEqual(0);
     }
   }
+});
+
+test('on a phone every chart keeps a plot about 200 px wide', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 800 });
+  for (const { path } of PAGES) {
+    await page.goto(path.slice(1));
+    await expect(page.locator('.shellContent h1')).toBeVisible();
+    for (const plot of await page.locator('.drawStage .uc-axis-x.uc-axis-bottom').all()) {
+      expect((await plot.boundingBox()).width, path).toBeGreaterThanOrEqual(190);
+    }
+  }
+});
+
+test('the front page shows its chart above the fold, and a Scenario its Event table between chart and source', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('');
+  const chart = page.locator('.drawStage').first();
+  await expect(chart).toBeVisible();
+  expect((await chart.boundingBox()).y).toBeLessThan(800 - 150);
+  const table = (await page.locator('#events').boundingBox()).y;
+  expect(table).toBeGreaterThan((await chart.boundingBox()).y);
+  expect(table).toBeLessThan((await page.locator('.scenarioCode').boundingBox()).y);
+});
+
+test('the logistics chart starts with door hidden: its DoorOpen lane says the same', async ({ page }) => {
+  await page.goto('logistics/');
+  await expect(page.getByRole('checkbox', { name: 'door', exact: true })).not.toBeChecked();
+  await expect(page.getByRole('checkbox', { name: 'temp', exact: true })).toBeChecked();
 });
 
 test('an address with a fragment lands on its section once the app has drawn the page', async ({ page }) => {

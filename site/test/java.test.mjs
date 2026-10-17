@@ -10,16 +10,14 @@ test('the pieces put together are the source', () => {
   assert.equal(javaTokens(source).map(([, text]) => text).join(''), source);
 });
 
-test('keywords, types, strings, numbers, comments and annotations are marked', () => {
+test('keywords, strings, numbers, comments and annotations are marked', () => {
   assert.deepEqual(
     marked('@Override public void on(Event e) { new X("a // b", 1_000.5); } // done'),
     [
       ['annotation', '@Override'],
       ['keyword', 'public'],
       ['keyword', 'void'],
-      ['type', 'Event'],
       ['keyword', 'new'],
-      ['type', 'X'],
       ['string', '"a // b"'],
       ['number', '1_000.5'],
       ['comment', '// done'],

@@ -446,9 +446,19 @@ dialog[aria-label='Search the documentation'] [role='option'] > [class*='_group_
   color: var(--u-color-text-secondary);
 }
 
+/* The front page's tagline on one line at desktop width, and the hero tight, so the first live
+   chart shows above the fold at 1280 x 800. */
+.page.front {
+  margin-top: calc(-1 * var(--u-space-4));
+}
+
+.front .flow > h1 ~ p:not(h2 ~ p) {
+  max-width: 80ch;
+}
+
 .front .flow > h1 + p {
-  max-width: 40rem;
-  font-size: 1.75rem;
+  max-width: 48rem;
+  font-size: 1.5rem;
   line-height: var(--u-leading-tight);
   font-weight: var(--u-weight-medium);
   letter-spacing: var(--u-tracking-display);
@@ -494,6 +504,16 @@ dialog[aria-label='Search the documentation'] [role='option'] > [class*='_group_
   border-radius: var(--u-radius-md);
   box-shadow: var(--u-edge);
   overflow: hidden;
+}
+
+/* Fenced blocks right after one another (Maven, Gradle) as tabs of one card (MarkdownPage). */
+.codeTabs {
+  display: block;
+  background: var(--u-color-surface-sunken);
+}
+
+.codeTabs [role='tablist'] {
+  padding: 0 var(--u-space-4);
 }
 
 .codeBar {
@@ -659,6 +679,13 @@ dialog[aria-label='Search the documentation'] [role='option'] > [class*='_group_
   grid-area: stage;
   min-width: 0;
   padding: var(--u-space-4);
+}
+
+/* On a phone the plot needs every pixel of width (at least 200 px at 375). */
+@media (max-width: 600px) {
+  .configuratorStage {
+    padding: var(--u-space-3) var(--u-space-2);
+  }
 }
 
 .configuratorPanel {
