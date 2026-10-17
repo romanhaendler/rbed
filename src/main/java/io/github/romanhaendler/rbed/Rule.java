@@ -139,8 +139,8 @@ public final class Rule {
   /**
    * Everything that defines this Rule's behaviour, written as in Java and in a fixed order, such
    * as {@code Rule.named("Hot").when(temp.above(80.0)).forSamples(3).maxGap(5000)}. Equal
-   * configuration gives equal text (aggregated Channels in the order given, which is the order of their Aggregates), on every run and
-   * runtime. Expressions and Conditions name a Rule by {@link #name()} alone.
+   * configuration gives equal text (aggregated Channels in the order given, which is the order
+   * of their Aggregates), on every run and runtime. Expressions and Conditions name a Rule by {@link #name()} alone.
    */
   @Override
   public String toString() {
