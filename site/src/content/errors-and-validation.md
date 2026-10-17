@@ -23,7 +23,7 @@ At the defaults, the average over 5 Samples rises above 25 °C at 12 s, the thir
 ## What else is rejected
 
 - An empty Rule or Channel name, a Rule without `when`, two Rules with the same name.
-- `forDuration` or [`forSamples`](../event-lifecycle/#the-start-lies-before-the-confirmation) before any `when` or `endWhen`; negative durations, `forSamples(0)`, `between` with its low above its high.
+- `forDuration` or [`forSamples`](../event-lifecycle/#durations-forduration-and-forsamples) before any `when` or `endWhen`; negative durations, `forSamples(0)`, `between` with its low above its high.
 - A sampling rate outside (0, 1000] Hz; a History Event that has not Ended, or whose name matches no Rule; one Channel name used both as a Pulse Channel and as an ordinary one.
 - While running: a timestamp not after the previous Sample or advance (or, with History, not after its latest end); a NaN, infinite or null value (the Sample is then ignored); pushing after `close()`; the wrong `push` for the sampling mode.
 - A Rule referring to itself, to a Rule added after it, or to one not added at all (`build()`).

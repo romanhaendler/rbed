@@ -38,7 +38,7 @@ Below, an accelerometer was logged at 10 Hz, but the logger lost the Samples fro
 
 - With "Values at a sampling rate" chosen, declare a different rate, and every duration stretches or shrinks with it: at 5 Hz the Samples are 200 ms apart, so the first vibration lasts 2.2 s and is Confirmed again, at 4.6 s, although on the clock it lasted 2 s.
 
-[`forSamples`](../event-lifecycle/#the-start-lies-before-the-confirmation) counts Samples in either mode, so only `forDuration` and the other time-based parts of a Rule depend on the rate.
+[`forSamples`](../event-lifecycle/#durations-forduration-and-forsamples) counts Samples in either mode, so only `forDuration` and the other time-based parts of a Rule depend on the rate.
 
 Use a sampling rate when the data really is regular and has no timestamps. When Samples can go missing, push them with their timestamps.
 
