@@ -1,8 +1,11 @@
 // The chart of a Scenario's run: its Channels (a Pulse Channel as marks; Channels of very
 // different scales in bands of their own) with the thresholds their Rules compare them to, the
 // plotted Expressions, each Rule's Events as a band on a lane of its own with their lifecycle
-// marked, the windows a within(...) counts, time advances and a restart, with a hover readout;
-// and the key to its bands, lines and marks under it. A click on a band selects its Event. On a
+// marked, the windows a within(...) counts as a strip over the lane of the Rule that counts
+// them, time advances and a restart, with a hover readout; and the key to its bands, lines and
+// marks under it. A Channel's line joins its Samples; where rbed holds a value (a Sample lacks
+// the Channel, or time was advanced without a Sample) the line breaks and a thin step line
+// carries the held value, which the readout marks "(kept)". A click on a band selects its Event. On a
 // Scenario whose Rules read latest(...), the readout reports the Event latest(...) reads at the
 // hovered time, which the chart then highlights.
 import { LimitBand, LimitLine, Tooltip, type TooltipHit, useChart } from '@umriss-ui/charts';
@@ -21,32 +24,39 @@ import {
   expressionColor,
   expressionKey,
   expressionValue,
-  hasGaps,
+  heldChannels,
   heldRows,
   isSeparate,
+  keyOf,
   LATEST_COLOR,
   lane,
   laneMarks,
   latestEvent,
+  lineRows,
   MARKS,
   type MarkRow,
   plotUnits,
   RESTART_COLOR,
   RING_COLOR,
   type Row,
+  readoutValue,
   ruleState,
   separateAxisOf,
+  THRESHOLD_COLOR,
   TRUNCATED,
-  thresholdLabel,
+  thresholdLines,
+  thresholdText,
+  labelRoom,
+  tickText,
   timeDomain,
   timeTicks,
   truncatedEdges,
   UNDEFINED_COLOR,
   undefinedStretches,
   WINDOW_COLOR,
-  windowStretches,
+  windowRows,
 } from './chartModel.ts';
-import { eventKey, type Lifecycle, ofRule } from './events.ts';
+import { eventKey, ofRule } from './events.ts';
 import { plotRect } from './plotArea.ts';
 
 const NARROW = '(max-width: 600px)';
@@ -66,7 +76,6 @@ export function useNarrow(): boolean {
 /** The tooltip: every shown Channel's and Expression's value and Rule's state at the hovered time. */
 function Readout({ model, t }: { model: ChartModel; t: number }) {
   const { scenario, rows, lifecycle, channels, rules, expressions, expressionRows } = model;
-  const row = rows.findLast((r) => r.t <= t) ?? rows[0];
   // The Expressions are also read at time advances, which have no Sample of their own.
   const expressionRow = expressionRows.findLast((r) => r.t <= t) ?? expressionRows[0];
   const { millis } = scenario.timeUnit;
@@ -89,11 +98,7 @@ function Readout({ model, t }: { model: ChartModel; t: number }) {
         {t} {scenario.timeUnit.name}
       </div>
       <div className="uc-tooltip-list">
-        {channels.map((c) => {
-          // A Channel the Sample lacks keeps its last value.
-          const kept = rows.findLast((r) => r.t <= t && r[c] != null)?.[c];
-          return line(c, channelColor(scenario, c), row[c] != null ? String(row[c]) : kept != null ? `${kept} (kept)` : '–');
-        })}
+        {channels.map((c) => line(c, channelColor(scenario, c), readoutValue(scenario, rows, c, t)))}
         {expressions.map((x, k) =>
           line(x.name, expressionColor(scenario, k), expressionValue(expressionRow?.[expressionKey(k)]) + (x.unit ? ` ${x.unit}` : '')),
         )}
@@ -159,10 +164,30 @@ export function EventChart({
 }) {
   const { scenario, rows, lifecycle, channels, rules, expressions, expressionRows, thresholds } = model;
   const { name: unit, millis } = scenario.timeUnit;
-  // A click (or Enter) on the chart selects the Event under it, if any.
-  const { Chart, XAxis, YAxis, Line, Scatter, StateBand } = useChart(rows, {
+  const advances = model.advances.map((t) => t / millis);
+  // A click on the chart selects the Event in the lane under the pointer, if any, and clears the
+  // selection elsewhere; Enter on the Active point selects an Event at its time. The chart hits
+  // every series at the pointer's time, so the lane comes from where the pointer went down.
+  const pointer = useRef<PointerEvent>(undefined);
+  useEffect(() => {
+    const down = (event: PointerEvent) => (pointer.current = event);
+    const key = () => (pointer.current = undefined);
+    document.addEventListener('pointerdown', down);
+    document.addEventListener('keydown', key);
+    return () => {
+      document.removeEventListener('pointerdown', down);
+      document.removeEventListener('keydown', key);
+    };
+  }, []);
+  const { Chart, XAxis, YAxis, Line, Scatter, StateBand } = useChart(lineRows(rows, advances), {
     onSelect: (hit) => {
-      const band = hit.points.find((p) => p.segment !== undefined && (p.datum as unknown as BandRow).s !== null);
+      const bands = hit.points.filter((p) => p.segment !== undefined && (p.datum as unknown as BandRow).key !== undefined && (p.datum as unknown as BandRow).s !== null);
+      const chart = (pointer.current?.target as Element | null)?.closest('.uc-root');
+      const plot = chart && plotRect(chart);
+      if (!pointer.current || !plot) return select(bands.length > 0 ? (bands[0].datum as unknown as BandRow).key : undefined);
+      const at = ((plot.top + plot.height - pointer.current.clientY) / plot.height) * total;
+      const rule = at >= 0 && at < lanes ? rules[lanes - 1 - Math.floor(at)] : undefined;
+      const band = bands.find((p) => p.seriesName === rule);
       select(band && (band.datum as unknown as BandRow).key);
     },
   });
@@ -174,6 +199,10 @@ export function EventChart({
   const total = plotUnits(lanes, separate.length > 0, channelAxes.length);
   const separateAxis = separate.length > 0 ? separateAxisOf(model, channelAxes.length) : undefined;
   const axisOf = (channel: string) => channelAxes.find((a) => a.channels.includes(channel)) ?? channelAxes[0];
+  const lines = thresholdLines(thresholds, channelAxes, channels, narrow);
+  // Room for the labels of a band with more than two threshold lines.
+  const crowded = channelAxes.reduce((sum, a) => sum + Math.max(0, lines.filter((l) => l.axis === a.id && l.label !== '').length - 2), 0) * 30;
+  const windows = windowRows(model.windows, lifecycle, millis);
   // Lines with a marker at every Sample, unless the Samples lie too close for markers to read.
   const markers = rows.length <= 100 ? 'always' : 'auto';
   // Few Samples: a tick at each, written as the Samples' times are.
@@ -186,19 +215,23 @@ export function EventChart({
   return (
     <>
       <Chart
-        height={narrow ? 260 + (separateAxis ? 60 : 0) + (channelAxes.length - 1) * 80 : 300 + (separateAxis ? 80 : 0) + (channelAxes.length - 1) * 100}
+        height={crowded + (narrow ? 260 + (separateAxis ? 60 : 0) + (channelAxes.length - 1) * 80 : 300 + (separateAxis ? 80 : 0) + (channelAxes.length - 1) * 100)}
         style={titles}
         ariaLabel={`${scenario.channels.join(', ')} over time in ${unit}, with the Events of ${scenario.rules.join(', ')} as bands, Pending then Confirmed, and their lifecycle marked`}
       >
-        <XAxis value="t" domain={timeDomain(rows)} ticks={ticks} tickFormat={ticks && ((v) => String(v))} label={`Time (${unit})`} />
+        <XAxis value="t" domain={timeDomain(rows, labelRoom(model, channelAxes, narrow))} ticks={ticks} tickFormat={ticks && ((v) => String(v))} label={`Time (${unit})`} />
+        {/* The first band's axis on the left, every further one on the right, next to the plot
+            (charts 0.40.0 gives each y axis a column of its own); the Expressions' with a unit
+            of their own is titled with the unit, as the key names the Expression. */}
         {channelAxes.map((a, b) => (
           <YAxis
             key={a.id}
             id={a.id}
             grid={b === 0}
-            position={narrow && b > 0 ? 'right' : 'left'}
+            position={b > 0 ? 'right' : 'left'}
             domain={a.domain}
             ticks={a.ticks}
+            tickFormat={tickText}
             label={a.channels.filter((c) => channels.includes(c)).join(', ')}
           />
         ))}
@@ -206,9 +239,11 @@ export function EventChart({
           <YAxis
             id="separate"
             grid={false}
+            position="right"
             domain={separateAxis.domain}
             ticks={separateAxis.ticks}
-            label={separate.map((x) => `${x.name} (${x.unit})`).join(', ')}
+            tickFormat={tickText}
+            label={[...new Set(separate.map((x) => x.unit))].join(', ')}
           />
         )}
         {/* Lane i (first Rule on top) spans lanes - i - 1 .. lanes - i. The lane names change with
@@ -230,14 +265,9 @@ export function EventChart({
           // No label: on the x axis it would cover a tick on a phone; the key names it.
           <LimitBand key={from} orientation="x" from={from} to={to} color={UNDEFINED_COLOR} />
         ))}
-        {windowStretches(model.windows, lifecycle, millis).map(([from, to]) => (
-          <LimitBand key={`window ${from}`} orientation="x" from={from} to={to} color={WINDOW_COLOR} />
+        {lines.map((l) => (
+          <LimitLine key={`${l.axis} ${l.value}`} axisId={l.axis} value={l.value} label={l.label} />
         ))}
-        {thresholds
-          .filter((t) => channels.includes(t.channel))
-          .map((t) => (
-            <LimitLine key={`${t.channel} ${t.condition} ${t.value}`} axisId={axisOf(t.channel).id} value={t.value} label={thresholdLabel(t, scenario)} />
-          ))}
         {expressions.map(
           (x, k) =>
             x.threshold !== null && (
@@ -245,7 +275,9 @@ export function EventChart({
                 key={`expression ${k}`}
                 axisId={isSeparate(x) ? 'separate' : channelAxes[0].id}
                 value={x.threshold}
-                label={`threshold ${x.threshold}${x.unit ? ` ${x.unit}` : ''}`}
+                // On a phone a longer label would stand in the plot; the line's mark says what it is.
+                label={narrow ? String(x.threshold) : `threshold ${x.threshold}`}
+                color={narrow ? THRESHOLD_COLOR : undefined}
               />
             ),
         )}
@@ -256,6 +288,21 @@ export function EventChart({
         {model.restart !== undefined && (
           // No label: on the x axis it would cover a tick on a phone; the key under the chart names it.
           <LimitLine orientation="x" value={model.restart / millis} color={RESTART_COLOR} />
+        )}
+        {rules.map(
+          (rule, i) =>
+            windows.has(rule) && (
+              <StateBand<BandRow>
+                key={`window ${rule}`}
+                data={windows.get(rule)!}
+                value="s"
+                states={[{ label: 'within', color: WINDOW_COLOR }]}
+                yAxisId="lanes"
+                laneFrom={lane(i, lanes, narrow).strip[0]}
+                laneTo={lane(i, lanes, narrow).strip[1]}
+                name={`within, ${rule}`}
+              />
+            ),
         )}
         {rules.map((rule, i) => (
           <StateBand<BandRow>
@@ -310,13 +357,11 @@ export function EventChart({
         )}
         {/* A Channel some Samples lack keeps its last value in rbed: a held step line under the
             line through the values it has, drawn as marks. */}
-        {channels.map(
-          (c) =>
-            !scenario.pulse.includes(c) &&
-            hasGaps(rows, c) && (
-              <Line key={`held ${c}`} data={heldRows(rows, c)} value={c} name={`${c} (kept)`} color={channelColor(scenario, c)} step markers="never" strokeWidth={1} yAxisId={axisOf(c).id} />
-            ),
-        )}
+        {heldChannels(scenario, rows, advances)
+          .filter((c) => channels.includes(c))
+          .map((c) => (
+            <Line key={`held ${c}`} data={heldRows(rows, c, advances)} value={c} name={`${c} (kept)`} color={channelColor(scenario, c)} step markers="never" strokeWidth={1} yAxisId={axisOf(c).id} />
+          ))}
         {expressions.map((x, k) => (
           <Line
             key={`expression ${k}`}
@@ -339,7 +384,8 @@ export function EventChart({
 /** What the bands' colors, the lines and the marks mean; the text alternative says it in words.
     Each group keeps its heading with its first item when the key wraps. */
 export function LifecycleKey({ model }: { model: ChartModel }) {
-  const { scenario, lifecycle, expressions, windows, advances, restart } = model;
+  const { scenario, lifecycle, expressions, windows, advances, restart, thresholds, channels } = model;
+  const key = keyOf(lifecycle);
   const item = (label: string, color: string, kind = '') => (
     <span key={label} className="keyItem">
       <span className={`swatch ${kind}`} style={kind === 'dash' || kind === 'line' ? { borderColor: color } : { background: color }} />
@@ -353,20 +399,16 @@ export function LifecycleKey({ model }: { model: ChartModel }) {
         {items}
       </span>
     );
-  const occurs = (l: Lifecycle) => ({
-    'Discarded at': l.discarded.length > 0,
-    Truncated: l.events.some((e) => e.truncatedStart || e.truncatedEnd),
-  });
-  const occurring = occurs(lifecycle);
+  const truncated = lifecycle.events.some((e) => e.truncatedStart || e.truncatedEnd);
   return (
     <div className="lifecycleKey" aria-hidden="true">
       {group(
         'Bands:',
-        EVENT_STATES.map((s) => item(s.label, s.color)),
+        key.states.map((s) => item(s.label, s.color)),
       )}
       {group('Marks:', [
-        ...MARKS.filter((m) => m.name !== 'Discarded at' || occurring['Discarded at']).map((m) => item(m.name, m.color, 'mark')),
-        occurring.Truncated && (
+        ...key.marks.map((m) => item(m.name, m.color, 'mark')),
+        truncated && (
           <span key="truncated" className="keyItem">
             <span className="swatch mark halo" style={{ background: TRUNCATED.color }} />
             Truncated start or end
@@ -378,11 +420,21 @@ export function LifecycleKey({ model }: { model: ChartModel }) {
         ...expressions.map((x, k) => item(x.name, expressionColor(scenario, k), 'dash')),
         restart !== undefined && item('Restart', RESTART_COLOR, 'line'),
       ])}
+      {group(
+        'Thresholds:',
+        [
+          ...thresholds.filter((t) => channels.includes(t.channel)).map(thresholdText),
+          ...expressions.flatMap((x) => (x.threshold === null ? [] : [`${x.name} ${x.threshold}${x.unit ? ` ${x.unit}` : ''}`])),
+        ].map((text) => item(text, THRESHOLD_COLOR, 'dash')),
+      )}
       {group('Shaded:', [
         undefinedStretches(model.expressionRows, expressions.length).length > 0 &&
           item(expressions.length > 1 ? 'An Expression undefined' : 'Expression undefined', `color-mix(in srgb, ${UNDEFINED_COLOR} 30%, transparent)`),
-        ...windows.map((w) => item(`within, after ${w.after}`, `color-mix(in srgb, ${WINDOW_COLOR} 30%, transparent)`)),
       ])}
+      {group(
+        'Strips:',
+        windows.map((w) => item(`${w.rule}: within, after ${w.after}`, WINDOW_COLOR)),
+      )}
     </div>
   );
 }

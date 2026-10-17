@@ -76,6 +76,6 @@ final class AfterScenario extends Scenario {
 
   @Override
   List<Window> windows(Map<String, Double> values) {
-    return List.of(new Window("DoorOpen", Math.round(values.get("window") * MINUTE)));
+    return List.of(new Window("ExcursionAfterDoor", "DoorOpen", Math.round(values.get("window") * MINUTE)));
   }
 }

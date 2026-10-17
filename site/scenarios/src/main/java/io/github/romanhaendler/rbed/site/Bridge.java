@@ -323,7 +323,8 @@ public final class Bridge {
     List<Scenario.Window> windows = scenario.windows(values);
     for (int i = 0; i < windows.size(); i++) {
       if (i > 0) out.append(',');
-      Json.string(out.append("{\"after\":"), windows.get(i).after())
+      Json.string(out.append("{\"rule\":"), windows.get(i).rule());
+      Json.string(out.append(",\"after\":"), windows.get(i).after())
           .append(",\"millis\":").append(windows.get(i).millis()).append('}');
     }
     out.append(']');

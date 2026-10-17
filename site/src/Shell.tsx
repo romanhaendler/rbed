@@ -242,7 +242,13 @@ export function Shell() {
         onClose={() => setSearching(false)}
         items={SEARCH}
         restingItems={resting}
-        onChoose={(path) => go(href(path))}
+        onChoose={(path) => {
+          // The palette closes, and the chosen page's heading takes the focus, so a screen
+          // reader announces it.
+          setSearching(false);
+          go(href(path));
+          requestAnimationFrame(() => document.querySelector<HTMLElement>('.shellContent h1')?.focus({ preventScroll: true }));
+        }}
         aria-label="Search the documentation"
       />
     </>

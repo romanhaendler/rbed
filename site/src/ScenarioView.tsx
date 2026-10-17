@@ -9,7 +9,7 @@
 import { Alert, VisuallyHidden } from '@umriss-ui/core';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { type Result, run, type Scenario, source } from './bridge';
-import { type ChannelAxis, type ChartModel, channelAxesOf, expressionKey, expressionRows, type Row, timeDomain } from './chartModel.ts';
+import { type ChannelAxis, type ChartModel, channelAxesOf, expressionKey, expressionRows, labelRoom, type Row, timeDomain } from './chartModel.ts';
 import { CodeBlock } from './CodeBlock';
 import { drawnSource, drawTo } from './draw.ts';
 import { DrawLayer } from './DrawLayer';
@@ -131,7 +131,8 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
     };
     stage = (
       <>
-        <div className="drawStage" ref={stageRef}>
+        {/* Esc on the chart clears the selection, as a click that hits no band does (EventChart). */}
+        <div className="drawStage" ref={stageRef} onKeyDown={(event) => event.key === 'Escape' && select(undefined)}>
           <EventChart
             key={`${scenario.id} ${model.rules.join(' ')} ${narrow}`}
             model={model}
@@ -141,7 +142,7 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
             latest={result.events.find((e) => eventKey(e) === hoveredLatest)}
             select={select}
           />
-          {pen !== '' && <DrawLayer x={timeDomain(rows)} channelAxis={penAxis} draw={drawPoint} end={() => setFrozen(undefined)} />}
+          {pen !== '' && <DrawLayer x={timeDomain(rows, labelRoom(model, channelAxes, narrow))} channelAxis={penAxis} draw={drawPoint} end={() => setFrozen(undefined)} />}
         </div>
         <LifecycleKey model={model} />
         <EventSummary
@@ -194,7 +195,8 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
       <VisuallyHidden role="status">{announcement}</VisuallyHidden>
       {!('error' in result) && (
         <>
-          {selected && result.events.some((e) => eventKey(e) === selected) && (
+          {/* An Event whose Rule reads no Channel has no Aggregates to show in full. */}
+          {selected && Object.keys(result.events.find((e) => eventKey(e) === selected)?.aggregates ?? {}).length > 0 && (
             <AggregatesPanel scenario={scenario} event={result.events.find((e) => eventKey(e) === selected)!} />
           )}
           <EventTable scenario={scenario} events={result.events} selected={selected} select={select} />

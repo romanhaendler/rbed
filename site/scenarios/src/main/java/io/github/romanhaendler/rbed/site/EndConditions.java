@@ -68,10 +68,8 @@ final class EndConditions extends Scenario {
 
   @Override
   List<Threshold> thresholds(Map<String, Double> values) {
-    double end = values.get("end");
-    return end == 500
-        ? List.of(new Threshold(WEIGHT, "LoadLifted", "when > 500, endWhen <", 500))
-        : List.of(new Threshold(WEIGHT, "LoadLifted", "when >", 500),
-            new Threshold(WEIGHT, "LoadLifted", "endWhen <", end));
+    // At 500 both share one line on the chart.
+    return List.of(new Threshold(WEIGHT, "LoadLifted", "when >", 500),
+        new Threshold(WEIGHT, "LoadLifted", "endWhen <", values.get("end")));
   }
 }

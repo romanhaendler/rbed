@@ -2,7 +2,7 @@
 // advances and restart in words, for a screen reader.
 import { VisuallyHidden } from '@umriss-ui/core';
 import type { PlottedExpression, Scenario, Threshold, Window } from './bridge';
-import { type Row, undefinedStretches } from './chartModel.ts';
+import { type Row, thresholdText, undefinedStretches } from './chartModel.ts';
 import { type Lifecycle, timeIn } from './events.ts';
 
 /** The plotted Expressions in words: what each is compared to and where they are undefined;
@@ -25,8 +25,8 @@ export function expressionSummary(expressions: PlottedExpression[], rows: Row[],
 export function limitsSummary(thresholds: Threshold[], windows: Window[], scenario: Scenario): string {
   const at = timeIn(scenario.timeUnit);
   return (
-    (thresholds.length === 0 ? '' : ` Lines mark the thresholds: ${thresholds.map((t) => `${t.rule} ${t.condition.replace(/^(\w+) /, `$1 ${t.channel} `)} ${t.value}`).join(', ')}.`) +
-    windows.map((w) => ` Shaded after each ${w.after} Event: the ${at(w.millis)} its within(...) counts.`).join('')
+    (thresholds.length === 0 ? '' : ` Lines mark the thresholds: ${thresholds.map(thresholdText).join(', ')}.`) +
+    windows.map((w) => ` A strip over the ${w.rule} lane marks the ${at(w.millis)} after each ${w.after} Event that its within(...) counts.`).join('')
   );
 }
 
