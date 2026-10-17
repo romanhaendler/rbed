@@ -112,7 +112,7 @@ class PerformanceTest {
 
   /**
    * Inside one long Event, with moving-average windows full and every Rule idle or Confirmed,
-   * pushing must not allocate beyond the map iterator. Covers bounded memory: a window over a
+   * pushing must not allocate beyond the map iterator, watched Expressions included. Covers bounded memory: a window over a
    * minute at 1 kHz keeps only that minute, and an Event's Aggregates do not grow with its length.
    */
   @Test
@@ -124,6 +124,8 @@ class PerformanceTest {
         .rules(Rule.named("AvgSamples").when(X.averageOverSamples(1_000).above(0)))
         .rules(Rule.named("AvgTime").when(X.averageOverDuration(60_000).above(0)))
         .rules(Rule.named("Rate").when(X.rate().above(1e9)))
+        .watch(X, X.averageOverSamples(1_000), X.averageOverDuration(60_000), X.rate(), X.age(),
+            X.minus(X.averageOverSamples(10)).abs()) // watching adds no work to a push
         .build();
     Feed feed = new Feed(8, X, i -> 1.0 + (i % 7)); // always > 0, never rising 1e9/s
 

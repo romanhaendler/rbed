@@ -9,6 +9,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalDouble;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -30,6 +31,8 @@ public final class Detector implements AutoCloseable {
   private final long latestHistoryEnd;
   private final RuleState[] rules;
   private final ChannelState[] pulses;
+  /** Watched Expressions, bound once; a Channel matches by name, others by identity. */
+  private final Map<Expression, Expression.Bound> watched = new HashMap<>();
   /** The latest moment processed: a Sample or a time advance. */
   private long now;
   private boolean started;
@@ -55,10 +58,10 @@ public final class Detector implements AutoCloseable {
       };
 
   /**
-   * While binding Rules: the Rule being bound, the names of all Rules and of those bound before
-   * it, and the Channels its Conditions refer to.
+   * While binding: what is being bound for messages ("Rule X" or "Watched Expression y"), the
+   * names of all Rules and of those bound before it, and the Channels a Rule's Conditions refer to.
    */
-  String bindingRule;
+  String binding;
   private Set<String> added;
   private Set<String> addedBefore;
   private Set<ChannelState> channelLookups;
@@ -72,19 +75,43 @@ public final class Detector implements AutoCloseable {
     rules = new RuleState[b.rules.size()];
     int i = 0;
     for (Rule rule : b.rules.values()) {
-      bindingRule = rule.name();
+      binding = "Rule " + rule.name();
       rules[i++] = new RuleState(this, rule);
       addedBefore.add(rule.name());
     }
+    for (Expression expression : b.watched) { // after all Rules, so it may refer to any of them
+      binding = "Watched Expression " + expression;
+      watched.put(expression, expression.bind(this));
+    }
     added = null;
     addedBefore = null;
-    bindingRule = null;
+    binding = null;
     pulses = channels.values().stream()
         .filter(state -> state.channel.pulse)
         .toArray(ChannelState[]::new);
 
     hasHistory = !b.history.isEmpty();
     latestHistoryEnd = remember(b.history); // after binding, so that Event counts see it too
+  }
+
+  /**
+   * The value of a watched Expression at the latest moment processed (Sample or time advance),
+   * also from within EventListener callbacks and after {@link #close}. Empty while the value is
+   * undefined: before the first Sample, while a moving average fills, for a Pulse Channel absent
+   * in that moment, or wherever the Expression is undefined. Reading only looks up the value: it
+   * costs nothing on Samples where nobody reads.
+   *
+   * @throws IllegalArgumentException if the Expression was not registered with
+   *     {@link Builder#watch}; a Channel matches by name, every other Expression by identity
+   */
+  public OptionalDouble value(Expression expression) {
+    Expression.Bound bound = watched.get(expression);
+    if (bound == null) {
+      throw new IllegalArgumentException("Expression " + expression
+          + " is not watched. Register it with Detector.builder().watch(...).");
+    }
+    double v = bound.value();
+    return v == v ? OptionalDouble.of(v) : OptionalDouble.empty();
   }
 
   /** Applies History in order of confirmation; returns its latest end. */
@@ -337,7 +364,7 @@ public final class Detector implements AutoCloseable {
   EventState referencedEvent(Rule rule) {
     String name = rule.name();
     if (!addedBefore.contains(name)) {
-      throw new IllegalArgumentException("Rule " + bindingRule + " references " + name
+      throw new IllegalArgumentException(binding + " references " + name
           + (added.contains(name) ? ", which is not added before it" : ", which is not added"));
     }
     return event(name);
@@ -347,6 +374,7 @@ public final class Detector implements AutoCloseable {
   public static final class Builder {
     private final Map<String, Rule> rules = new LinkedHashMap<>();
     private final List<Event> history = new ArrayList<>();
+    private final Set<Expression> watched = new LinkedHashSet<>();
     private EventListener listener = new EventListener() {};
     private double samplingRate;
     private int retentionLimit = 1_000_000;
@@ -368,6 +396,17 @@ public final class Detector implements AutoCloseable {
         }
         this.rules.put(name, rule);
       }
+      return this;
+    }
+
+    /**
+     * Registers Expressions whose values the built Detector reports through
+     * {@link Detector#value}. They are bound after all Rules and need not be used by any Rule;
+     * their Channels count as used. May be called more than once; watching an Expression twice is
+     * harmless.
+     */
+    public Builder watch(Expression... expressions) {
+      for (Expression e : expressions) watched.add(Objects.requireNonNull(e, "expression"));
       return this;
     }
 

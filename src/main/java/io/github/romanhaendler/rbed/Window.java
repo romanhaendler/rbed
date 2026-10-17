@@ -60,7 +60,7 @@ abstract class Window {
   /** The values from the last {@code millis}, counted back from the latest value. */
   static final class OverDuration extends Window {
     private final long millis;
-    private final String rule;
+    private final String binding;
     private long[] times;
     private double[] values;
     private int head;
@@ -73,7 +73,7 @@ abstract class Window {
     OverDuration(Detector detector, long millis) {
       super(detector);
       this.millis = millis;
-      rule = "Rule " + detector.bindingRule;
+      binding = detector.binding;
       int initial = Math.min(16, detector.retentionLimit());
       times = new long[initial];
       values = new double[initial];
@@ -99,7 +99,7 @@ abstract class Window {
         size--;
         detector.release();
         evictedSinceExactSum++;
-        detector.recordDrop(rule);
+        detector.recordDrop(binding);
       }
       if (size == times.length) grow();
       int tail = (head + size) % times.length;

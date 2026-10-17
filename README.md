@@ -16,7 +16,7 @@ Vocabulary (Sample, Channel, Condition, Rule, Event, Detector, ...) is defined i
 - [The Event lifecycle](#the-event-lifecycle)
 - [Events](#events)
 - [Building Rules](#building-rules): durations, End Conditions, data gaps, derived values
-- [Conditions and Expressions](#conditions-and-expressions): comparisons, arithmetic, trends, moving averages, logic
+- [Conditions and Expressions](#conditions-and-expressions): comparisons, arithmetic, trends, moving averages, logic, reading values
 - [Referring to other Rules](#referring-to-other-rules): `during`, `after`, `count`, `totalDuration`, `latest`
 - [Aggregates](#aggregates)
 - [Batch processing and sampling rates](#batch-processing-and-sampling-rates)
@@ -34,14 +34,14 @@ rbed is on Maven Central and needs Java 17 or later. Maven:
 <dependency>
   <groupId>io.github.romanhaendler</groupId>
   <artifactId>rbed</artifactId>
-  <version>0.2.0</version>
+  <version>0.3.0</version>
 </dependency>
 ```
 
 Gradle:
 
 ```kotlin
-implementation("io.github.romanhaendler:rbed:0.2.0")
+implementation("io.github.romanhaendler:rbed:0.3.0")
 ```
 
 The library is the Java module `io.github.romanhaendler.rbed` (`requires io.github.romanhaendler.rbed;`) and has a single package of the same name. It also works on the class path.
@@ -429,6 +429,25 @@ pressure.above(5).not()   // false as long as pressure has no value, not true
 ```
 
 So a Rule never fires because data is missing. To detect missing data explicitly, use [`age()`](#silent-sensors-advancing-time).
+
+### Reading an Expression's value
+
+To log, plot or check the values your Rules compare, register the Expressions with `watch` and read them with `value`:
+
+```java
+ChannelExpression smoothTemp = temp.averageOverSamples(5);
+Detector detector = Detector.builder()
+    .rules(overheat)
+    .watch(smoothTemp)
+    .build();
+
+detector.push(0, Map.of(temp, 82.0));
+detector.value(smoothTemp);    // OptionalDouble.empty: the average is still warming up
+// ... four more Samples later
+detector.value(smoothTemp).ifPresent(v -> System.out.println("smoothed: " + v));
+```
+
+`value` reports the Expression at the latest Sample or time advance and is empty while the value is undefined. It may be called at any time, also from an EventListener callback (the moment being processed) and after `close()`. A watched Expression need not be used by any Rule. Reading only looks the value up, so watching costs nothing on Samples where you do not read. Reading an Expression that was not watched throws `IllegalArgumentException`; a Channel matches by name, every other Expression is the same object you passed to `watch`.
 
 ## Referring to other Rules
 
