@@ -562,6 +562,15 @@ dialog[aria-label='Search the documentation'] [role='option'] > [class*='_group_
   padding: 0 var(--u-space-4);
 }
 
+/* The tab already names the language. */
+.codeTabs .codeLanguage {
+  display: none;
+}
+
+.codeTabs .codeBar {
+  justify-content: flex-end;
+}
+
 .codeBar {
   display: flex;
   align-items: center;
