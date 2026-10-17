@@ -74,7 +74,7 @@ import java.util.Map;
 
 - A Rule is an immutable value: `when`, `forDuration`, `endWhen` and the other methods each return a new Rule, so a Rule can be shared by several Detectors, and a call whose result is not used changes nothing.
 - A Detector is single-use and not thread-safe. Use one per data stream, and feed it from one thread at a time.
-- Rules and the listener are fixed when the Detector is built. To change Rules, build a new Detector and pass it the Events so far as [History](history/).
+- Rules and the listener are fixed when the Detector is built. To change Rules, build a new Detector and pass it the Events so far as [History](history/), or [resume the stream](resuming-a-stream/) from a Snapshot.
 - A pushed Sample costs one hash lookup per value, and in steady state (no Event starting or ending) a Detector allocates nothing. Throughput ranges from about 1.2 million Samples per second for 50 Rules over 20 Channels to over 40 million for a single threshold Rule. See the README's [Performance](https://github.com/romanhaendler/rbed#performance), and [Memory and the Retention Limit](memory/) for what a Detector keeps.
 
 The Guide takes one concept per page, starting with [Samples and Channels](samples-and-channels/).

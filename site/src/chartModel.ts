@@ -2,7 +2,7 @@
 // lanes, the axes that share the plot between the Channels (a band per scale), the Expressions
 // with a unit of their own and the lanes, and the colors of it all. Imports only types and
 // events.ts, so Node tests it.
-import type { Event, PlottedExpression, Scenario, Threshold, Window } from './bridge';
+import type { Event, PlottedExpression, Resume, Scenario, Threshold, Window } from './bridge';
 import { eventKey, type Lifecycle, ofRule } from './events.ts';
 
 /** A chart row: a Sample's time in the Scenario's unit and its Channels' values (and the Expressions'). */
@@ -59,6 +59,11 @@ export const RING_COLOR = 'var(--u-color-surface)';
 /** Time advanced without a Sample (advanceTo), marked just above the lanes; a restart is a line. */
 export const ADVANCE_COLOR = 'var(--u-color-text-secondary)';
 export const RESTART_COLOR = 'var(--u-color-text-secondary)';
+/** A resumed stream (Resuming Scenario): the Replay Point, the Memory Horizon before the stop and
+    the Events that differ from the uninterrupted run. */
+export const REPLAY_COLOR = 'var(--u-color-accent)';
+export const HORIZON_COLOR = 'var(--uc-series-4)';
+export const DIFFERS_COLOR = 'var(--u-color-danger)';
 /** A Truncated start or end: a halo behind the edge's mark, so it reads as more than a color. */
 export const TRUNCATED = { name: 'Truncated', color: 'color-mix(in srgb, var(--u-color-text) 30%, transparent)' };
 export const truncatedEdges = (l: Lifecycle) =>
@@ -462,6 +467,8 @@ export type ChartModel = {
   restart?: number;
   /** Whether the Detector was restarted without History (windowRows). */
   restartForgets?: boolean;
+  /** A resumed stream: the stop, Replay Point and Memory Horizon, and the uninterrupted run. */
+  resume?: Resume;
 };
 
 /** Where the run forgets its earlier Events (ms): the restart, if its Detector got no History. */

@@ -131,6 +131,13 @@ export const PAGES: Page[] = [
     rubric: 'Guide',
   },
   {
+    path: '/resuming-a-stream/',
+    title: 'Resuming a stream',
+    description:
+      'Stop a Detector and continue as if it had never stopped: a Snapshot restores its complete state, the Replay Point says where to replay from, the Memory Horizon sizes retention.',
+    rubric: 'Guide',
+  },
+  {
     path: '/errors-and-validation/',
     title: 'Errors and validation',
     description:

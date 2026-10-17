@@ -228,6 +228,40 @@ class SourceTest {
   }
 
   /**
+   * The Resuming page's source with each restart: the Events it reports (a replay reports some a
+   * second time, to its Tee only) are exactly the bridge's.
+   */
+  @SuppressWarnings("unchecked")
+  @Test
+  void everyRestartOfTheResumingSourceFindsTheBridgesEvents(@TempDir Path out) throws Exception {
+    Map<String, String> units = new HashMap<>(Map.of("Tee", TEE));
+    Map<String, List<String>> expected = new HashMap<>();
+    for (List<Variant> variants : variants()) {
+      for (int i = 0; i < variants.size(); i++) {
+        Variant v = variants.get(i);
+        if (!v.id().equals("resuming") || i == 0) continue;
+        String name = "Resuming_" + i;
+        units.put(name, unit(name, teed(v.source())));
+        expected.put(name, BridgeTest.events(run(v)));
+      }
+    }
+    assertEquals(4, expected.size());
+    PrintStream stdout = System.out;
+    try (URLClassLoader loader = compile(units, out)) {
+      List<String> ended = (List<String>) loader.loadClass("Tee").getField("ended").get(null);
+      System.setOut(new PrintStream(new ByteArrayOutputStream()));
+      for (var e : expected.entrySet()) {
+        ended.clear();
+        loader.loadClass(e.getKey()).getMethod("main", String[].class)
+            .invoke(null, (Object) new String[0]);
+        assertEquals(new HashSet<>(e.getValue()), new HashSet<>(ended), e.getKey());
+      }
+    } finally {
+      System.setOut(stdout);
+    }
+  }
+
+  /**
    * The snippet under "Read an Expression's value" on the Conditions and Expressions page is a
    * source like a Scenario's: it compiles, runs and prints what its comment says.
    */

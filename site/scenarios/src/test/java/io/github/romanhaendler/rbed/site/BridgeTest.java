@@ -1169,4 +1169,119 @@ class BridgeTest {
       }
     }
   }
+
+  // Resuming a stream (the README's example, ResumingAStreamExample)
+
+  static final String NAIVE = "0", HISTORY_ONLY = "1", REPLAY_POINT = "2", SNAPSHOT = "3";
+
+  static Map<String, Object> resumed(String stop, String restart) {
+    return run("resuming", "{\"stop\": " + stop + ", \"restart\": " + restart + "}");
+  }
+
+  /** The Events as the bridge writes them, notes aside, in the order they Ended. */
+  @SuppressWarnings("unchecked")
+  static List<Object> bits(Object events) {
+    return ((List<Map<String, Object>>) events).stream().<Object>map(e -> {
+      Map<String, Object> copy = new java.util.TreeMap<>(e);
+      copy.remove("note");
+      return copy;
+    }).toList();
+  }
+
+  @SuppressWarnings("unchecked")
+  static Map<String, Object> resume(Map<String, Object> result) {
+    return (Map<String, Object>) result.get("resume");
+  }
+
+  static final List<String> UNINTERRUPTED = List.of("Overheat 10..20", "Overheat 40..60",
+      "Repeated 43..74", "Overheat 90..100", "Repeated 93..104");
+
+  @Test
+  void atTheDefaultsTheReplayPointAndSnapshotRestartsEqualTheUninterruptedRun() {
+    for (String restart : List.of(REPLAY_POINT, SNAPSHOT)) {
+      Map<String, Object> result = resumed("45", restart);
+      assertEquals(UNINTERRUPTED, describe(result, 1000), restart);
+      assertEquals(bits(resume(result).get("uninterrupted")), bits(result.get("events")), restart);
+    }
+  }
+
+  @Test
+  void atTheDefaultsTheNaiveAndHistoryOnlyRestartsDoNot() {
+    Map<String, Object> naive = resumed("45", NAIVE);
+    assertEquals(List.of("Overheat 10..20", "Overheat 45..60 truncatedStart", "Overheat 90..100",
+        "Repeated 93..109"), describe(naive, 1000));
+    Map<String, Object> history = resumed("45", HISTORY_ONLY);
+    assertEquals(List.of("Overheat 10..20", "Overheat 45..60 truncatedStart", "Repeated 48..74",
+        "Overheat 90..100", "Repeated 93..109"), describe(history, 1000));
+    for (Map<String, Object> result : List.of(naive, history)) {
+      assertEquals(UNINTERRUPTED, describe(Map.of("events", resume(result).get("uninterrupted")), 1000));
+      assertFalse(bits(resume(result).get("uninterrupted")).equals(bits(result.get("events"))));
+    }
+  }
+
+  @Test
+  void theResultCarriesTheStopTheReplayPointAndTheMemoryHorizon() {
+    Map<String, Object> resume = resume(resumed("45", SNAPSHOT));
+    assertEquals(44_000.0, resume.get("stop"));
+    assertEquals(39_000.0, resume.get("replayPoint"));
+    assertEquals(Map.of("millis", 60_000.0, "samples", 0.0), resume.get("memoryHorizon"));
+  }
+
+  @SuppressWarnings("unchecked")
+  @Test
+  void whatTheReplayPointAndSnapshotRestartsReportIsTheUninterruptedRunForEveryStop() {
+    boolean someStopMovesTheReplayPoint = false;
+    for (int stop = 1; stop < Resuming.MESSAGES; stop++) {
+      for (String restart : List.of(REPLAY_POINT, SNAPSHOT)) {
+        Map<String, Object> result = (Map<String, Object>) Json.parse(Bridge.run("resuming",
+            "{\"stop\": " + stop + ", \"restart\": " + restart + "}", "{}"));
+        assertEquals(bits(resume(result).get("uninterrupted")), bits(result.get("events")),
+            "stop " + stop + " restart " + restart);
+        someStopMovesTheReplayPoint |= (Double) resume(result).get("replayPoint") > 0;
+      }
+    }
+    assertTrue(someStopMovesTheReplayPoint);
+  }
+
+  /** Which of naive, History only, Replay Point and Snapshot equal the uninterrupted run. */
+  static List<Boolean> equalAt(int stop) {
+    return List.of(NAIVE, HISTORY_ONLY, REPLAY_POINT, SNAPSHOT).stream().map(restart -> {
+      Map<String, Object> result = resumed("" + stop, restart);
+      return bits(result.get("events")).equals(bits(resume(result).get("uninterrupted")));
+    }).toList();
+  }
+
+  @Test
+  void thePageSaysWhichRestartsMatterAtWhichStop() {
+    assertEquals(List.of(true, true, true, true), equalAt(5));       // nothing has happened yet
+    assertEquals(List.of(false, true, true, true), equalAt(80));     // only the count of Overheats is lost
+    assertEquals(List.of(false, false, true, true), equalAt(45));    // an Overheat in progress is lost, too
+    assertEquals(List.of(false, false, true, true), equalAt(100));   // another Overheat in progress
+    assertEquals(89_000.0, resume(resumed("100", SNAPSHOT)).get("replayPoint"));
+    assertEquals(List.of(true, true, true, true), equalAt(105));     // nothing left to lose
+  }
+
+  /** The Snapshot (hexadecimal text, a JSON string in parity.json) a run takes at its stop. */
+  static String snapshot(String scenarioId, String parameters) {
+    String hex = Bridge.snapshot(scenarioId, parameters);
+    call("snapshot", Json.string(new StringBuilder(), hex).toString(), scenarioId, parameters);
+    return hex;
+  }
+
+  @SuppressWarnings("unchecked")
+  @Test
+  void aSnapshotWrittenByTheRunRestoresInAnotherRun() {
+    assertEquals("", snapshot("history", "{}"));
+    // parity.json repeats these against the compiled JavaScript: it must write the same bytes
+    // and restore the JVM's Snapshot into the same result
+    for (int stop : new int[] {1, 20, 45, 80, 119}) {
+      String parameters = "{\"stop\": " + stop + ", \"restart\": 3}";
+      String snapshot = snapshot("resuming", parameters);
+      assertFalse(snapshot.isEmpty());
+      Map<String, Object> restored = (Map<String, Object>) Json.parse(call("resume",
+          Bridge.resume("resuming", parameters, snapshot), "resuming", parameters, snapshot));
+      assertEquals(run("resuming", parameters), restored);
+      if (stop == 45) assertEquals(UNINTERRUPTED, describe(restored, 1000));
+    }
+  }
 }

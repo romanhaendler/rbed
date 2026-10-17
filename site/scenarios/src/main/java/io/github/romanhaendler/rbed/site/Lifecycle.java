@@ -4,11 +4,13 @@ import io.github.romanhaendler.rbed.Detector;
 import io.github.romanhaendler.rbed.Event;
 import io.github.romanhaendler.rbed.EventListener;
 import io.github.romanhaendler.rbed.Expression;
+import io.github.romanhaendler.rbed.MemoryHorizon;
 import io.github.romanhaendler.rbed.Sample;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
 
 /**
  * The listener the bridge registers, recording the callbacks the test Recorder records. An Ended
@@ -29,6 +31,21 @@ class Lifecycle implements EventListener {
   Long restart;
   /** Whether the restarted Detector started without History, knowing no earlier Event. */
   boolean restartForgets;
+  /**
+   * Where a stopped stream was resumed: the timestamp of the last message before the stop, the
+   * Replay Point and Memory Horizon there, and the Events an uninterrupted Detector reports.
+   */
+  record Resume(long stop, OptionalLong replayPoint, MemoryHorizon horizon,
+      List<Event> uninterrupted) {}
+
+  /** Set by a Scenario that resumes a stream; otherwise null. */
+  Resume resume;
+  /** The Snapshot a resuming Scenario took at the stop, or null. */
+  byte[] snapshot;
+  /** A Snapshot written elsewhere (by the other runtime), which a resuming Scenario restores. */
+  byte[] given;
+  /** While true, Ended and Discarded Events are not recorded: a replay of what was reported. */
+  boolean replaying;
   /** The Expressions the bridge plots, which every Detector of the run watches. */
   private final Expression[] plotted;
   /** The plotted Expressions' values after each Sample, in order; NaN where undefined. */
@@ -107,11 +124,11 @@ class Lifecycle implements EventListener {
 
   @Override
   public void onEnded(Event event) {
-    ended.add(event);
+    if (!replaying) ended.add(event);
   }
 
   @Override
   public void onDiscarded(Event event) {
-    discarded.add(new Discard(event, now));
+    if (!replaying) discarded.add(new Discard(event, now));
   }
 }

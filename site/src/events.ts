@@ -69,6 +69,16 @@ export const byStart = (events: Event[]) =>
 export const forDisplay = (result: Result): Result =>
   'error' in result ? result : { ...result, events: byStart(result.events) };
 
+/** The Events a resumed run reports that an uninterrupted one does not (`extra`) and the ones it
+ *  lacks (`missing`). Events are equal when everything but the note is: name, start, Confirmed,
+ *  end, Truncated flags and Aggregates, as the bridge writes them. */
+export function differences(events: Event[], uninterrupted: Event[]): { extra: Event[]; missing: Event[] } {
+  const bits = (e: Event) => JSON.stringify({ ...e, note: undefined });
+  const had = new Set(uninterrupted.map(bits));
+  const has = new Set(events.map(bits));
+  return { extra: events.filter((e) => !had.has(bits(e))), missing: uninterrupted.filter((e) => !has.has(bits(e))) };
+}
+
 /** The table of Discarded Pending Events: its column heads, and a row's cells. */
 export const discardedHead = (unit: string) => ['Name', `Start (${unit})`, `Discarded (${unit})`];
 export const discardedCells = (d: Discard, millis: number) => [d.name, String(d.start / millis), String(d.discarded / millis)];
