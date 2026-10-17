@@ -10,7 +10,11 @@ import java.util.Objects;
  * with {@link Conditions}.
  */
 public abstract class Condition {
-  Condition() {}
+  private final String text;
+
+  Condition(String text) {
+    this.text = text;
+  }
 
   /** Resolves this Condition against one Detector's state, once, when the Detector is built. */
   abstract Bound bind(Detector detector);
@@ -24,7 +28,7 @@ public abstract class Condition {
   public Condition and(Condition other) {
     Objects.requireNonNull(other, "other");
     Condition self = this;
-    return new Condition() {
+    return new Condition(this + ".and(" + other + ")") {
       @Override Bound bind(Detector detector) {
         Bound left = self.bind(detector);
         Bound right = other.bind(detector);
@@ -37,7 +41,7 @@ public abstract class Condition {
   public Condition or(Condition other) {
     Objects.requireNonNull(other, "other");
     Condition self = this;
-    return new Condition() {
+    return new Condition(this + ".or(" + other + ")") {
       @Override Bound bind(Detector detector) {
         Bound left = self.bind(detector);
         Bound right = other.bind(detector);
@@ -49,11 +53,22 @@ public abstract class Condition {
   /** Negation; undefined stays undefined. */
   public Condition not() {
     Condition self = this;
-    return new Condition() {
+    return new Condition(this + ".not()") {
       @Override Bound bind(Detector detector) {
         Bound inner = self.bind(detector);
         return () -> inner.test().not();
       }
     };
+  }
+
+  /**
+   * How this Condition is written in Java, such as {@code temp.above(80.0)} or {@code
+   * after(Maintenance).within(7776000000).not()}: Channels and Rules by name, constants as
+   * {@code double}, durations in milliseconds. Deterministic and built once, so it identifies the
+   * Condition.
+   */
+  @Override
+  public String toString() {
+    return text;
   }
 }

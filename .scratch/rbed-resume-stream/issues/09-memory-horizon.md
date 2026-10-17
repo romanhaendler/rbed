@@ -4,9 +4,15 @@
 
 **Blocked by:** None (can start immediately; builds on rbed 0.3.0)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `memoryHorizon()` exists with the value type and Javadoc as described (the glossary term is added by ticket 03, or here if 03 is not merged yet)
-- [ ] Tests pin the millis and Sample count for Rule sets mixing every windowed construct, including constructs inside watched Expressions and nested Expressions
-- [ ] A Detector without windowed constructs reports zero for both
-- [ ] `mvn -q verify` passes
+- [x] `memoryHorizon()` exists with the value type and Javadoc as described (the glossary term is added by ticket 03, or here if 03 is not merged yet)
+- [x] Tests pin the millis and Sample count for Rule sets mixing every windowed construct, including constructs inside watched Expressions and nested Expressions
+- [x] A Detector without windowed constructs reports zero for both
+- [x] `mvn -q verify` passes
+
+## Comments
+
+- `MemoryHorizon(long millis, int samples)` is a public record; `Detector.memoryHorizon()` returns it. Windowed constructs report while binding via package-private `Detector.windowMillis/windowSamples` (RuleState: phases and `maxGap`; Window constructors; `After.bind`; `EventCount.bind`). `Long.MAX_VALUE` (unbounded `maxGap`/`after`) counts for nothing.
+- Snapshot restore (later tickets): the horizon is configuration, so a restored Detector gets it from binding; nothing to serialize.
+- Glossary term "Memory Horizon" added to CONTEXT.md here.

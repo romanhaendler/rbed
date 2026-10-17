@@ -91,7 +91,7 @@ public abstract class ChannelExpression extends Expression {
   }
 
   private Condition trend(boolean rising) {
-    return new Condition() {
+    return new Condition(this + (rising ? ".rising()" : ".falling()")) {
       @Override Bound bind(Detector detector) {
         ValueTrack t = track(detector);
         return rising

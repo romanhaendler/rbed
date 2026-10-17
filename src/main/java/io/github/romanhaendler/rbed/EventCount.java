@@ -12,7 +12,7 @@ public final class EventCount extends Expression {
   private final long window;
 
   EventCount(Rule rule, long window) {
-    super("count(" + rule + ")" + (window < 0 ? "" : ".within(" + window + ")"));
+    super("count(" + rule.name() + ")" + (window < 0 ? "" : ".within(" + window + ")"));
     this.rule = Objects.requireNonNull(rule, "rule");
     this.window = window;
   }
@@ -39,6 +39,7 @@ public final class EventCount extends Expression {
   Bound bind(Detector detector) {
     EventState events = detector.referencedEvent(rule);
     if (window < 0) return () -> events.count;
+    detector.windowMillis(window);
     events.countWithin(window);
     Timestamps.Counter counter = events.counter(window);
     return () -> {

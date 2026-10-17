@@ -57,7 +57,7 @@ public abstract class Expression {
     requireFinite(high);
     if (low > high) throw new IllegalArgumentException("between: " + low + " > " + high);
     Expression self = this;
-    return new Condition() {
+    return new Condition(this + ".between(" + low + ", " + high + ")") {
       @Override Bound bind(Detector detector) {
         Expression.Bound x = self.bind(detector);
         return () -> {
@@ -163,7 +163,7 @@ public abstract class Expression {
 
   private static Condition comparison(Expression left, Expression right, boolean greater) {
     Objects.requireNonNull(right, "other");
-    return new Condition() {
+    return new Condition(left + (greater ? ".above(" : ".below(") + right + ")") {
       @Override Bound bind(Detector detector) {
         Expression.Bound x = left.bind(detector);
         Expression.Bound y = right.bind(detector);

@@ -49,6 +49,13 @@ final class RuleState {
     for (ChannelState referenced : detector.recordedChannelLookups()) aggregate(referenced);
     for (Channel channel : spec.aggregated) aggregate(channel.state(detector));
     this.maxGap = spec.maxGap;
+    detector.windowMillis(maxGap);
+    detector.windowSamples(spec.when.samples());
+    detector.windowMillis(spec.when.millis());
+    if (spec.end != null) {
+      detector.windowSamples(spec.end.samples());
+      detector.windowMillis(spec.end.millis());
+    }
   }
 
   /** Keeps Aggregates for this Channel too; returns its index in the Accumulators. */
