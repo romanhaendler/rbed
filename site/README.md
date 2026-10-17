@@ -67,7 +67,7 @@ From these, `npm run build` (`prerender.mjs`, run at the end of `vite build`) wr
 
 `node version.mjs` prints the rbed version of the root pom, which the scripts pass to the Scenario module (`-Drbed.version`; it has no default). `PORT=4391 npm run test:browser` serves the site on another port than 4173.
 
-The app reads the same Markdown for the page itself and for the search (Ctrl/Cmd+K), which finds a page by its title, its text, its inline code and the methods its Java source calls, and a section by its heading. `public/og-image.png` is the sharing image of every page.
+The app reads the same Markdown for the page itself and for the search (Ctrl/Cmd+K), which finds a page by its title, its text, its inline code and the methods its Java source calls, and a section by its heading. `public/og-image.png` is the sharing image of every page, `public/favicon.svg` its icon.
 
 ## Deployment
 
