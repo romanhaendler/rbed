@@ -143,6 +143,25 @@ class PerformanceTest {
         "allocated " + perSample + " bytes per Sample");
   }
 
+  /** A huge value passing through a moving average must not make later Samples allocate. */
+  @Test
+  void movingAveragesDoNotAllocateAfterHugeValues() {
+    Detector detector = Detector.builder()
+        .rules(Rule.named("Avg").when(X.averageOverSamples(4).above(1e300)))
+        .watch(X.averageOverDuration(10))
+        .build();
+    detector.push(-2, Map.of(X, 1e200));
+    detector.push(-1, Map.of(X, Double.MAX_VALUE));
+    Feed feed = new Feed(8, X, i -> 1.0 + (i % 7));
+    feed.push(detector, 100_000);
+    long bytes = allocatedBytes(() -> feed.push(detector, MEASURED_SAMPLES));
+
+    double perSample = (double) bytes / MEASURED_SAMPLES;
+    report("allocation after huge values", perSample, "bytes/Sample");
+    assertTrue(perSample <= ACCEPTED_BYTES_PER_SAMPLE,
+        "allocated " + perSample + " bytes per Sample");
+  }
+
   /** A duration window held at the Retention Limit drops an entry every Sample, still for free. */
   @Test
   void droppingAtTheRetentionLimitDoesNotAllocate() {
