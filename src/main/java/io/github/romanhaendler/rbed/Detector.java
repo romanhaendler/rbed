@@ -432,7 +432,7 @@ public final class Detector implements AutoCloseable {
      * window keeps (default 1,000,000), and the maximum number of timestamps kept per counted Rule for
      * {@code count(...).within(...)}. When a full window or timestamp buffer gets a new entry, its
      * oldest entry is dropped, and the Detector logs one warning through {@link System.Logger}. See
-     * {@link Detector#droppedValues}. {@code build()} rejects a Rule using
+     * {@link Detector#droppedValues}. {@code build()} rejects a Rule or watched Expression using
      * {@code averageOverSamples(n)} with {@code n} above the limit.
      *
      * @throws IllegalArgumentException if {@code n} is below 1
@@ -459,10 +459,11 @@ public final class Detector implements AutoCloseable {
     }
 
     /**
-     * Builds the Detector and binds every Rule's Conditions to it.
+     * Builds the Detector and binds every Rule's Conditions and every watched Expression to it.
      *
      * @throws IllegalArgumentException if a Rule references itself, a Rule added after it or a
-     *     Rule not added, or if History contains an Event of no added Rule. A Rule without
+     *     Rule not added, if a watched Expression references a Rule not added, or if History
+     *     contains an Event of no added Rule. A Rule without
      *     {@code when} and duplicate Rule names are already rejected by {@link #rules}.
      */
     public Detector build() {

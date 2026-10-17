@@ -1,5 +1,6 @@
 package io.github.romanhaendler.rbed;
 
+import java.util.Locale;
 import java.util.Objects;
 
 /**
@@ -31,7 +32,7 @@ public final class LatestEvent {
 
   /** The latest Event's duration in milliseconds; for a running Event, up to now. */
   public Expression duration() {
-    return new Expression() {
+    return new Expression("latest(" + rule + ").duration()") {
       @Override Bound bind(Detector detector) {
         EventState events = detector.referencedEvent(rule);
         return () -> events.latestDuration(detector.now());
@@ -41,7 +42,8 @@ public final class LatestEvent {
 
   private Expression aggregate(Channel channel, Accumulator.Aggregate aggregate) {
     Objects.requireNonNull(channel, "channel");
-    return new Expression() {
+    String call = aggregate.name().toLowerCase(Locale.ROOT) + "(" + channel + ")";
+    return new Expression("latest(" + rule + ")." + call) {
       @Override Bound bind(Detector detector) {
         // not a Channel lookup of the reading Rule: the referenced Rule aggregates it
         return detector.referencedEvent(rule).latest(channel.state(detector), aggregate);

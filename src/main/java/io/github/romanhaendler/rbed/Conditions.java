@@ -37,7 +37,7 @@ public final class Conditions {
    */
   public static Expression totalDuration(Rule rule) {
     Objects.requireNonNull(rule, "rule");
-    return new Expression() {
+    return new Expression("totalDuration(" + rule + ")") {
       @Override Bound bind(Detector detector) {
         EventState events = detector.referencedEvent(rule);
         return () -> events.totalDuration(detector.now());

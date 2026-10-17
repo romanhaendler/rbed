@@ -678,6 +678,8 @@ Mistakes are reported as early as possible, most of them when the Detector is bu
 | A sampling rate outside (0, 1000] Hz                                  | `samplingRate(...)`: `IllegalArgumentException` |
 | A History Event that has not Ended                                    | `history(...)`: `IllegalArgumentException` |
 | A Rule referring to itself, to a Rule added after it or not added     | `build()`: `IllegalArgumentException` |
+| A watched Expression referring to a Rule not added                    | `build()`: `IllegalArgumentException` |
+| `averageOverSamples(n)` with `n` above the Retention Limit, in a Rule or a watched Expression | `build()`: `IllegalArgumentException`, naming the Rule or the Expression |
 | A History Event whose name matches no added Rule                      | `build()`: `IllegalArgumentException` |
 | One Channel name used both as a Pulse Channel and as an ordinary one  | `build()`: `IllegalArgumentException` |
 | An empty Channel name                                                 | `Channel.named`/`Channel.pulse`: `IllegalArgumentException` |
@@ -685,6 +687,7 @@ Mistakes are reported as early as possible, most of them when the Detector is bu
 | A NaN, infinite or null value                                         | `push`: `IllegalArgumentException`, and the Sample is ignored |
 | Pushing after `close()`, or the wrong `push` for the sampling mode    | `IllegalStateException`             |
 | Reading Aggregates of a Channel the Rule does not aggregate           | `Event.aggregates(...)`: `IllegalArgumentException` |
+| Reading the value of an Expression that was not watched               | `value(...)`: `IllegalArgumentException`, naming the Expression |
 
 ## Examples
 
