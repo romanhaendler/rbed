@@ -90,9 +90,11 @@ final class Resuming extends Scenario {
         Channel load = Channel.named("load");
         Rule overheat = Rule.named("Overheat").when(temp.above(80))
             .forDuration(Duration.ofSeconds(3)).endWhen(load.below(10));
+        Rule warm = Rule.named("Warm")
+            .when(temp.averageOverSamples(5).above(60)).forSamples(3);
         Rule repeated = Rule.named("Repeated")
             .when(count(overheat).within(Duration.ofSeconds(60)).above(1));
-        Rule[] rules = {overheat, repeated};
+        Rule[] rules = {overheat, warm, repeated};
 
         List<Sample> topic = new ArrayList<>();   // the stream: one message a second
         for (int s = 0; s < 120; s++) {
@@ -148,8 +150,9 @@ final class Resuming extends Scenario {
   Rule[] rules(Map<String, Double> values) {
     Rule overheat = Rule.named("Overheat").when(TEMP.above(80)).forDuration(3_000)
         .endWhen(LOAD.below(10));
+    Rule warm = Rule.named("Warm").when(TEMP.averageOverSamples(5).above(60)).forSamples(3);
     Rule repeated = Rule.named("Repeated").when(count(overheat).within(60_000).above(1));
-    return new Rule[] {overheat, repeated};
+    return new Rule[] {overheat, warm, repeated};
   }
 
   /**
