@@ -50,6 +50,40 @@ class ExpressionValueTest {
     @Override public void onEnded(Event e) { read("ended", e); }
   }
 
+  // "Reading an Expression's value": the listener example, exactly as printed in the README
+  static final Channel temp = Channel.named("temp");
+  static final Rule overheat = Rule.named("Overheat").when(temp.above(80)).forDuration(2_000);
+
+  static class OverheatLog implements EventListener {
+    final ChannelExpression smoothTemp = temp.averageOverSamples(3);
+    final Detector detector = Detector.builder()
+        .rules(overheat)
+        .listener(this)
+        .watch(smoothTemp)
+        .build();
+
+    @Override public void onConfirmed(Event e) {
+      System.out.println(e.name() + " Confirmed, smoothed temp "
+          + detector.value(smoothTemp).orElse(Double.NaN));
+    }
+  }
+
+  @Test
+  void readmeListenerExample() {
+    java.io.PrintStream out = System.out;
+    java.io.ByteArrayOutputStream printed = new java.io.ByteArrayOutputStream();
+    System.setOut(new java.io.PrintStream(printed, true));
+    try {
+      OverheatLog log = new OverheatLog();
+      log.detector.push(0,     Map.of(temp, 90.0));
+      log.detector.push(1_000, Map.of(temp, 92.0));
+      log.detector.push(2_000, Map.of(temp, 91.0));
+    } finally {
+      System.setOut(out);
+    }
+    assertEquals("Overheat Confirmed, smoothed temp 91.0", printed.toString().strip());
+  }
+
   @Test
   void aWatchedChannelReadsItsLatestValueAndIsEmptyBeforeTheFirstSample() {
     Detector d = Detector.builder().watch(X).build();
@@ -143,10 +177,19 @@ class ExpressionValueTest {
     assertEquals("x.minus(y).times(2.5).dividedBy(y.plus(1.0))",
         X.minus(Y).times(2.5).dividedBy(Y.plus(1)).toString());
     assertEquals("count(Run)", count(run).toString());
+    assertEquals("x.plus(5.0)", X.plus(5).toString());
     assertEquals("count(Run).within(60000)", count(run).within(60_000).toString());
+    assertEquals("count(Run).within(60000)", count(run).within(Duration.ofMinutes(1)).toString());
     assertEquals("totalDuration(Run)", totalDuration(run).toString());
     assertEquals("latest(Run).duration()", latest(run).duration().toString());
     assertEquals("latest(Run).max(x)", latest(run).max(X).toString());
+  }
+
+  @Test
+  void readingNullFailsLikeWatchingNull() {
+    Detector d = Detector.builder().watch(X).build();
+    assertThrows(NullPointerException.class, () -> d.value(null));
+    assertThrows(NullPointerException.class, () -> Detector.builder().watch((Expression) null));
   }
 
   @Test
@@ -182,6 +225,52 @@ class ExpressionValueTest {
     }
     assertEquals(1, unwatched.retainedValues()); // x
     assertEquals(1 + 1 + 4, watched.retainedValues()); // x, y and y's window
+  }
+
+  @Test
+  void aWatchedMovingAverageKeepsAWindowOfItsOwnEvenIfARuleUsesTheSameInstance() {
+    ChannelExpression avg = X.averageOverSamples(4);
+    Rule smooth = Rule.named("Smooth").when(avg.above(0));
+    Detector unwatched = Detector.builder().rules(smooth).build();
+    Detector watched = Detector.builder().rules(smooth).watch(avg).build();
+    for (int i = 0; i < 10; i++) {
+      unwatched.push(i, Map.of(X, 1.0));
+      watched.push(i, Map.of(X, 1.0));
+    }
+    assertEquals(1 + 4, unwatched.retainedValues()); // x and the Rule's window
+    assertEquals(1 + 4 + 4, watched.retainedValues()); // and the watched window
+  }
+
+  @Test
+  void watchingTheLatestAggregateOfAChannelMakesTheRuleAggregateIt() {
+    Rule run = Rule.named("Run").when(X.above(0));
+    List<Sample> series = new ArrayList<>();
+    double[] xs = {1, 2, -1, 3, 4, 5, -2, 6};
+    for (int i = 0; i < xs.length; i++) {
+      series.add(new Sample(i * 1000L, Map.of(X, xs[i], Y, 10.0 * i)));
+    }
+    Recorder plainLog = new Recorder();
+    Recorder watchedLog = new Recorder();
+    List<Event> plain = Detector.builder().rules(run).listener(plainLog).build().detect(series);
+    List<Event> watched = Detector.builder().rules(run).listener(watchedLog)
+        .watch(latest(run).max(Y)).build().detect(series);
+
+    // which Events are found, and when, is unchanged
+    assertEquals(List.of("pending Run 0", "confirmed Run 0", "ended Run 0..2000 truncatedStart",
+        "pending Run 3000", "confirmed Run 3000", "ended Run 3000..6000",
+        "pending Run 7000", "confirmed Run 7000", "ended Run 7000..7000 truncatedEnd"),
+        plainLog.log);
+    assertEquals(plainLog.log, watchedLog.log);
+    assertEquals(withoutAggregates(plain), withoutAggregates(watched));
+    // but each Event of Run gains Aggregates of y
+    for (Event e : plain) assertEquals(java.util.Set.of(X), e.aggregates().keySet());
+    for (Event e : watched) assertEquals(java.util.Set.of(X, Y), e.aggregates().keySet());
+    assertEquals(50, watched.get(1).aggregates(Y).max());
+  }
+
+  private static List<Event> withoutAggregates(List<Event> events) {
+    return events.stream().map(e -> new Event(e.name(), e.start(), e.confirmed(), e.end(),
+        e.truncatedStart(), e.truncatedEnd(), Map.of())).toList();
   }
 
   @Test
@@ -223,6 +312,47 @@ class ExpressionValueTest {
     assertEquals(of(2, 1, 1_500, 0, 2), values(d, watched));
     d.advanceTo(5_000);
     assertEquals(of(2, 1, 2_500, 1_000, 2), values(d, watched));
+  }
+
+  @Test
+  void expressionsAboutEventsAreDefinedBeforeTheFirstSampleAndIncludeHistory() {
+    Rule run = Rule.named("Run").when(X.above(0));
+    Expression[] watched = {X, X.averageOverSamples(2), count(run), totalDuration(run),
+        latest(run).duration(), latest(run).max(X)};
+    Event earlier = new Event("Run", -5_000, java.util.OptionalLong.of(-5_000),
+        java.util.OptionalLong.of(-3_000), false, false, Map.of());
+    Detector fresh = Detector.builder().rules(run).watch(watched).build();
+    Detector resumed = Detector.builder().rules(run).history(List.of(earlier)).watch(watched)
+        .build();
+    assertEquals(of(Double.NaN, Double.NaN, 0, 0, Double.NaN, Double.NaN),
+        values(fresh, watched));
+    assertEquals(of(Double.NaN, Double.NaN, 1, 2_000, 2_000, Double.NaN),
+        values(resumed, watched));
+  }
+
+  @Test
+  void callbacksSeeTheEventsOfRulesAddedLaterAsOfThePreviousMoment() {
+    Rule first = Rule.named("First").when(Y.above(0));
+    Rule later = Rule.named("Later").when(X.above(0));
+    Reader reader = new Reader(count(later), latest(later).max(X), totalDuration(later), X);
+    Detector d = Detector.builder().rules(first, later).listener(reader)
+        .watch(reader.expressions).build();
+    reader.detector = d;
+    d.push(0, Map.of(X, 1.0));
+    d.push(1_000, Map.of(X, 3.0, Y, 1.0)); // First starts while Later runs
+    d.push(2_000, Map.of(X, -1.0, Y, 1.0));
+    d.push(3_000, Map.of(X, 2.0, Y, -1.0)); // First Ends while Later starts again
+    assertEquals(List.of(
+        "pending Later " + of(0, Double.NaN, 0, 1),
+        "confirmed Later " + of(1, 1, 0, 1),
+        // Later's Aggregates lack this moment's 3; its running Event counts up to now
+        "pending First " + of(1, 1, 1_000, 3),
+        "confirmed First " + of(1, 1, 1_000, 3),
+        "ended Later " + of(1, 3, 2_000, -1),
+        // Later's Event Confirmed in this moment is not counted yet
+        "ended First " + of(1, 3, 2_000, 2),
+        "pending Later " + of(1, 3, 2_000, 2),
+        "confirmed Later " + of(2, 2, 2_000, 2)), reader.log);
   }
 
   @Test

@@ -147,6 +147,43 @@ class RetentionTest {
     assertTrue(message.contains("Hi") && message.contains("10") && message.contains("retentionLimit"), message);
   }
 
+  /** The messages logged to the library's logger while {@code work} runs. */
+  private static List<String> warnings(Runnable work) {
+    java.util.logging.Logger logger = java.util.logging.Logger.getLogger("io.github.romanhaendler.rbed");
+    List<String> messages = new ArrayList<>();
+    java.util.logging.Handler handler = new java.util.logging.Handler() {
+      @Override public void publish(java.util.logging.LogRecord r) { messages.add(r.getMessage()); }
+      @Override public void flush() {}
+      @Override public void close() {}
+    };
+    logger.addHandler(handler);
+    try {
+      work.run();
+    } finally {
+      logger.removeHandler(handler);
+    }
+    return messages;
+  }
+
+  @Test
+  void theWarningNamesWhatOwnsTheFullWindow() {
+    ChannelExpression avg = X.averageOverDuration(100);
+    assertEquals(List.of("Rule Hi: a window reached the Retention Limit of 3 entries; its oldest"
+        + " entries are dropped, so results of Rule Hi deviate from an unlimited window."
+        + " Raise the limit with Detector.builder().retentionLimit(...)."), warnings(() -> {
+          Detector d = Detector.builder().retentionLimit(3)
+              .rules(Rule.named("Hi").when(avg.above(0))).build();
+          for (int i = 0; i < 5; i++) d.push(i, Map.of(X, 1.0));
+        }));
+    assertEquals(List.of("Watched Expression x.averageOverDuration(100): a window reached the"
+        + " Retention Limit of 3 entries; its oldest entries are dropped, so results of Watched"
+        + " Expression x.averageOverDuration(100) deviate from an unlimited window."
+        + " Raise the limit with Detector.builder().retentionLimit(...)."), warnings(() -> {
+          Detector d = Detector.builder().retentionLimit(3).watch(avg).build();
+          for (int i = 0; i < 5; i++) d.push(i, Map.of(X, 1.0));
+        }));
+  }
+
   @Test
   void retentionLimitBelowOneIsRejected() {
     assertThrows(IllegalArgumentException.class, () -> Detector.builder().retentionLimit(0));

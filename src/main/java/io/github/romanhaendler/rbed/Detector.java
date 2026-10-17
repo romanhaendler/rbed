@@ -96,16 +96,24 @@ public final class Detector implements AutoCloseable {
 
   /**
    * The value of a watched Expression at the latest moment processed (Sample or time advance),
-   * also from within EventListener callbacks and after {@link #close}. Empty while the value is
-   * undefined: before the first Sample, while a moving average fills, for a Pulse Channel absent
-   * in that moment, or wherever the Expression is undefined. Reading only looks up the value: it
-   * costs nothing on Samples where nobody reads.
+   * also after {@link #close}. Empty while the value is undefined, for example a Channel before
+   * its first value, a moving average during its warm-up, a Pulse Channel absent in that moment
+   * or {@code latest(...)} before the first such Event. Expressions about Events are defined from
+   * the start: before the first Sample, {@code count(...)} and {@code totalDuration(...)} are 0,
+   * or what the History gives. Reading only looks the value up.
+   *
+   * <p>From an EventListener callback, it reads the moment being processed. Rules are evaluated
+   * in the order they were added, so for a Rule added later than the Rule whose callback runs,
+   * {@code count}, {@code totalDuration} and {@code latest} show its Events as of the previous
+   * moment: an Event of it Confirmed or Ended in this moment is not reflected yet, nor is this
+   * moment in its Aggregates; a running Event's duration counts up to this moment.
    *
    * @throws IllegalArgumentException if the Expression was not registered with
    *     {@link Builder#watch}; a Channel matches by name, every other Expression by identity
+   * @throws NullPointerException if {@code expression} is null
    */
   public OptionalDouble value(Expression expression) {
-    Expression.Bound bound = watched.get(expression);
+    Expression.Bound bound = watched.get(Objects.requireNonNull(expression, "expression"));
     if (bound == null) {
       throw new IllegalArgumentException("Expression " + expression
           + " is not watched. Register it with Detector.builder().watch(...).");
@@ -130,8 +138,8 @@ public final class Detector implements AutoCloseable {
   }
 
   /**
-   * The number of entries this Detector currently holds: one per Channel a Rule uses, one per
-   * value in each moving-average window and one per timestamp kept for
+   * The number of entries this Detector currently holds: one per Channel a Rule or watched
+   * Expression uses, one per value in each moving-average window and one per timestamp kept for
    * {@code count(...).within(...)}. A plain counter read, cheap to poll between pushes.
    */
   public long retainedValues() {
@@ -164,7 +172,8 @@ public final class Detector implements AutoCloseable {
     if (dropped++ == 0) {
       System.getLogger("io.github.romanhaendler.rbed").log(System.Logger.Level.WARNING,
           what + ": a window reached the Retention Limit of " + retentionLimit
-              + " entries; its oldest entries are dropped, so results deviate from the Rule."
+              + " entries; its oldest entries are dropped, so results of " + what
+              + " deviate from an unlimited window."
               + " Raise the limit with Detector.builder().retentionLimit(...).");
     }
   }
@@ -404,6 +413,13 @@ public final class Detector implements AutoCloseable {
      * {@link Detector#value}. They are bound after all Rules and need not be used by any Rule;
      * their Channels count as used. May be called more than once; watching an Expression twice is
      * harmless.
+     *
+     * <p>Watching adds no allocation per Sample. Each moving average in a watched Expression
+     * keeps a window of its own, even if a Rule uses the same instance: its entries take memory,
+     * count in {@link Detector#retainedValues} and against the Retention Limit, and each push
+     * updates it. Everything else in a watched Expression adds no work per push. Watching {@code latest(r).min/max/mean(c)}
+     * makes Rule {@code r} aggregate Channel {@code c}, so {@code r}'s Events gain Aggregates of
+     * {@code c}; which Events are found, and when, is unchanged.
      */
     public Builder watch(Expression... expressions) {
       for (Expression e : expressions) watched.add(Objects.requireNonNull(e, "expression"));

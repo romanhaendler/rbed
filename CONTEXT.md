@@ -20,6 +20,14 @@ _Avoid_: Marker, event channel, trigger channel
 A statement about the current Sample that is true, false or undefined (while the data it needs is not available yet), such as "weight above 500". Undefined never counts as true.
 _Avoid_: Predicate, check, filter
 
+**Expression**:
+A numeric value derived from the current Sample, such as a Channel, a moving average, `rate()`, arithmetic between them or a count of Events; undefined while the data it needs is not available. Conditions compare Expressions.
+_Avoid_: Metric, formula, signal
+
+**Watched Expression**:
+An Expression registered on a Detector's builder so that its value at the latest Sample or time advance can be read; it need not be used by any Rule.
+_Avoid_: Observed, tracked or monitored expression, probe
+
 **Rule**:
 One or more Conditions combined with timing logic (duration, ordering) that produces Events when satisfied.
 _Avoid_: Pattern, trigger
