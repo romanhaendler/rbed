@@ -43,9 +43,16 @@ public final class Detector implements AutoCloseable {
   private long now;
   private boolean started;
   private long lastSample;
-  /** See {@link #replayPoint}: the earliest start of a replay for the moment being processed. */
-  private long closedNow = Long.MAX_VALUE;
-  private long lastSampleClosed = Long.MAX_VALUE;
+  /**
+   * Runs of Rules that are over, as (start, end] pairs, oldest end first: a replay must not start
+   * inside one, or it would split the Event (see {@link #replayPoint}). Entries that end before
+   * the Replay Point are dropped; if the rest fills the array, neighbours are merged into one
+   * larger pair, which only makes the Replay Point earlier.
+   */
+  private static final int MAX_RUNS = 64;
+  private final long[] runStarts = new long[MAX_RUNS];
+  private final long[] runEnds = new long[MAX_RUNS];
+  private int runCount;
   private long samples;
   private boolean closed;
   /** A push, advance or close is running, so a listener callback may be on the stack. */
@@ -81,6 +88,8 @@ public final class Detector implements AutoCloseable {
   private Set<String> added;
   private Set<String> addedBefore;
   private Set<ChannelState> channelLookups;
+  private Map<ValueTrack, Integer> trackReads;
+  private Set<RuleState> latestReads;
 
   private Detector(Builder b) {
     listener = b.listener;
@@ -188,8 +197,11 @@ public final class Detector implements AutoCloseable {
     w.int64(dropped);
     w.bool(hasHistory);
     w.int64(latestHistoryEnd);
-    w.int64(closedNow);
-    w.int64(lastSampleClosed);
+    w.int32(runCount);
+    for (int i = 0; i < runCount; i++) {
+      w.int64(runStarts[i]);
+      w.int64(runEnds[i]);
+    }
     ChannelState[] sorted = sortedChannels();
     w.int32(sorted.length);
     for (ChannelState state : sorted) state.save(w);
@@ -206,8 +218,13 @@ public final class Detector implements AutoCloseable {
     dropped = r.int64();
     hasHistory = r.bool();
     latestHistoryEnd = r.int64();
-    closedNow = r.int64();
-    lastSampleClosed = r.int64();
+    int runs = r.length();
+    if (runs > MAX_RUNS) throw new java.io.IOException("runs");
+    for (int i = 0; i < runs; i++) {
+      runStarts[i] = r.int64();
+      runEnds[i] = r.int64();
+    }
+    runCount = runs;
     ChannelState[] sorted = sortedChannels();
     r.expect(sorted.length);
     for (ChannelState state : sorted) state.load(r);
@@ -277,17 +294,19 @@ public final class Detector implements AutoCloseable {
    * that Ended before the Replay Point, including those supplied to this Detector as History;
    * Events that Ended later are produced again by the replay.
    *
-   * <p>The Replay Point reaches back to what the state of this Detector depends on: the Events in
-   * progress, including the End Condition's duration; a Rule that has not seen its {@code when}
-   * Condition stop holding since its last Event ended on an End Condition, so a fresh Rule would
-   * start another Event; the moment {@code when} was last seen false, which decides whether the
-   * next Event is Truncated at its start; the Samples in moving-average windows; the latest and
-   * previous values read by {@code rate()}, {@code age()}, {@code rising()}, {@code falling()}
-   * and the previous Sample behind {@code maxGap}; the Channel values the Rules read; and the
-   * latest Event of every Rule whose Aggregates are read through {@code latest(...)}. It is never
-   * inside the span of an Event, so no Event is split. Reading it takes time proportional to
-   * the number of Channels, moving averages and Rules, not to the history, and allocates only the
-   * result.
+   * <p>The Replay Point reaches back to what the state of this Detector depends on, value by
+   * value: the Events in progress, including the End Condition's duration; a Rule that has not
+   * seen its {@code when} Condition stop holding since its last Event ended on an End Condition,
+   * so a fresh Rule would start another Event; the moment {@code when} was last seen false, which
+   * decides whether the next Event is Truncated at its start; the oldest Sample in each
+   * moving-average window; the latest and previous values read by {@code rate()}, {@code age()},
+   * {@code rising()}, {@code falling()} and the previous Sample behind {@code maxGap}; the
+   * Channel values the Rules read; and the start of the latest Event of every Rule whose
+   * Aggregates are read through {@code latest(...)}. It is not inside the span of an Event that
+   * another Rule reads or that ended on an End Condition, so such an Event is never split. On a
+   * steady input it keeps up with the stop, within what the constructs in use need. Reading it
+   * takes time proportional to the number of Channels, moving averages, Rules and finished runs
+   * kept, not to the history, and allocates only the result.
    *
    * <p>Preconditions: the replay gets the same input, Rules and options, and its listener's side
    * effects are suppressed up to the stop; the Detector has
@@ -299,35 +318,63 @@ public final class Detector implements AutoCloseable {
    */
   public OptionalLong replayPoint() {
     if (samplingRate > 0 || samples == 0) return OptionalLong.empty();
-    long point = closedNow;
+    return OptionalLong.of(outsideRuns(earliestNeed()));
+  }
+
+  /** The earliest timestamp the state of this Detector, taken piece by piece, depends on. */
+  private long earliestNeed() {
+    long point = now;
     for (ChannelState track : tracks) point = Math.min(point, track.replayNeed());
     for (RuleState rule : rules) point = Math.min(point, rule.replayNeed());
-    if (gaps) point = Math.min(point, lastSampleClosed);
-    return OptionalLong.of(point);
+    if (gaps) point = Math.min(point, lastSample);
+    return point;
+  }
+
+  /** The latest timestamp at or before {@code start} that is not inside the run of a Rule. */
+  private long outsideRuns(long start) {
+    boolean moved = true;
+    while (moved) {
+      moved = false;
+      for (int i = 0; i < runCount; i++) {
+        if (runStarts[i] < start && start <= runEnds[i]) {
+          start = runStarts[i];
+          moved = true;
+        }
+      }
+    }
+    return start;
   }
 
   /**
-   * The latest timestamp from which a replay reproduces how the Rules evaluate the moment being
-   * processed; see {@link #settle}. What is recorded at this moment needs no more.
+   * A Rule's run, from the start a replay needs for it until {@code end}, is over: a replay may
+   * not start inside it. The Detector keeps it until the Replay Point has passed it.
    */
-  long closedNow() {
-    return closedNow;
-  }
-
-  /**
-   * Once the tracks are updated for a moment: the latest timestamp from which a replay reproduces
-   * how the Rules evaluate it. That is the moment itself, unless the state they read goes back
-   * further: Channel and moving-average values (and the ones before, if read), the latest Events
-   * whose Aggregates are read, and the Events in progress. Everything a Rule decides at this
-   * moment that lasts (an Event starts, {@code when} is false) needs no more than this.
-   */
-  private void settle(long timestamp) {
-    long closed = timestamp;
-    for (RuleState rule : rules) closed = Math.min(closed, rule.runFrom(timestamp));
-    for (ChannelState track : tracks) closed = Math.min(closed, track.replayNeed());
-    for (RuleState rule : rules) closed = Math.min(closed, rule.latestNeed());
-    closedNow = closed;
-    for (ChannelState track : tracks) track.settle(closed);
+  void forbidReplayStarts(long start, long end) {
+    if (runCount == MAX_RUNS) {
+      long keep = outsideRuns(earliestNeed());
+      int kept = 0;
+      for (int i = 0; i < runCount; i++) {
+        if (runEnds[i] >= keep) {
+          runStarts[kept] = runStarts[i];
+          runEnds[kept++] = runEnds[i];
+        }
+      }
+      runCount = kept;
+      if (runCount > MAX_RUNS / 2) { // merge neighbours into pairs that cover both
+        int merged = 0;
+        for (int i = 0; i + 1 < runCount; i += 2) {
+          runStarts[merged] = Math.min(runStarts[i], runStarts[i + 1]);
+          runEnds[merged++] = Math.max(runEnds[i], runEnds[i + 1]);
+        }
+        if (runCount % 2 == 1) {
+          runStarts[merged] = runStarts[runCount - 1];
+          runEnds[merged++] = runEnds[runCount - 1];
+        }
+        runCount = merged;
+      }
+    }
+    runStarts[runCount] = start;
+    runEnds[runCount++] = end;
   }
 
   /** Applies History in order of confirmation; returns its latest end. */
@@ -471,7 +518,6 @@ public final class Detector implements AutoCloseable {
     }
     moveTo(timestamp);
     for (ChannelState pulse : pulses) pulse.pulseAbsent();
-    settle(timestamp);
     boolean outer = processing;
     processing = true;
     try {
@@ -483,12 +529,12 @@ public final class Detector implements AutoCloseable {
 
   private void accept(long timestamp, Map<Channel, Double> values) {
     values.forEach(validateValue); // first, so a rejected Sample leaves no trace
+    boolean advancedSince = samples > 0 && now > lastSample;
     moveTo(timestamp);
     for (ChannelState pulse : pulses) pulse.carried = false;
     sampleTimestamp = timestamp;
     values.forEach(applyValue);
     for (ChannelState pulse : pulses) if (!pulse.carried) pulse.pulseAbsent();
-    settle(timestamp);
     boolean outer = processing;
     processing = true;
     try {
@@ -496,7 +542,9 @@ public final class Detector implements AutoCloseable {
     } finally {
       processing = outer;
     }
-    lastSampleClosed = closedNow;
+    // a replay starting at the time advances between two Samples would not notice a gap in
+    // between, which the Rules with a maxGap did
+    if (gaps && advancedSince) forbidReplayStarts(lastSample, timestamp - 1);
     lastSample = timestamp;
     samples++;
   }
@@ -576,9 +624,35 @@ public final class Detector implements AutoCloseable {
     return state;
   }
 
-  /** Starts recording which Channels the Conditions being bound refer to. */
+  /** Starts recording which Channels, tracks and latest Events the Conditions being bound read. */
   void recordChannelLookups() {
     channelLookups = new LinkedHashSet<>();
+    trackReads = new LinkedHashMap<>();
+    latestReads = new LinkedHashSet<>();
+  }
+
+  /** A track (a Channel or a moving average) a Condition being bound reads, and how. */
+  void read(ValueTrack track, int reads) {
+    if (trackReads != null) trackReads.merge(track, reads, (a, b) -> a | b);
+  }
+
+  /** The Rule whose latest Event's Aggregates a Condition being bound reads. */
+  void readsLatestOf(RuleState rule) {
+    if (latestReads != null) latestReads.add(rule);
+  }
+
+  /** The tracks read since {@link #recordChannelLookups()}, with how they are read. */
+  Map<ValueTrack, Integer> recordedTrackReads() {
+    Map<ValueTrack, Integer> recorded = trackReads;
+    trackReads = null;
+    return recorded;
+  }
+
+  /** The Rules whose latest Event was read since {@link #recordChannelLookups()}. */
+  RuleState[] recordedLatestReads() {
+    RuleState[] recorded = latestReads.toArray(RuleState[]::new);
+    latestReads = null;
+    return recorded;
   }
 
   /** The Channels looked up since {@link #recordChannelLookups()}; stops recording. */
@@ -609,7 +683,9 @@ public final class Detector implements AutoCloseable {
       throw new IllegalArgumentException(binding + " references " + name
           + (added.contains(name) ? ", which is not added before it" : ", which is not added"));
     }
-    return event(name);
+    EventState state = event(name);
+    state.read = true;
+    return state;
   }
 
   /** Builds a {@link Detector}. */

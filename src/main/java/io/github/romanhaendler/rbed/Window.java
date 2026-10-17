@@ -13,13 +13,14 @@ abstract class Window {
     this.detector = detector;
   }
 
-  abstract void add(long time, double value);
+  /** @param need the earliest timestamp a replay must start at to reproduce this entry */
+  abstract void add(long time, double value, long need);
 
-  /** The earliest timestamp a replay must start at to reproduce this window; NONE if empty. */
+  /**
+   * The earliest timestamp a replay must start at to reproduce this window: that of its oldest
+   * entry (the entries after it are not older); NONE if empty.
+   */
   abstract long need();
-
-  /** The value added in this moment needs a replay to start at {@code closed}, no later. */
-  abstract void settleNewest(long closed);
 
   /** The mean of the window, or NaN while it is warming up. */
   abstract double average();
@@ -49,13 +50,7 @@ abstract class Window {
     }
 
     @Override
-    void settleNewest(long closed) {
-      int newest = (next + values.length - 1) % values.length;
-      needs[newest] = closed;
-    }
-
-    @Override
-    void add(long time, double value) {
+    void add(long time, double value, long need) {
       if (size == values.length) {
         sum.remove(values[next]);
       } else {
@@ -63,7 +58,7 @@ abstract class Window {
         detector.retain();
       }
       values[next] = value;
-      needs[next] = ValueTrack.NONE; // until settled
+      needs[next] = need;
       sum.add(value);
       next = (next + 1) % values.length;
     }
@@ -131,13 +126,7 @@ abstract class Window {
     }
 
     @Override
-    void settleNewest(long closed) {
-      int newest = (head + size - 1) % needs.length;
-      needs[newest] = closed;
-    }
-
-    @Override
-    void add(long time, double value) {
+    void add(long time, double value, long need) {
       if (!started) {
         started = true;
         first = time;
@@ -161,7 +150,7 @@ abstract class Window {
       int tail = (head + size) % times.length;
       times[tail] = time;
       values[tail] = value;
-      needs[tail] = ValueTrack.NONE; // until settled
+      needs[tail] = need;
       size++;
       detector.retain();
       sum.add(value);

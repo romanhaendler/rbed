@@ -20,12 +20,13 @@ class ValueTrack {
   private Averaged[] averages = new Averaged[0];
   /**
    * Replay Point bookkeeping, see {@link Detector#replayPoint}: the earliest timestamp a replay
-   * must start at to reproduce this track after the latest update and after the one before.
-   * Both are settled by {@link #settle} once the moment's replay start is known.
+   * must start at to reproduce this track after the latest update, and after the one before. An
+   * update needs what its value depends on (a Channel: the Sample itself; a moving average: the
+   * oldest entry of its window) and never more: whatever else is going on in that moment is
+   * recorded where it belongs.
    */
   private long lastNeed = NONE;
   private long previousNeed = NONE;
-  private boolean touched;
   /** Read by {@code rate()}, {@code rising()} or {@code falling()}: the previous value matters. */
   boolean needsPrevious;
   /** Read by {@code age()}: the time of the latest update matters. */
@@ -34,7 +35,10 @@ class ValueTrack {
   /** No constraint on the Replay Point. */
   static final long NONE = Long.MAX_VALUE;
 
-  void update(long t, double v) {
+  /**
+   * @param need the earliest timestamp a replay must start at to reproduce this update
+   */
+  void update(long t, double v, long need) {
     previous = latestUpdate;
     previousTime = time;
     latestUpdate = v;
@@ -42,45 +46,45 @@ class ValueTrack {
     time = t;
     updated = true;
     previousNeed = lastNeed;
-    lastNeed = NONE; // until settled
-    touched = true;
-    for (Averaged average : averages) average.follow(t, v);
+    lastNeed = need;
+    for (Averaged average : averages) average.follow(t, v, need);
   }
 
-  /** What the window of a moving average needs; NONE for a Channel. */
-  long windowNeed() {
-    return NONE;
-  }
-
-  /** The need of the latest update, once the moment's replay start is {@code closed}. */
-  long updateNeed(long closed) {
-    return closed;
-  }
-
-  /** Settles the needs of the tracks updated in this moment. */
-  final void settle(long closed) {
-    if (touched) {
-      touched = false;
-      settleWindow(closed);
-      lastNeed = updateNeed(closed);
-    }
-    for (Averaged average : averages) average.settle(closed);
-  }
-
-  void settleWindow(long closed) {}
+  /** What a reader of a track reads besides its value; see {@link #need}. */
+  static final int PREVIOUS = 1;
+  static final int AGE = 2;
 
   /**
-   * The earliest timestamp a replay must start at to reproduce this track and the tracks derived
-   * from it: the latest update (and the one before, if the previous value is read), unless the
-   * value is an absent pulse nobody reads the age or previous value of.
+   * The earliest timestamp a replay must start at to reproduce this track for a reader that
+   * reads its value and, as {@code reads} says, the previous value and/or the age: the latest
+   * update (and the one before, if the previous value is read). An absent pulse has no value to
+   * reproduce and no previous value, only an age; but if the reader goes on reading it later
+   * ({@code later}), the previous value at the next pulse is this track's latest update.
    */
+  final long need(int reads, boolean later) {
+    if (!updated) return NONE;
+    if (absent() && (reads & AGE) == 0 && !(later && (reads & PREVIOUS) != 0)) return NONE;
+    long need = lastNeed;
+    if ((reads & PREVIOUS) != 0 && !absent()) need = Math.min(need, previousNeed);
+    return need;
+  }
+
+  /**
+   * What the state of this track needs for what comes next: its latest update (and the one
+   * before, if the previous value is read), unless the value is an absent pulse nobody reads the
+   * age or previous value of: the next pulse then does not depend on this one.
+   */
+  final long ownNeed() {
+    if (!updated) return NONE;
+    boolean read = needsAge || needsPrevious;
+    long need = absent() && !read ? NONE : lastNeed;
+    if (needsPrevious && !absent()) need = Math.min(need, previousNeed);
+    return need;
+  }
+
+  /** {@link #ownNeed()} of this track and of the moving averages derived from it. */
   final long replayNeed() {
-    long need = NONE;
-    if (updated) {
-      boolean read = needsAge || needsPrevious;
-      need = absent() && !read ? NONE : touched ? windowNeed() : lastNeed;
-      if (needsPrevious && !absent()) need = Math.min(need, previousNeed);
-    }
+    long need = ownNeed();
     for (Averaged average : averages) need = Math.min(need, average.replayNeed());
     return need;
   }
@@ -155,27 +159,12 @@ class ValueTrack {
       window.load(r);
     }
 
-    private boolean added;
-
-    void follow(long t, double source) {
-      added = source == source; // skip NaN
-      if (added) window.add(t, source);
-      update(t, window.average());
-    }
-
-    @Override
-    void settleWindow(long closed) {
-      if (added) window.settleNewest(closed);
-    }
-
-    @Override
-    long updateNeed(long closed) {
-      return Math.min(window.need(), needsAge || needsPrevious ? closed : NONE);
-    }
-
-    @Override
-    long windowNeed() {
-      return window.need();
+    void follow(long t, double source, long sourceNeed) {
+      boolean added = source == source; // skip NaN
+      if (added) window.add(t, source, sourceNeed);
+      // the age and the previous value also depend on the update itself having happened
+      long need = Math.min(window.need(), needsAge || needsPrevious ? sourceNeed : NONE);
+      update(t, window.average(), need);
     }
   }
 }
