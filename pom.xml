@@ -39,6 +39,9 @@
     <!-- Timing-based tests are opt-in: mvn test -Pperformance -->
     <surefire.excludedGroups>performance</surefire.excludedGroups>
     <surefire.groups></surefire.groups>
+    <!-- Differential tests: fixed seeds in the regular build; mvn test -Pdifferential runs far more with fresh seeds -->
+    <rbed.diff.cases>3000</rbed.diff.cases>
+    <rbed.diff.fresh>false</rbed.diff.fresh>
   </properties>
 
   <dependencies>
@@ -79,6 +82,10 @@
             <include>**/*Test.java</include>
             <include>**/*Example.java</include>
           </includes>
+          <systemPropertyVariables>
+            <rbed.diff.cases>${rbed.diff.cases}</rbed.diff.cases>
+            <rbed.diff.fresh>${rbed.diff.fresh}</rbed.diff.fresh>
+          </systemPropertyVariables>
           <groups>${surefire.groups}</groups>
           <excludedGroups>${surefire.excludedGroups}</excludedGroups>
           <!-- lets the performance tests measure allocations via the platform MXBean -->
@@ -152,6 +159,14 @@
           </plugin>
         </plugins>
       </build>
+    </profile>
+    <profile>
+      <!-- Far more generated cases with fresh seeds: mvn test -Pdifferential -Dtest=DifferentialTest -->
+      <id>differential</id>
+      <properties>
+        <rbed.diff.cases>200000</rbed.diff.cases>
+        <rbed.diff.fresh>true</rbed.diff.fresh>
+      </properties>
     </profile>
     <profile>
       <id>performance</id>
