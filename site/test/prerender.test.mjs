@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { javadocLinkErrors, llmsFull, llmsTxt, notFoundHtml, pageHtml, sitemap, twin } from '../prerender.mjs';
+import { PAGES } from '../src/pages.ts';
 
 const pages = [
   { path: '/', title: 'rbed', description: 'Rule-based event detection.' },
@@ -243,4 +244,16 @@ test('the sitemap lists every page, without a date that would change on every bu
       '  <url><loc>https://romanhaendler.github.io/rbed/data-gaps/</loc></url>\n' +
       '</urlset>\n',
   );
+});
+
+test('without JavaScript, a page ends with the pager to the pages before and after it', () => {
+  const html = pageHtml(template, PAGES[1], markdown, facts);
+  assert.ok(
+    html.includes(
+      '<nav class="pageTurn" aria-label="Previous and next page">' +
+        '<a href="/rbed/" rel="prev"><span class="pageTurnLabel">Previous</span><span class="pageTurnName">Overview</span></a>' +
+        '<a href="/rbed/event-lifecycle/" rel="next"><span class="pageTurnLabel">Next · Guide</span><span class="pageTurnName">The Event lifecycle</span></a></nav>',
+    ),
+  );
+  assert.ok(!twin(markdown, facts, PAGES[1]).includes('Previous'), 'not in the twin');
 });

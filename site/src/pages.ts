@@ -240,3 +240,17 @@ export const rubricOf = (page: Pick<Page, 'rubric'>) => page.rubric ?? 'Overview
 export function titleOf(page: Pick<Page, 'path' | 'title'>): string {
   return page.path === '/' ? 'rbed: rule-based event detection' : `${page.title} · rbed`;
 }
+
+export type Turn = { rel: 'prev' | 'next'; label: string; path: string; name: string };
+
+/** What the pager at the end of a page offers: the page before it and the one after it in this
+ *  list's order, the reading order, each with its rubric ("Next · Guide") and its name as the
+ *  navigation has it. */
+export function turnsOf(page: Pick<Page, 'path'>): Turn[] {
+  const at = PAGES.findIndex((p) => p.path === page.path);
+  const turn = (rel: Turn['rel'], p: Page | undefined): Turn[] =>
+    p === undefined
+      ? []
+      : [{ rel, label: (rel === 'prev' ? 'Previous' : 'Next') + (p.rubric ? ` · ${p.rubric}` : ''), path: p.path, name: p.path === '/' ? 'Overview' : p.title }];
+  return [...turn('prev', PAGES[at - 1]), ...turn('next', PAGES[at + 1])];
+}

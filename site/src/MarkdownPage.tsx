@@ -1,12 +1,13 @@
 // A page of src/pages.ts: its rubric and its Markdown twin to copy or view, then its Markdown
 // (src/content/), with each fenced block as a code block with a copy button (fenced blocks right
-// after one another as tabs of one) and each Scenario marker as the live Scenario.
+// after one another as tabs of one) and each Scenario marker as the live Scenario, and last the
+// pager to the pages before and after it.
 import { Tab, TabList, TabPanel, Tabs } from '@umriss-ui/core';
 import { useMemo } from 'react';
 import { scenarios } from './bridge';
 import { CodeBlock, CopyButton } from './CodeBlock';
 import { type Block, parse } from './markdown.ts';
-import { markdownFile, type Page } from './pages.ts';
+import { markdownFile, type Page, turnsOf } from './pages.ts';
 import { ScenarioView } from './ScenarioView';
 
 const SOURCES = import.meta.glob<string>('./content/*.md', { query: '?raw', import: 'default', eager: true });
@@ -78,6 +79,15 @@ export function MarkdownPage({ page }: { page: Page }) {
           <ScenarioView key={block.id} scenario={CATALOGUE.find((s) => s.id === block.id)!} draw={block.draw} hidden={block.hidden} />
         ),
       )}
+      {/* The way on in the reading order, as the umriss-ui demo's pages end (PageTurn, MIT). */}
+      <nav className="pageTurn" aria-label="Previous and next page">
+        {turnsOf(page).map((turn) => (
+          <a key={turn.rel} href={import.meta.env.BASE_URL + turn.path.slice(1)} rel={turn.rel}>
+            <span className="pageTurnLabel">{turn.label}</span>
+            <span className="pageTurnName">{turn.name}</span>
+          </a>
+        ))}
+      </nav>
     </article>
   );
 }

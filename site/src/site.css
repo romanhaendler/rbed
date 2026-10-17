@@ -446,6 +446,52 @@ dialog[aria-label='Search the documentation'] [role='option'] > [class*='_group_
   color: var(--u-color-text-secondary);
 }
 
+/* The pager at a page's foot, as the umriss-ui demo's (page.css, MIT): two cards side by side; the
+   next one keeps the right half where it stands alone, as on the front page. */
+.pageTurn {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--u-space-4);
+  margin-top: var(--u-space-6);
+}
+
+.pageTurn a {
+  display: flex;
+  flex-direction: column;
+  gap: var(--u-space-1);
+  padding: var(--u-space-3) var(--u-space-4);
+  border-radius: var(--u-radius-md);
+  box-shadow: var(--u-edge);
+  background: var(--u-color-surface);
+  text-decoration: none;
+  transition: box-shadow var(--u-transition);
+}
+
+.pageTurn a[rel='next'] {
+  grid-column: 2;
+  text-align: right;
+}
+
+.pageTurn a:hover {
+  box-shadow: 0 0 0 1px var(--u-edge-color-strong);
+}
+
+.pageTurn a:focus-visible {
+  box-shadow: var(--u-focus-ring);
+}
+
+.pageTurnLabel {
+  font-size: var(--u-text-xs);
+  color: var(--u-color-text-secondary);
+}
+
+.pageTurnName {
+  font-size: var(--u-text-md);
+  font-weight: var(--u-weight-medium);
+  color: var(--u-color-accent-text);
+  overflow-wrap: anywhere;
+}
+
 /* The front page's tagline on one line at desktop width, and the hero tight, so the first live
    chart shows above the fold at 1280 x 800. */
 .page.front {

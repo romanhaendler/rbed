@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { markdownFile, PAGES, pageAt, pathOf, titleOf } from '../src/pages.ts';
+import { markdownFile, PAGES, pageAt, pathOf, titleOf, turnsOf } from '../src/pages.ts';
 
 test('a path below the base is the page path, with or without its trailing slash', () => {
   assert.equal(pathOf('/rbed/', '/rbed/'), '/');
@@ -46,4 +46,16 @@ test("every link from one page to another names a page of the manifest or the si
 test('the document title names the page and the site', () => {
   assert.equal(titleOf({ path: '/', title: 'rbed' }), 'rbed: rule-based event detection');
   assert.equal(titleOf({ path: '/event-lifecycle/', title: 'Event lifecycle' }), 'Event lifecycle · rbed');
+});
+
+test('the pager turns to the pages before and after in the reading order, each under its rubric', () => {
+  assert.deepEqual(turnsOf(PAGES[0]), [{ rel: 'next', label: 'Next · Guide', path: '/samples-and-channels/', name: 'Samples and Channels' }]);
+  assert.deepEqual(turnsOf(PAGES[1]), [
+    { rel: 'prev', label: 'Previous', path: '/', name: 'Overview' },
+    { rel: 'next', label: 'Next · Guide', path: '/event-lifecycle/', name: 'The Event lifecycle' },
+  ]);
+  const last = PAGES.at(-1);
+  assert.deepEqual(turnsOf(last), [{ rel: 'prev', label: 'Previous · Examples', path: PAGES.at(-2).path, name: PAGES.at(-2).title }]);
+  const firstExample = PAGES.findIndex((p) => p.rubric === 'Examples');
+  assert.equal(turnsOf(PAGES[firstExample - 1]).at(-1).label, 'Next · Examples');
 });

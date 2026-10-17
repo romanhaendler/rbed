@@ -12,7 +12,7 @@ import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { aggregatesText, discardedCells, discardedHead, eventCells, eventHead, forDisplay, hasNotes } from './src/events.ts';
 import { escape, LIVE_MARKER, parse, SCENARIO_MARKER } from './src/markdown.ts';
-import { markdownFile, PAGES, REPOSITORY, RUBRICS, rubricOf, titleOf } from './src/pages.ts';
+import { markdownFile, PAGES, REPOSITORY, RUBRICS, rubricOf, titleOf, turnsOf } from './src/pages.ts';
 import { defaultsOf, fillSource } from './src/parameters.ts';
 
 export const SITE = 'https://romanhaendler.github.io/rbed/';
@@ -123,14 +123,25 @@ function railHtml(pages, current) {
   return `<nav class="rail" aria-label="Pages">${entry(pages.find((p) => p.path === '/'), 'Overview')}${rubrics.join('')}</nav>`;
 }
 
-/** #root as a reader without JavaScript sees it: the header, the navigation and the content. */
-function rootHtml(pages, current, content) {
+/** The pager to the pages before and after, as the app ends a page (MarkdownPage). */
+function pagerHtml(page) {
+  const turns = turnsOf(page).map(
+    (t) =>
+      `<a href="${BASE}${t.path.slice(1)}" rel="${t.rel}"><span class="pageTurnLabel">${escape(t.label)}</span>` +
+      `<span class="pageTurnName">${escape(t.name)}</span></a>`,
+  );
+  return `<nav class="pageTurn" aria-label="Previous and next page">${turns.join('')}</nav>`;
+}
+
+/** #root as a reader without JavaScript sees it: the header, the navigation and the content, and
+ *  after it whatever ends the page (the pager). */
+function rootHtml(pages, current, content, end = '') {
   return (
     '<div id="root"><div class="prerendered">' +
     `<header class="shellHead"><a class="shellMark" href="${BASE}">rbed</a></header>` +
     `<div class="shellBody">${railHtml(pages, current)}<main class="shellContent"><article class="page"><div class="flow">\n` +
     content +
-    '\n</div></article></main></div></div></div>'
+    `\n</div>${end}</article></main></div></div></div>`
   );
 }
 
@@ -199,7 +210,9 @@ export function pageHtml(template, page, markdown, facts, pages = PAGES) {
       b.kind === 'html' ? b.html : b.kind === 'code' ? `<pre><code>${escape(b.source)}</code></pre>` : scenarioHtml(factOf(facts, b.id)),
     )
     .join('\n');
-  return template.replace('<title>rbed</title>', () => head).replace('<div id="root"></div>', () => rootHtml(pages, page.path, body));
+  return template
+    .replace('<title>rbed</title>', () => head)
+    .replace('<div id="root"></div>', () => rootHtml(pages, page.path, body, pagerHtml(page)));
 }
 
 /** 404.html, which GitHub Pages serves for any other path: the app's "no page" view, and the
