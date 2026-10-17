@@ -34,7 +34,7 @@ At the default duration of two seconds:
 
 ## The start lies before the confirmation
 
-An Event's `start()` is where its Conditions started holding, not where it was Confirmed: the first Event starts at 3 s, although it is only known at 5 s. `confirmed()` returns the moment of confirmation, which the Event table shows in a column of its own. `forDuration` measures from the start, so the required duration is reached at `start()` plus the duration, and the Event is Confirmed at the first Sample from then on. Without a duration, an Event is Pending and Confirmed at the same moment.
+An Event's `start()` is where its Conditions started holding, not where it was Confirmed: the first Event starts at 3 s, although it is only known at 5 s. `confirmed()` returns the moment of confirmation, which the Event table shows in a column of its own. `forDuration` measures from the start, so the required duration is reached at `start()` plus the duration, and the Event is Confirmed at the first Sample from then on. `forSamples(n)` instead requires at least `n` consecutive Samples; with both, both must be met. Each applies to what comes right before it: `when(...)`, or `endWhen(...)` for an [End Condition](../end-conditions/#a-duration-for-the-end-condition). Without either, an Event is Pending and Confirmed at the same moment.
 
 A Detector only sees what its Samples show. The Discarded moment on this page is the Sample at which the Conditions were found no longer holding. The `Event` passed to `onDiscarded` has no such timestamp, only its start.
 

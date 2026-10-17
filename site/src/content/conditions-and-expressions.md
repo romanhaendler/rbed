@@ -26,8 +26,8 @@ At the default, a moving average over 5 Samples, `AboveLimit` runs from 4 s, whe
 
 - **Moving average over Samples**: the temperature is above 24 from the first Sample, but the average of 5 Samples is undefined until the fifth. The first Event starts at 4 s, Truncated at its start. Raise the Samples averaged to 10 and the warm start is averaged away.
 - **Rate**: the outlier at 15 s is a single step of 8.2 °C in one second, so the rate crosses its threshold and makes an Event of its own; the ramp from 30 s makes a second one, from 31 s to 39 s. A rate shows noise in full.
-- **Moving average over a duration**: undefined until the values span the window. With 10 s, the warm start lies entirely in the warm-up and leaves no Event.
-- **Arithmetic between Channels**: `temp.minus(ambient)` is undefined until `ambient` has a value. Arithmetic does not smooth: the outlier makes an Event here, too.
+- **Moving average over a duration**: undefined until the values span the window. With the default 10 s, the warm start lies entirely in the warm-up and leaves no Event; the ramp makes one from 40 s.
+- **Arithmetic between Channels**: `temp.minus(ambient)` is undefined until `ambient` has a value. Arithmetic does not smooth: the outlier makes an Event here, too, and the ramp one from 38 s.
 
 ## Comparisons
 
@@ -56,7 +56,7 @@ A division by zero, or any other operation without a finite result, is undefined
 
 A threshold tells you *where* a Channel is; a trend tells you *where it is going*, so a Rule can react before a threshold is reached.
 
-- `rising()` and `falling()` are Conditions: the Channel's latest value is greater, or less, than its previous one. An unchanged value is neither. Combine them with `forSamples` for a sustained trend, or with `and` and a level, so that a high value that is still climbing counts and one that is already falling does not.
+- `rising()` and `falling()` are Conditions: the Channel's latest value is greater, or less, than its previous one. An unchanged value is neither. Combine them with [`forSamples`](../event-lifecycle/#the-start-lies-before-the-confirmation) for a sustained trend, or with `and` and a level, so that a high value that is still climbing counts and one that is already falling does not.
 - `rate()` is an Expression: the change per second between the two latest values, `(latest - previous) / seconds between them`, so irregular sampling is handled correctly.
 
 ```java

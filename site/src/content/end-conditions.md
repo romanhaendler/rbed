@@ -44,7 +44,7 @@ Rule loadLifted = Rule.named("LoadLifted")
 
 Set the End threshold to 450 kg and the End duration to 1 s: the swing at 14 s lasts a single Sample, so it no longer Ends the Event, and the first Event now lasts until the load is set down.
 
-The Event's `end()` is where the End Condition *started* holding, 22 s here, not where its duration was reached, so the Event's extent is what you would draw by hand. The listener's `onEnded` comes later, once the duration is reached: at 23 s with an End duration of 1 s, at 24 s with 2 s. Until then the Event is still Confirmed, and `during(...)` of it still holds.
+The Event's `end()` is where the End Condition *started* holding, 22 s here, not where its duration was reached, so the Event's extent is what you would draw by hand. The listener's `onEnded` comes later, once the duration is reached: at 23 s with an End duration of 1 s, at 24 s with 2 s. Until then the Event is still Confirmed, and [`during(...)`](../during/) of it still holds.
 
 ## Reference
 

@@ -33,20 +33,24 @@ Move the threshold and the Detector runs again on the same three Samples. Or set
 
 <!-- scenario first-rule draw -->
 
-At the default threshold of 80 °C, `HighTemperature` runs from 2 s to 3 s: the README's "HighTemperature from 2000 to 3000".
+At the default threshold of 80 °C, `HighTemperature` runs from 2 s to 3 s, and the listener prints "HighTemperature from 2000 to 3000": timestamps are milliseconds, and the site's tables show seconds.
 
 ### Things to try
 
-- Lower the threshold to 70 °C: the first Sample already holds, so the Event starts at 1 s with a Truncated start.
+- Lower the threshold to 70 °C: the Condition already holds at the first Sample (75 °C), so the Event starts at 1 s with a Truncated start.
 - Raise it to 90 °C: no Sample is above it, and there is no Event.
 
 ### Three steps
 
-Three steps are always the same:
+Every use of rbed takes the same three steps:
 
 1. **Build a Detector** from the Rules and a listener.
 2. **Feed it Samples** with `push(timestamp, values)`, in time order.
 3. **Close it** with `close()` when the data ends, so that an Event still in progress is reported, too.
+
+For a recorded series, [`detect`](sampling-rate/) does all three in one call, and a Detector is `AutoCloseable`, so try-with-resources works.
+
+## The code on this site
 
 The Java on every page can be copied and run: it starts with its imports, and its statements are the body of a method, such as `main`. Where it calls a method of its own, that method follows under `// In the enclosing class:`. Time values are written as `java.time.Duration`; every method that takes one also takes a `long` in milliseconds. Short snippets in the text assume the Channels, Rules, variables and methods they name, and these imports:
 
@@ -69,6 +73,8 @@ import java.util.Map;
 - A pushed Sample costs one hash lookup per value, and in steady state (no Event starting or ending) a Detector allocates nothing: from about 1.2 million Samples per second for 50 Rules over 20 Channels to over 40 million for a single threshold Rule. See the README's [Performance](https://github.com/romanhaendler/rbed#performance), and [Memory and the Retention Limit](memory/) for what a Detector keeps.
 
 Methods used: [`Channel.named`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Channel.html#named%28java.lang.String%29), [`Rule.named`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#named%28java.lang.String%29), [`Rule.when`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html#when%28io.github.romanhaendler.rbed.Condition%29), [`Expression.above`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Expression.html#above%28double%29), [`Detector.builder`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#builder%28%29), [`Detector.Builder.rules`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.Builder.html#rules%28io.github.romanhaendler.rbed.Rule...%29), [`Detector.Builder.listener`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.Builder.html#listener%28io.github.romanhaendler.rbed.EventListener%29), [`EventListener.onEnded`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/EventListener.html#onEnded%28io.github.romanhaendler.rbed.Event%29), [`Event.name`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Event.html#name%28%29), [`Event.start`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Event.html#start%28%29), [`Event.end`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Event.html#end%28%29), [`Detector.Builder.build`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.Builder.html#build%28%29), [`Detector.push`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#push%28long,java.util.Map%29), [`Detector.close`](api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Detector.html#close%28%29).
+
+The Guide takes one concept per page, starting with [Samples and Channels](samples-and-channels/).
 
 ## Domain examples
 

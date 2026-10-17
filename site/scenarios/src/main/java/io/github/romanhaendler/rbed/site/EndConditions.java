@@ -34,7 +34,7 @@ final class EndConditions extends Scenario {
 
         Rule loadLifted = Rule.named("LoadLifted")
             .when(weight.above(500))
-            .endWhen(weight.below(${end})).forDuration(Duration.ofSeconds(${endDuration}));   // 0 s: Ends at once
+            .endWhen(weight.below(${end})).forDuration(Duration.ofSeconds(${endDuration}));   // with 0 s, it Ends at once
         Detector detector = Detector.builder()
             .rules(loadLifted)
             .build();

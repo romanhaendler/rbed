@@ -2,7 +2,7 @@
 
 `latest(a)` gives access to the most recent Confirmed Event of Rule `a`, whether still running or Ended:
 
-- `.min(x)`, `.max(x)`, `.mean(x)`: its Aggregates of Channel `x`, so far if it is running. Rule `a` aggregates `x` for this automatically.
+- `.min(x)`, `.max(x)`, `.mean(x)`: its [Aggregates](../aggregates/) of Channel `x`, so far if it is running. Rule `a` aggregates `x` for this automatically.
 - `.duration()`: its duration in milliseconds, up to now if it is running.
 
 Each is an Expression, undefined while there has been no Event of `a`. This relates the present to an earlier Event.
