@@ -781,6 +781,14 @@ class BridgeTest {
             "Maintenance 140..141", "OverdueService 102..141"),
         describe(result, DAY));
     assertEquals(60.0 * DAY, result.get("restart"));
+    assertNull(result.get("restartForgets"));
+  }
+
+  @Test
+  void withoutHistoryTheResultSaysTheRestartForgotTheEarlierEvents() {
+    Map<String, Object> result = run("history", "{\"history\": 1}");
+    assertEquals(60.0 * DAY, result.get("restart"));
+    assertEquals(true, result.get("restartForgets"));
   }
 
   @Test
@@ -867,6 +875,17 @@ class BridgeTest {
     assertEquals(List.of(Map.of("rule", "ExcursionAfterDoor", "after", "DoorOpen", "millis", 45.0 * 60_000)),
         run("after", "{\"window\": 45}").get("windows"));
     assertEquals(List.of(), run("first-rule", "{}").get("windows"));
+  }
+
+  @Test
+  void aPlotNamesTheRuleAndComparisonOfItsThreshold() {
+    Map<String, Object> plot = plotOf(run("count", "{}"));
+    assertEquals("FrequentStarts", plot.get("rule"));
+    assertEquals("when >", plot.get("condition"));
+    assertEquals(3.0, plot.get("threshold"));
+    Map<String, Object> unthresholded = plotOf(run("finance", "{}"));
+    assertNull(unthresholded.get("rule"));
+    assertNull(unthresholded.get("condition"));
   }
 
   @Test
@@ -1031,7 +1050,7 @@ class BridgeTest {
 
       @Override
       List<Plot> plots(Map<String, Double> values) {
-        return List.of(new Plot(name, plotted, 0));
+        return List.of(new Plot(name, plotted, "Any", "when >", 0));
       }
     };
   }

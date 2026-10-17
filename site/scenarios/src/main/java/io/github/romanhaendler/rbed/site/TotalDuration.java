@@ -67,7 +67,8 @@ final class TotalDuration extends Scenario {
   @Override
   List<Plot> plots(Map<String, Double> values) {
     return List.of(new Plot("totalDuration(excursion)",
-        totalDuration(rules(values)[0]).dividedBy(MINUTE), values.get("limit"), "min"));
+        totalDuration(rules(values)[0]).dividedBy(MINUTE), "CumulativeLimit", "when >",
+        values.get("limit"), "min"));
   }
 
   @Override

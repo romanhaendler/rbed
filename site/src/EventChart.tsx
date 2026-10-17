@@ -5,9 +5,9 @@
 // them, time advances and a restart, with a hover readout; and the key to its bands, lines and
 // marks under it. A Channel's line joins its Samples; where rbed holds a value (a Sample lacks
 // the Channel, or time was advanced without a Sample) the line breaks and a thin step line
-// carries the held value, which the readout marks "(kept)". A click on a band selects its Event. On a
-// Scenario whose Rules read latest(...), the readout reports the Event latest(...) reads at the
-// hovered time, which the chart then highlights.
+// carries the held value, which the readout marks "(kept)". A click on a band selects its Event.
+// On a Scenario whose Rules read latest(...), the readout reports the Event latest(...) reads at
+// the hovered time, which the chart then highlights.
 import { LimitBand, LimitLine, Tooltip, type TooltipHit, useChart } from '@umriss-ui/charts';
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { Event } from './bridge';
@@ -202,7 +202,7 @@ export function EventChart({
   const lines = thresholdLines(thresholds, channelAxes, channels, narrow);
   // Room for the labels of a band with more than two threshold lines.
   const crowded = channelAxes.reduce((sum, a) => sum + Math.max(0, lines.filter((l) => l.axis === a.id && l.label !== '').length - 2), 0) * 30;
-  const windows = windowRows(model.windows, lifecycle, millis);
+  const windows = windowRows(model.windows, lifecycle, millis, model.restartForgets ? model.restart : undefined);
   // Lines with a marker at every Sample, unless the Samples lie too close for markers to read.
   const markers = rows.length <= 100 ? 'always' : 'auto';
   // Few Samples: a tick at each, written as the Samples' times are.

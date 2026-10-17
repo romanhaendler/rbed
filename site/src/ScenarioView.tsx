@@ -117,6 +117,7 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
       windows: result.windows,
       advances: result.advances,
       restart: result.restart,
+      restartForgets: result.restartForgets,
     };
     const event = result.events.find((e) => eventKey(e) === selected);
     const channelAxes = frozen ?? channelAxesOf(model);

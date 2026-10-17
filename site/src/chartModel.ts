@@ -16,8 +16,8 @@ export type MarkRow = { t: number; y: number };
 /** The Event lanes take the bottom of the plot, one unit each; each band of Channels three units
     above them, the first band on top. Expressions with a unit of their own take two units
     between the Channels and the lanes. */
-export const CHANNEL_UNITS = 3;
-export const SEPARATE_UNITS = 2;
+const CHANNEL_UNITS = 3;
+const SEPARATE_UNITS = 2;
 /** The Events' colors (site.css): Pending a lighter tone of Confirmed in light, a darker one in
     dark, each at least 3:1 against the surface. */
 export const EVENT_COLOR = 'var(--event-confirmed)';
@@ -36,7 +36,7 @@ export const MARKS = [
 
 /** Whether some Event, or Discarded Pending Event, was Pending for a while: only then does the
     chart show a Pending stretch and a Went Pending mark apart from the Confirmed one. */
-export const somePending = (l: Lifecycle) =>
+const somePending = (l: Lifecycle) =>
   l.events.some((e) => e.confirmed > e.start) || l.discarded.some((d) => d.discarded > d.start);
 
 /** The key's bands and marks, in lifecycle order, of those the chart shows. */
@@ -123,7 +123,7 @@ function niceStep(rough: number): number {
 
 /** An axis with ticks over the values only, and a domain that puts them into the band from `below`
     to `below + units` of the plot's `total` units, counted from its bottom. */
-export function bandAxis(values: (number | null | undefined)[], below: number, units: number, total: number) {
+function bandAxis(values: (number | null | undefined)[], below: number, units: number, total: number) {
   const finite = values.filter(Number.isFinite) as number[];
   const lo = Math.min(...finite);
   const hi = Math.max(...finite);
@@ -368,13 +368,16 @@ export function thresholdLines(thresholds: Threshold[], axes: ChannelAxis[], cha
 export const tickText = (v: number) => v.toLocaleString('en-US', { maximumFractionDigits: 6 });
 
 /** Each Rule's within(...) windows as StateBand rows of one state, over the time it counts after
-    each Event of the Rule it follows (in the Scenario's unit); overlapping windows merge. */
-export function windowRows(windows: Window[], lifecycle: Lifecycle, millis: number): Map<string, BandRow[]> {
+    each Event of the Rule it follows (in the Scenario's unit); overlapping windows merge. A
+    Detector restarted without History at `forgetsAt` (ms) knows no earlier Event, so a window
+    opened before it ends there. */
+export function windowRows(windows: Window[], lifecycle: Lifecycle, millis: number, forgetsAt?: number): Map<string, BandRow[]> {
   const byRule = new Map<string, BandRow[]>();
+  const until = (end: number, to: number) => (forgetsAt !== undefined && end < forgetsAt ? Math.min(to, forgetsAt) : to);
   for (const rule of new Set(windows.map((w) => w.rule))) {
     const stretches = windows
       .filter((w) => w.rule === rule)
-      .flatMap((w) => ofRule(lifecycle, w.after).events.map((e) => [e.end / millis, (e.end + w.millis) / millis]))
+      .flatMap((w) => ofRule(lifecycle, w.after).events.map((e) => [e.end / millis, until(e.end, e.end + w.millis) / millis]))
       .sort((a, b) => a[0] - b[0]);
     const merged: number[][] = [];
     for (const [from, to] of stretches) {
@@ -411,4 +414,6 @@ export type ChartModel = {
   /** Timestamps time was advanced to without a Sample, and the restart, if any (ms). */
   advances: number[];
   restart?: number;
+  /** Whether the Detector was restarted without History (windowRows). */
+  restartForgets?: boolean;
 };
