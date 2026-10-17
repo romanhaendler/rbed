@@ -70,6 +70,18 @@ class BridgeTest {
     return (List<Map<String, Object>>) Json.parse(call("scenarios", Bridge.scenarios()));
   }
 
+  @Test
+  void everyScenarioDescribesItsRulesAsTheyAreWrittenInJava() {
+    for (Map<String, Object> s : scenarios()) {
+      String id = (String) s.get("id");
+      List<?> rules = (List<?>) Json.parse(call("describeRules", Bridge.describeRules(id), id));
+      for (Object rule : rules) {
+        org.junit.jupiter.api.Assertions.assertTrue(
+            ((String) rule).startsWith("Rule.named(\""), (String) rule);
+      }
+    }
+  }
+
   /** The Events of a result as "Name start..end" plus Truncated flags. */
   @SuppressWarnings("unchecked")
   static List<String> events(Map<String, Object> result) {

@@ -171,6 +171,22 @@ public final class Bridge {
     }
   }
 
+  /**
+   * The descriptions (Rule#toString) of a Scenario's Rules at their default parameters, as a JSON
+   * array of strings; it lets the parity test compare them between the JVM and the compiled
+   * JavaScript.
+   */
+  @JSExport
+  public static String describeRules(String scenarioId) {
+    Scenario scenario = scenario(scenarioId);
+    StringBuilder out = new StringBuilder("[");
+    for (Rule rule : scenario.rules(values(scenario, "{}"))) {
+      if (out.length() > 1) out.append(',');
+      Json.string(out, rule.toString());
+    }
+    return out.append(']').toString();
+  }
+
   private static String error(RuntimeException e, String by) {
     return Json.string(new StringBuilder("{\"error\":"), String.valueOf(e.getMessage()))
         .append(by).append('}').toString();
