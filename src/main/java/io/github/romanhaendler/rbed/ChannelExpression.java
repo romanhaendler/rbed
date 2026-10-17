@@ -44,7 +44,9 @@ public abstract class ChannelExpression extends Expression {
   public Expression rate() {
     return new Expression(this + ".rate()") {
       @Override Bound bind(Detector detector) {
-        return track(detector)::rate;
+        ValueTrack t = track(detector);
+        t.needsPrevious = true;
+        return t::rate;
       }
     };
   }
@@ -57,6 +59,7 @@ public abstract class ChannelExpression extends Expression {
     return new Expression(this + ".age()") {
       @Override Bound bind(Detector detector) {
         ValueTrack t = track(detector);
+        t.needsAge = true;
         return () -> t.age(detector.now());
       }
     };
@@ -94,6 +97,7 @@ public abstract class ChannelExpression extends Expression {
     return new Condition(this + (rising ? ".rising()" : ".falling()")) {
       @Override Bound bind(Detector detector) {
         ValueTrack t = track(detector);
+        t.needsPrevious = true;
         return rising
             ? () -> t.absent() ? Truth.FALSE : Truth.greater(t.value, t.previous)
             : () -> t.absent() ? Truth.FALSE : Truth.less(t.value, t.previous);

@@ -34,6 +34,16 @@ final class RuleState {
   private boolean inEndPhase;
   /** The latest moment this Rule was evaluated with data no older than {@code maxGap}. */
   private long lastValidMoment;
+  /**
+   * Replay Point bookkeeping (see {@link Detector#replayPoint}): where a replay may start so that
+   * it is not inside this Rule's latest run (from an Event beginning until {@code when} stopped
+   * holding after it), when {@code when} was last seen false, and where the latest Ended Event
+   * began.
+   */
+  private long runStart;
+  private long falseSeen;
+  private long latestEndedStart;
+  private boolean latestRead;
 
   /** Binds the Rule's Conditions; the Detector must be ready to resolve their references. */
   RuleState(Detector detector, Rule spec) {
@@ -61,6 +71,48 @@ final class RuleState {
   /** Keeps Aggregates for this Channel too; returns its index in the Accumulators. */
   int aggregate(ChannelState channel) {
     return channels.indexOf(channel);
+  }
+
+  /** A Condition reads Aggregates of this Rule's latest Event, which a replay must reproduce. */
+  void latestIsRead() {
+    latestRead = true;
+  }
+
+  boolean hasMaxGap() {
+    return maxGap != Long.MAX_VALUE;
+  }
+
+  /**
+   * The earliest timestamp a replay must start at for this Rule: before the Event in progress, and
+   * before the run of an Event that Ended on its End Condition while {@code when} still holds
+   * (a fresh Rule would start another Event); before the moment {@code when} was last seen false
+   * (it decides whether the next Event starts truncated); before the latest Ended Event if its
+   * Aggregates are read.
+   */
+  long replayNeed() {
+    long need = ValueTrack.NONE;
+    if (running()) need = runStart;
+    if (seenFalse) need = Math.min(need, falseSeen);
+    return Math.min(need, latestNeed());
+  }
+
+  /** Before the latest Ended Event, if its Aggregates are read. */
+  long latestNeed() {
+    return latestRead && hasEnded && state != State.CONFIRMED ? latestEndedStart : ValueTrack.NONE;
+  }
+
+  /** From the start of an Event until {@code when} stops holding after it. */
+  private boolean running() {
+    return state != State.IDLE || !armed;
+  }
+
+  /**
+   * Where a replay starting at moment {@code now} may start for this Rule: its run began earlier
+   * unless it is about to end for a gap in the data.
+   */
+  long runFrom(long now) {
+    boolean gap = detector.hasSamples() && now - detector.lastSample() > maxGap;
+    return running() && !gap ? runStart : ValueTrack.NONE;
   }
 
   /** An Aggregate of the latest Confirmed Event, running or Ended; NaN if there is none. */
@@ -125,12 +177,16 @@ final class RuleState {
 
   private void stoppedHolding(Truth holds) {
     armed = true;
-    if (holds == Truth.FALSE) seenFalse = true;
+    if (holds == Truth.FALSE) {
+      seenFalse = true;
+      falseSeen = detector.closedNow();
+    }
   }
 
   private void begin(long now, boolean isSample) {
     state = State.PENDING;
     armed = false;
+    runStart = detector.closedNow();
     truncatedStart = !seenFalse;
     holding.begin(now, isSample);
     startRecording(aggregates, now, isSample);
@@ -201,6 +257,7 @@ final class RuleState {
     latestEnded = aggregates;
     aggregates = recycled; // cleared when the next Event begins
     hasEnded = true;
+    latestEndedStart = runStart;
     detector.ended(ended);
   }
 

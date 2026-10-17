@@ -118,17 +118,7 @@ final class Differential {
 
   static Result compare(Consumer<Detector.Builder> config, List<Expression> watched, List<Op> ops,
       Side sideA, Side sideB) {
-    Logger logger = Logger.getLogger("io.github.romanhaendler.rbed");
-    List<String> warnings = new ArrayList<>();
-    Handler handler = new Handler() {
-      @Override public void publish(LogRecord r) { warnings.add(r.getLevel() + " " + r.getMessage()); }
-      @Override public void flush() {}
-      @Override public void close() {}
-    };
-    boolean parents = logger.getUseParentHandlers();
-    logger.setUseParentHandlers(false);
-    logger.addHandler(handler);
-    try {
+    return capturing(warnings -> {
       Run a = new Run(sideA, config, watched, warnings);
       Run b = new Run(sideB, config, watched, warnings);
       Difference d = diff(0, "build", a.buildOutcome, b.buildOutcome);
@@ -141,6 +131,23 @@ final class Differential {
         if (d != null) return new Result(d, true, i + 1, a.stats);
       }
       return new Result(null, true, ops.size(), a.stats);
+    });
+  }
+
+  /** Runs {@code body} with the library's warnings collected into the list it is given. */
+  static <T> T capturing(java.util.function.Function<List<String>, T> body) {
+    Logger logger = Logger.getLogger("io.github.romanhaendler.rbed");
+    List<String> warnings = new ArrayList<>();
+    Handler handler = new Handler() {
+      @Override public void publish(LogRecord r) { warnings.add(r.getLevel() + " " + r.getMessage()); }
+      @Override public void flush() {}
+      @Override public void close() {}
+    };
+    boolean parents = logger.getUseParentHandlers();
+    logger.setUseParentHandlers(false);
+    logger.addHandler(handler);
+    try {
+      return body.apply(warnings);
     } finally {
       logger.removeHandler(handler);
       logger.setUseParentHandlers(parents);
@@ -161,8 +168,12 @@ final class Differential {
   }
 
   /** One side: its Detector, what its listener heard, and the warnings logged for it. */
-  private static final class Run implements EventListener {
+  static final class Run implements EventListener {
     final List<String> heard = new ArrayList<>();
+    /** The Events that Ended on this side, in order. */
+    final List<Event> ended = new ArrayList<>();
+    /** Whether the latest {@link #apply} was accepted. */
+    boolean lastOk;
     final List<Expression> watched;
     final List<String> warnings;
     Detector detector;
@@ -193,6 +204,7 @@ final class Differential {
       } catch (RuntimeException e) {
         outcome = e.getClass().getName() + ": " + e.getMessage();
       }
+      lastOk = outcome.equals("ok");
       if (!outcome.equals("ok")) stats.merge("exception", 1, Integer::sum);
       stats.merge("warning", warnings.size(), Integer::sum);
       List<String> lines = new ArrayList<>();
@@ -201,7 +213,7 @@ final class Differential {
       return lines;
     }
 
-    private List<String> observe() {
+    List<String> observe() {
       List<String> lines = new ArrayList<>();
       lines.add("callback count: " + heard.size());
       for (int i = 0; i < heard.size(); i++) lines.add("callback " + i + ": " + heard.get(i));
@@ -235,7 +247,7 @@ final class Differential {
 
     @Override public void onPending(Event e) { hear("pending", e); }
     @Override public void onConfirmed(Event e) { hear("confirmed", e); }
-    @Override public void onEnded(Event e) { hear("ended", e); }
+    @Override public void onEnded(Event e) { ended.add(e); hear("ended", e); }
     @Override public void onDiscarded(Event e) { hear("discarded", e); }
   }
 

@@ -39,6 +39,7 @@ final class EventState {
    */
   Expression.Bound latest(ChannelState channel, Accumulator.Aggregate aggregate) {
     RuleState rule = producer;
+    rule.latestIsRead();
     int index = rule.aggregate(channel);
     return () -> rule.latest(index, aggregate);
   }

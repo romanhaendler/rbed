@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalDouble;
+import java.util.OptionalLong;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -31,12 +32,18 @@ public final class Detector implements AutoCloseable {
   private final long latestHistoryEnd;
   private final RuleState[] rules;
   private final ChannelState[] pulses;
+  private final ChannelState[] tracks;
+  /** Some Rule has a finite maxGap, so the previous Sample matters. */
+  private final boolean gaps;
   /** Watched Expressions, bound once; a Channel matches by name, others by identity. */
   private final Map<Expression, Expression.Bound> watched = new HashMap<>();
   /** The latest moment processed: a Sample or a time advance. */
   private long now;
   private boolean started;
   private long lastSample;
+  /** See {@link #replayPoint}: the earliest start of a replay for the moment being processed. */
+  private long closedNow = Long.MAX_VALUE;
+  private long lastSampleClosed = Long.MAX_VALUE;
   private long samples;
   private boolean closed;
   /** Entries held by moving-average windows and count timestamps; see {@link #retainedValues}. */
@@ -92,6 +99,11 @@ public final class Detector implements AutoCloseable {
         .filter(state -> state.channel.pulse)
         .toArray(ChannelState[]::new);
 
+    tracks = channels.values().toArray(ChannelState[]::new);
+    boolean anyGap = false;
+    for (RuleState rule : rules) anyGap |= rule.hasMaxGap();
+    gaps = anyGap;
+
     hasHistory = !b.history.isEmpty();
     latestHistoryEnd = remember(b.history); // after binding, so that Event counts see it too
   }
@@ -142,6 +154,74 @@ public final class Detector implements AutoCloseable {
    */
   public MemoryHorizon memoryHorizon() {
     return new MemoryHorizon(horizonMillis, horizonSamples);
+  }
+
+  /**
+   * The earliest timestamp from which replaying this Detector's input into a fresh Detector
+   * (same Rules and options), with the Events that Ended before that timestamp supplied as
+   * {@link Builder#history History}, reproduces this Detector exactly: the replay then continues
+   * with the same Events, callbacks, values and exceptions as this Detector. Empty before the
+   * first Sample, and with a sampling rate (a fresh Detector cannot continue the Sample index).
+   * Read it after each moment, store it with the stream position, and the stream has to be kept
+   * back to the oldest Replay Point still needed.
+   *
+   * <p>Replay all moments (Samples, time advances, and {@link #close} if it was called) with a
+   * timestamp from the Replay Point on, in order, with the listener's side effects suppressed up
+   * to the position where the replay catches up with this Detector. The History is every Event
+   * that Ended before the Replay Point, including those supplied to this Detector as History;
+   * Events that Ended later are produced again by the replay.
+   *
+   * <p>The Replay Point reaches back to what the state of this Detector depends on: the Events in
+   * progress, including the End Condition's duration; a Rule that has not seen its {@code when}
+   * Condition stop holding since its last Event ended on an End Condition, so a fresh Rule would
+   * start another Event; the moment {@code when} was last seen false, which decides whether the
+   * next Event is Truncated at its start; the Samples in moving-average windows; the latest and
+   * previous values read by {@code rate()}, {@code age()}, {@code rising()}, {@code falling()}
+   * and the previous Sample behind {@code maxGap}; the Channel values the Rules read; and the
+   * latest Event of every Rule whose Aggregates are read through {@code latest(...)}. It is never
+   * inside the span of an Event, so no Event is split. Reading it takes time proportional to
+   * the number of Channels, moving averages and Rules, not to the history, and allocates only the
+   * result.
+   *
+   * <p>Preconditions: the replay gets the same input, Rules and options; the Detector has
+   * not dropped entries because of the Retention Limit ({@link #droppedValues} is 0), which would
+   * make windows depend on the dropped entries; and {@code droppedValues()}, a count since the
+   * Detector was built, and the warning logged with the first drop are not reproduced by a replay.
+   * A moving average is recomputed from the replayed values, so its last bit can differ from the
+   * original when floating-point rounding depends on the order in which values entered and left
+   * the window.
+   */
+  public OptionalLong replayPoint() {
+    if (samplingRate > 0 || samples == 0) return OptionalLong.empty();
+    long point = closedNow;
+    for (ChannelState track : tracks) point = Math.min(point, track.replayNeed());
+    for (RuleState rule : rules) point = Math.min(point, rule.replayNeed());
+    if (gaps) point = Math.min(point, lastSampleClosed);
+    return OptionalLong.of(point);
+  }
+
+  /**
+   * The latest timestamp from which a replay reproduces how the Rules evaluate the moment being
+   * processed; see {@link #settle}. What is recorded at this moment needs no more.
+   */
+  long closedNow() {
+    return closedNow;
+  }
+
+  /**
+   * Once the tracks are updated for a moment: the latest timestamp from which a replay reproduces
+   * how the Rules evaluate it. That is the moment itself, unless the state they read goes back
+   * further: Channel and moving-average values (and the ones before, if read), the latest Events
+   * whose Aggregates are read, and the Events in progress. Everything a Rule decides at this
+   * moment that lasts (an Event starts, {@code when} is false) needs no more than this.
+   */
+  private void settle(long timestamp) {
+    long closed = timestamp;
+    for (RuleState rule : rules) closed = Math.min(closed, rule.runFrom(timestamp));
+    for (ChannelState track : tracks) closed = Math.min(closed, track.replayNeed());
+    for (RuleState rule : rules) closed = Math.min(closed, rule.latestNeed());
+    closedNow = closed;
+    for (ChannelState track : tracks) track.settle(closed);
   }
 
   /** Applies History in order of confirmation; returns its latest end. */
@@ -278,6 +358,7 @@ public final class Detector implements AutoCloseable {
     }
     moveTo(timestamp);
     for (ChannelState pulse : pulses) pulse.pulseAbsent();
+    settle(timestamp);
     evaluate(timestamp, false);
   }
 
@@ -288,7 +369,9 @@ public final class Detector implements AutoCloseable {
     sampleTimestamp = timestamp;
     values.forEach(applyValue);
     for (ChannelState pulse : pulses) if (!pulse.carried) pulse.pulseAbsent();
+    settle(timestamp);
     evaluate(timestamp, true);
+    lastSampleClosed = closedNow;
     lastSample = timestamp;
     samples++;
   }
