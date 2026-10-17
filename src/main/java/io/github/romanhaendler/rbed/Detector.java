@@ -42,6 +42,8 @@ public final class Detector implements AutoCloseable {
   /** Entries held by moving-average windows and count timestamps; see {@link #retainedValues}. */
   private long retained;
   private final int retentionLimit;
+  private long horizonMillis;
+  private int horizonSamples;
   private long dropped;
   private List<Event> collected;
   /** Timestamp of the Sample being applied by {@link #applyValue}. */
@@ -120,6 +122,26 @@ public final class Detector implements AutoCloseable {
     }
     double v = bound.value();
     return v == v ? OptionalDouble.of(v) : OptionalDouble.empty();
+  }
+
+  /** Called while binding by every windowed construct; unbounded ({@code Long.MAX_VALUE}) counts for nothing. */
+  void windowMillis(long millis) {
+    if (millis != Long.MAX_VALUE) horizonMillis = Math.max(horizonMillis, millis);
+  }
+
+  void windowSamples(int n) {
+    horizonSamples = Math.max(horizonSamples, n);
+  }
+
+  /**
+   * How far back this Detector's configuration makes it look: the longest time window and the
+   * largest Sample count used by its Rules and watched Expressions, computed when it was built.
+   * This is a configuration bound, not a guarantee. An Event in progress, a Rule waiting for its
+   * {@code when} Condition to stop holding, and {@code latest(...)} can depend on Samples further
+   * back; the Replay Point is the exact answer to how far back a replay must start.
+   */
+  public MemoryHorizon memoryHorizon() {
+    return new MemoryHorizon(horizonMillis, horizonSamples);
   }
 
   /** Applies History in order of confirmation; returns its latest end. */
