@@ -2,7 +2,8 @@
 // without a page error or sideways scrolling; on a concept page and on a domain page, moving a
 // control runs rbed again and changes the Event table; drawing a Channel changes the Java source;
 // on a phone, the Event tables fit without sideways scrolling, and the chart stays in view while
-// a control moves; an address with a fragment lands on its section; Tab first reaches the skip link.
+// a control moves; an address with a fragment lands on its section; Tab first reaches the skip link;
+// a chosen search result closes the search; Reset keeps the focus in the panel.
 import { expect, test } from '@playwright/test';
 import { PAGES } from '../src/pages.ts';
 
@@ -127,7 +128,7 @@ test('on a phone the chart stays in view while a control under it moves, and the
   expect(chart.y).toBeGreaterThanOrEqual(56);
   expect(control.y).toBeGreaterThan(chart.y + chart.height);
   expect(control.y + control.height).toBeLessThanOrEqual(800);
-  await expect(page.getByRole('status')).toHaveText(/\d+ Events?/);
+  await expect(page.getByRole('status').filter({ hasText: /Events?/ })).toHaveText(/\d+ Events?/);
 });
 
 test('the first Tab stop skips to the content', async ({ page }) => {
@@ -142,4 +143,24 @@ test('the Javadoc has the site’s fonts and a link back to the site', async ({ 
   expect(await page.evaluate(() => getComputedStyle(document.body).fontFamily)).toContain('Geist Sans');
   await page.getByRole('link', { name: 'rbed documentation' }).click();
   await expect(page).toHaveURL(/\/rbed\/$/);
+});
+
+test('choosing a search result closes the palette and focuses the chosen page', async ({ page }) => {
+  await page.goto('cranes/');
+  await expect(page.locator('.uc-root canvas').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Search' }).click();
+  await page.keyboard.type('Data gaps');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.shellContent h1')).toHaveText(PAGES.find((p) => p.path === '/data-gaps/').title);
+  await expect(page.getByRole('dialog', { name: 'Search the documentation' })).toBeHidden();
+  await expect(page.locator('.shellContent h1')).toBeFocused();
+});
+
+test('Reset moves the focus to the first control, not to the page', async ({ page }) => {
+  await page.goto('event-lifecycle/');
+  const slider = page.getByRole('slider').first();
+  await slider.focus();
+  await slider.press('ArrowRight');
+  await page.getByRole('button', { name: 'Reset' }).click();
+  await expect(slider).toBeFocused();
 });
