@@ -76,7 +76,6 @@ abstract class Window {
       w.int64s(needs);
       w.int32(size);
       w.int32(next);
-      sum.save(w);
     }
 
     @Override
@@ -89,10 +88,12 @@ abstract class Window {
       System.arraycopy(loadedNeeds, 0, needs, 0, loadedNeeds.length);
       size = r.int32();
       next = r.int32();
-      sum.load(r);
-      if (size < 0 || size > values.length || next < 0 || next >= values.length) {
+      if (size < 0 || size > values.length || next < 0 || next >= values.length
+          || (size < values.length && next != size)) {
         throw new IOException("window position");
       }
+      sum.clear(); // the sum is a function of the entries: recomputed, never read from the Snapshot
+      for (int i = 0; i < size; i++) sum.add(values[i]);
     }
   }
 
@@ -175,7 +176,6 @@ abstract class Window {
         w.int64(needs[(head + i) % needs.length]);
       }
       w.int64(expiredNeed);
-      sum.save(w);
       w.bool(started);
       w.int64(first);
     }
@@ -194,9 +194,10 @@ abstract class Window {
       }
       expiredNeed = r.int64();
       size = n; // a restore only happens in a Detector just built, so head is 0
-      sum.load(r);
       started = r.bool();
       first = r.int64();
+      sum.clear();
+      for (int i = 0; i < n; i++) sum.add(values[i]);
     }
 
     @Override

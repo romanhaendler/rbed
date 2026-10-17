@@ -1,6 +1,5 @@
 package io.github.romanhaendler.rbed;
 
-import java.io.IOException;
 import java.util.Arrays;
 
 /**
@@ -108,32 +107,9 @@ final class ExactSum {
     return negative ? -magnitude : magnitude;
   }
 
-  /** The non-zero limbs as (index, value) pairs; the limbs are a function of the values alone. */
-  void save(StateWriter w) {
-    int count = 0;
-    for (long l : limbs) if (l != 0) count++;
-    w.int32(count);
-    for (int i = 0; i < LIMBS; i++) {
-      if (limbs[i] == 0) continue;
-      w.int32(i);
-      w.int64(limbs[i]);
-    }
-  }
-
-  void load(StateReader r) throws IOException {
-    int count = r.int32();
-    if (count < 0 || count > LIMBS) throw new IOException("sum");
+  void clear() {
     Arrays.fill(limbs, 0);
     lo = LIMBS;
     hi = -1;
-    int previous = -1;
-    for (int k = 0; k < count; k++) {
-      int i = r.int32();
-      if (i <= previous || i >= LIMBS - 2) throw new IOException("sum");
-      previous = i;
-      limbs[i] = r.int64();
-      lo = Math.min(lo, i);
-      hi = Math.max(hi, i);
-    }
   }
 }

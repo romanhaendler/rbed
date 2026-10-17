@@ -131,7 +131,7 @@ class SnapshotValidationTest {
     new Window.OverSamples(d, 3).load(reader(overSamples(3, 3, 2))); // control
     assertThrows(IOException.class,
         () -> new Window.OverSamples(d, 3).load(reader(overSamples(3, 4, 0, 0))), "needs");
-    int[][] bad = {{4, 0, 0}, {2, 0, 0}, {3, 4, 0}, {3, -1, 0}, {3, 0, 3}, {3, 0, -1}};
+    int[][] bad = {{4, 0, 0}, {2, 0, 0}, {3, 4, 0}, {3, -1, 0}, {3, 0, 3}, {3, 0, -1}, {3, 2, 0}};
     for (int[] b : bad) {
       assertThrows(IOException.class,
           () -> new Window.OverSamples(d, 3).load(reader(overSamples(b[0], b[1], b[2]))),
