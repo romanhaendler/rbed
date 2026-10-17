@@ -18,6 +18,16 @@ final class CompensatedSum {
     return sum + compensation;
   }
 
+  void save(StateWriter w) {
+    w.float64(sum);
+    w.float64(compensation);
+  }
+
+  void load(StateReader r) throws java.io.IOException {
+    sum = r.float64();
+    compensation = r.float64();
+  }
+
   void reset() {
     sum = 0;
     compensation = 0;

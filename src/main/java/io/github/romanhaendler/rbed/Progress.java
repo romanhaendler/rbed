@@ -16,6 +16,16 @@ final class Progress {
     count = counted ? 1 : 0;
   }
 
+  void save(StateWriter w) {
+    w.int64(since);
+    w.int32(count);
+  }
+
+  void load(StateReader r) throws java.io.IOException {
+    since = r.int64();
+    count = r.int32();
+  }
+
   void advance() {
     count++;
   }

@@ -29,6 +29,34 @@ final class EventState {
     this.name = name;
   }
 
+  void save(StateWriter w) {
+    w.bool(confirmed);
+    w.bool(hasEnded);
+    w.int64(lastEnd);
+    w.bool(hasBeenConfirmed);
+    w.int64(lastConfirmed);
+    w.int64(count);
+    w.int64(lastDuration);
+    w.int64(runningStart);
+    w.int64(endedDuration);
+    w.bool(confirmations != null);
+    if (confirmations != null) confirmations.save(w);
+  }
+
+  void load(StateReader r) throws java.io.IOException {
+    confirmed = r.bool();
+    hasEnded = r.bool();
+    lastEnd = r.int64();
+    hasBeenConfirmed = r.bool();
+    lastConfirmed = r.int64();
+    count = r.int64();
+    lastDuration = r.int64();
+    runningStart = r.int64();
+    endedDuration = r.int64();
+    if (r.bool() != (confirmations != null)) throw new java.io.IOException("count timestamps");
+    if (confirmations != null) confirmations.load(r);
+  }
+
   void producedBy(RuleState rule) {
     producer = rule;
   }
