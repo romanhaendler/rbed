@@ -50,6 +50,40 @@ class ExpressionValueTest {
     @Override public void onEnded(Event e) { read("ended", e); }
   }
 
+  // "Reading an Expression's value": the listener example, exactly as printed in the README
+  static final Channel temp = Channel.named("temp");
+  static final Rule overheat = Rule.named("Overheat").when(temp.above(80)).forDuration(2_000);
+
+  static class OverheatLog implements EventListener {
+    final ChannelExpression smoothTemp = temp.averageOverSamples(3);
+    final Detector detector = Detector.builder()
+        .rules(overheat)
+        .listener(this)
+        .watch(smoothTemp)
+        .build();
+
+    @Override public void onConfirmed(Event e) {
+      System.out.println(e.name() + " Confirmed, smoothed temp "
+          + detector.value(smoothTemp).orElse(Double.NaN));
+    }
+  }
+
+  @Test
+  void readmeListenerExample() {
+    java.io.PrintStream out = System.out;
+    java.io.ByteArrayOutputStream printed = new java.io.ByteArrayOutputStream();
+    System.setOut(new java.io.PrintStream(printed, true));
+    try {
+      OverheatLog log = new OverheatLog();
+      log.detector.push(0,     Map.of(temp, 90.0));
+      log.detector.push(1_000, Map.of(temp, 92.0));
+      log.detector.push(2_000, Map.of(temp, 91.0));
+    } finally {
+      System.setOut(out);
+    }
+    assertEquals("Overheat Confirmed, smoothed temp 91.0", printed.toString().strip());
+  }
+
   @Test
   void aWatchedChannelReadsItsLatestValueAndIsEmptyBeforeTheFirstSample() {
     Detector d = Detector.builder().watch(X).build();

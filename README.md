@@ -447,7 +447,34 @@ detector.value(smoothTemp);    // OptionalDouble.empty: the average is still war
 detector.value(smoothTemp).ifPresent(v -> System.out.println("smoothed: " + v));
 ```
 
-`value` reports the Expression at the latest Sample or time advance and is empty while the value is undefined. It may be called at any time, also from an EventListener callback (the moment being processed) and after `close()`. A watched Expression need not be used by any Rule. Reading only looks the value up, so watching costs nothing on Samples where you do not read. Reading an Expression that was not watched throws `IllegalArgumentException`; a Channel matches by name, every other Expression is the same object you passed to `watch`.
+`value` reports the Expression at the latest Sample or time advance and is empty while the value is undefined (a Channel before its first value, a moving average during its warm-up). Expressions about Events are defined from the start: `count(...)` and `totalDuration(...)` read 0, or what the [History](#restarts-history) gives, before the first Sample. `value` may be called at any time, also after `close()`. A watched Expression need not be used by any Rule. Reading an Expression that was not watched throws `IllegalArgumentException`; a Channel matches by name, every other Expression is the same object you passed to `watch`.
+
+From an EventListener callback, `value` reads the moment being processed. To record what an Expression was when an Event was Confirmed, let the class that holds the Detector be its listener:
+
+```java
+class OverheatLog implements EventListener {
+  final ChannelExpression smoothTemp = temp.averageOverSamples(3);
+  final Detector detector = Detector.builder()
+      .rules(overheat)
+      .listener(this)
+      .watch(smoothTemp)
+      .build();
+
+  @Override public void onConfirmed(Event e) {
+    System.out.println(e.name() + " Confirmed, smoothed temp "
+        + detector.value(smoothTemp).orElse(Double.NaN));
+  }
+}
+
+OverheatLog log = new OverheatLog();
+log.detector.push(0,     Map.of(temp, 90.0));
+log.detector.push(1_000, Map.of(temp, 92.0));
+log.detector.push(2_000, Map.of(temp, 91.0));  // prints "Overheat Confirmed, smoothed temp 91.0"
+```
+
+Rules are evaluated in the order they were added, so in a callback, `count`, `totalDuration` and `latest` of a Rule added *later* than the Rule whose callback runs show that Rule's Events as of the previous moment: an Event it Confirms or Ends in this moment is not reflected yet, nor is this moment in its Aggregates (a running Event's duration does count up to now).
+
+Watching adds no allocation per Sample, and reading only looks the value up. Each moving average in a watched Expression keeps a window of its own, even if a Rule uses the same instance: it takes memory, is updated at each push and counts in `retainedValues()` and against the [Retention Limit](#memory). Everything else in a watched Expression adds no work per push. Watching `latest(a).min/max/mean(x)` makes Rule A aggregate `x`, so A's Events gain [Aggregates](#aggregates) of `x`; which Events are found, and when, is unchanged.
 
 ## Referring to other Rules
 
@@ -724,11 +751,11 @@ The performance tests are excluded from the default build because timings depend
 
 ## Memory
 
-Values of Channels that no Rule uses are ignored and leave no trace. What a Detector holds is known from its Rules:
+Values of Channels that no Rule or watched Expression uses are ignored and leave no trace. What a Detector holds is known from its Rules and [watched Expressions](#reading-an-expressions-value):
 
 | Feature                         | Retains                                       |
 | ------------------------------- | --------------------------------------------- |
-| Channel used by a Rule          | 1 value                                       |
+| Channel used                    | 1 value                                       |
 | `averageOverSamples(n)`         | n values; `build()` rejects n above the Retention Limit |
 | `averageOverDuration(w)`        | every value within `w`, at most the Retention Limit |
 | `count(...).within(w)`          | one timestamp per Confirmed Event within `w`, at most the Retention Limit |

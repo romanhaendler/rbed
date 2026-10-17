@@ -138,8 +138,8 @@ public final class Detector implements AutoCloseable {
   }
 
   /**
-   * The number of entries this Detector currently holds: one per Channel a Rule uses, one per
-   * value in each moving-average window and one per timestamp kept for
+   * The number of entries this Detector currently holds: one per Channel a Rule or watched
+   * Expression uses, one per value in each moving-average window and one per timestamp kept for
    * {@code count(...).within(...)}. A plain counter read, cheap to poll between pushes.
    */
   public long retainedValues() {
