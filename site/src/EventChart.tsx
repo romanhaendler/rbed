@@ -5,9 +5,9 @@
 // them, time advances and a restart, with a hover readout; and the key to its bands, lines and
 // marks under it. A Channel's line joins its Samples; where rbed holds a value (a Sample lacks
 // the Channel, or time was advanced without a Sample) the line breaks and a thin step line
-// carries the held value, which the readout marks "(kept)". A click on a band selects its
-// Event. On a Scenario whose Rules read latest(...), the readout reports the Event latest(...)
-// reads at the hovered time, which the chart then highlights.
+// carries the held value, which the readout marks "(kept)". A click on a band selects its Event.
+// On a Scenario whose Rules read latest(...), the readout reports the Event latest(...) reads at
+// the hovered time, which the chart then highlights.
 import { LimitBand, LimitLine, Tooltip, type TooltipHit, useChart } from '@umriss-ui/charts';
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { Event } from './bridge';
@@ -49,7 +49,6 @@ import {
   TRUNCATED,
   thresholdLines,
   thresholdText,
-  labelRoom,
   tickText,
   timeDomain,
   timeTicks,
@@ -206,6 +205,9 @@ export function EventChart({
   const separateAxis = separate.length > 0 ? separateAxisOf(model, channelAxes.length) : undefined;
   const axisOf = (channel: string) => channelAxes.find((a) => a.channels.includes(channel)) ?? channelAxes[0];
   const lines = thresholdLines(thresholds, channelAxes, channels, narrow);
+  // The first band's axis carries a threshold label (a Channel's, or an Expression's on its scale).
+  const firstLabelled =
+    lines.some((l) => l.axis === channelAxes[0].id && l.label !== '') || expressions.some((x) => !isSeparate(x) && x.threshold !== null);
   // Room for the labels of a band with more than two threshold lines.
   const crowded = channelAxes.reduce((sum, a) => sum + Math.max(0, lines.filter((l) => l.axis === a.id && l.label !== '').length - 2), 0) * 30;
   const windows = windowRows(model.windows, lifecycle, millis, forgetsAt(model));
@@ -228,12 +230,12 @@ export function EventChart({
         style={titles}
         ariaLabel={`${scenario.channels.join(', ')} over time in ${unit}, with the Events of ${scenario.rules.join(', ')} as bands, Pending then Confirmed, and their lifecycle marked`}
       >
-        <XAxis value="t" domain={timeDomain(rows, labelRoom(model, channelAxes, narrow))} ticks={ticks} tickFormat={ticks && ((v) => String(v))} label={`Time (${unit})`} />
+        <XAxis value="t" domain={timeDomain(rows)} ticks={ticks} tickFormat={ticks && ((v) => String(v))} label={`Time (${unit})`} />
         {/* The first band's axis on the left, every further one on the right, next to the plot
             (charts 0.40.0 gives each y axis a column of its own); the Expressions' with a unit
-            of their own is titled with the unit, as the key names the Expression. On a phone the
-            right-hand axes have no title: their column is narrow, a threshold label stands in
-            it, and the key names each threshold in full. */}
+            of their own is titled with the unit, as the key names the Expression. On a phone an
+            axis with a threshold label, and every right-hand one, has no title: its column is
+            narrow, the label would run into the title, and the key names each threshold in full. */}
         {channelAxes.map((a, b) => (
           <YAxis
             key={a.id}
@@ -243,7 +245,7 @@ export function EventChart({
             domain={a.domain}
             ticks={a.ticks}
             tickFormat={tickText}
-            label={narrow && b > 0 ? undefined : a.channels.filter((c) => channels.includes(c)).join(', ')}
+            label={narrow && (b > 0 || firstLabelled) ? undefined : a.channels.filter((c) => channels.includes(c)).join(', ')}
           />
         ))}
         {separateAxis && (

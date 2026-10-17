@@ -69,16 +69,27 @@
   border-bottom: 1px solid var(--border-color);
 }
 
-/* The search field, which the Javadoc focuses on load: the site's edge and focus color instead
-   of the browser's blue outline. */
+/* Links in running text and in signatures are underlined, not told apart by colour alone. */
+.block a[href],
+footer a[href],
+.member-signature a[href],
+code a[href]:not(.member-name-link) {
+  text-decoration: underline;
+}
+
+/* Long member names in running text wrap on a phone instead of running off the page. */
+.block code {
+  overflow-wrap: anywhere;
+}
+
+/* The search fields: the site's edge, and its accent for the focus ring (Javadoc focuses the
+   field on load). */
 #search-input,
 #page-search-input {
   border: 1px solid var(--border-color);
-  border-radius: 4px;
 }
 #search-input:focus,
 #page-search-input:focus {
-  outline: none;
-  border-color: var(--selected-background-color);
-  box-shadow: 0 0 0 1px var(--selected-background-color);
+  outline: 2px solid var(--link-color);
+  outline-offset: 0;
 }

@@ -27,19 +27,13 @@ export function expressionSummary(expressions: PlottedExpression[], rows: Row[],
   );
 }
 
-/** The thresholds and within(...) windows in words, for the text alternative; `forgetsAt` (ms)
-    is a restart without History, where the strips end (windowRows). */
-export function limitsSummary(thresholds: Threshold[], windows: Window[], scenario: Scenario, forgetsAt?: number): string {
+/** The thresholds and within(...) windows in words, for the text alternative (a restart without
+    History, which ends the strips, is timeSummary's). */
+export function limitsSummary(thresholds: Threshold[], windows: Window[], scenario: Scenario): string {
   const at = timeIn(scenario.timeUnit);
   return (
     (thresholds.length === 0 ? '' : ` Lines mark the thresholds: ${thresholds.map((t) => thresholdText(t)).join(', ')}.`) +
-    windows
-      .map(
-        (w) =>
-          ` A strip over the ${w.rule} lane marks the ${at(w.millis)} after each ${w.after} Event that its within(...) counts` +
-          (forgetsAt === undefined ? '.' : `, up to the restart at ${at(forgetsAt)}, whose Detector knows no earlier ${w.after} Event.`),
-      )
-      .join('')
+    windows.map((w) => ` A strip over the ${w.rule} lane marks the ${at(w.millis)} after each ${w.after} Event that its within(...) counts.`).join('')
   );
 }
 
@@ -48,13 +42,20 @@ export const drawnSummary = (channels: string[]) =>
   channels.length === 0 ? '' : ` The values of ${channels.join(' and ')} are drawn, not the Scenario's own.`;
 
 /** The time advances and the restart in words, for the text alternative. */
-export function timeSummary({ advances, restart }: { advances: number[]; restart?: number }, scenario: Scenario): string {
+export function timeSummary(
+  { advances, restart, restartForgets }: { advances: number[]; restart?: number; restartForgets?: boolean },
+  scenario: Scenario,
+): string {
   const at = timeIn(scenario.timeUnit);
   return (
     (advances.length === 0
       ? ''
       : ` Time is advanced without a Sample ${advances.length === 1 ? 'once' : `${advances.length} times`}, from ${at(advances[0])} to ${at(advances[advances.length - 1])}.`) +
-    (restart === undefined ? '' : ` The Detector is restarted at ${at(restart)}.`)
+    (restart === undefined
+      ? ''
+      : ` The Detector is restarted at ${at(restart)}${
+          restartForgets ? ' without History: it knows no earlier Event, so a within(...) strip from before it ends there' : ' with History'
+        }.`)
   );
 }
 

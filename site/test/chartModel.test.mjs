@@ -142,26 +142,7 @@ test('the time a within(...) counts lies in the lane of the Rule that counts it,
   );
 });
 
-test('a restart without History cuts the within(...) strips there: the new Detector forgets the earlier Events', () => {
-  const lifecycle = { events: [{ name: 'Maintenance', start: 10, end: 11 }], discarded: [] };
-  const windows = [{ rule: 'OverdueService', after: 'Maintenance', millis: 90 }];
-  assert.deepEqual(windowRows(windows, lifecycle, 1).get('OverdueService'), [
-    { t: 11, s: 0 },
-    { t: 101, s: null },
-  ]);
-  assert.deepEqual(windowRows(windows, lifecycle, 1, 60).get('OverdueService'), [
-    { t: 11, s: 0 },
-    { t: 60, s: null },
-  ]);
-  // An Event after the restart opens its window in full.
-  const later = { events: [{ name: 'Maintenance', start: 70, end: 71 }], discarded: [] };
-  assert.deepEqual(windowRows(windows, later, 1, 60).get('OverdueService'), [
-    { t: 71, s: 0 },
-    { t: 161, s: null },
-  ]);
-});
-
-test("what a Rule is at a time: Pending, Confirmed, Ended, Discarded or no Event, and the readout chip's color", () => {
+test("the readout's chip has the color of the Rule's state: Pending, Confirmed, or none without an Event", () => {
   const lifecycle = { events: [{ name: 'R', start: 2000, confirmed: 4000, end: 6000 }], discarded: [{ name: 'R', start: 8000, discarded: 9000 }] };
   assert.deepEqual(
     [1, 2, 3, 4, 5, 6, 7, 8, 9].map((t) => ruleState(lifecycle, t, 1000)),
@@ -171,16 +152,6 @@ test("what a Rule is at a time: Pending, Confirmed, Ended, Discarded or no Event
   assert.equal(stateColor('Confirmed'), 'var(--event-confirmed)');
   assert.equal(stateColor('Ended'), 'var(--event-confirmed)');
   assert.equal(stateColor('no Event'), 'transparent');
-});
-
-test('latest(...) reads nothing before the first Confirmed Event, then the running one, then the Ended one until the next is Confirmed', () => {
-  const lift = (start, end) => ({ name: 'Lift', start: start * 1000, confirmed: start * 1000, end: end * 1000 });
-  const events = [lift(10, 40), lift(60, 90)];
-  assert.equal(latestEvent(events, 5, 1000), undefined);
-  assert.equal(latestEvent(events, 20, 1000), events[0]);
-  assert.equal(latestEvent(events, 50, 1000), events[0]);
-  assert.equal(latestEvent(events, 60, 1000), events[1]);
-  assert.equal(latestEvent(events, 120, 1000), events[1]);
 });
 
 test('a Pulse Channel reads "–" where a Sample does not carry it; another Channel keeps its last value', () => {
@@ -294,4 +265,42 @@ test('the key lists the lifecycle in order, and Pending only where something was
 
 test("an axis' ticks keep their decimals", () => {
   assert.deepEqual([0, 0.5, 1, 1500].map(tickText), ['0', '0.5', '1', '1,500']);
+});
+
+test('a restart without History cuts the within(...) windows of Events before it', () => {
+  const lifecycle = { events: [{ name: 'Maintenance', start: 10, end: 11 }], discarded: [] };
+  const windows = [{ rule: 'OverdueService', after: 'Maintenance', millis: 90 }];
+  const strip = (forgetsAt) => windowRows(windows, lifecycle, 1, forgetsAt).get('OverdueService');
+  assert.deepEqual(strip(undefined), [
+    { t: 11, s: 0 },
+    { t: 101, s: null },
+  ]);
+  assert.deepEqual(strip(60), [
+    { t: 11, s: 0 },
+    { t: 60, s: null },
+  ]);
+  assert.deepEqual(strip(5), [
+    { t: 11, s: 0 },
+    { t: 101, s: null },
+  ]);
+});
+
+test('a Rule is Pending until Confirmed, then Confirmed, Ended at its end, and Discarded where it was', () => {
+  const lifecycle = {
+    events: [{ name: 'R', start: 2000, confirmed: 4000, end: 6000 }],
+    discarded: [{ name: 'R', start: 8000, discarded: 9000 }],
+  };
+  assert.deepEqual(
+    [1, 2, 3, 4, 5, 6, 7, 8, 8.5, 9, 10].map((t) => ruleState(lifecycle, t, 1000)),
+    ['no Event', 'Pending', 'Pending', 'Confirmed', 'Confirmed', 'Ended', 'no Event', 'Pending', 'Pending', 'Discarded', 'no Event'],
+  );
+});
+
+test('latest(...) reads nothing before the first Confirmed Event, then the running one, then the Ended one until the next is Confirmed', () => {
+  const first = { name: 'LoadLifted', start: 10_000, confirmed: 10_000, end: 40_000 };
+  const second = { name: 'LoadLifted', start: 60_000, confirmed: 60_000, end: 90_000 };
+  assert.deepEqual(
+    [5, 10, 25, 40, 50, 60, 95].map((t) => latestEvent([first, second], t, 1000)),
+    [undefined, first, first, first, first, second, second],
+  );
 });

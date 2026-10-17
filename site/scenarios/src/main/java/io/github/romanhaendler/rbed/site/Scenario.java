@@ -102,18 +102,21 @@ abstract class Scenario {
   }
 
   /**
-   * An Expression plotted next to the Channels, with the threshold its Condition compares to. One
-   * with a {@code unit} of its own (a count of Events, a duration) is plotted on its own axis,
-   * under the Events. The Expression may refer to the Scenario's Rules.
+   * An Expression plotted next to the Channels, with the threshold its Condition compares to: the
+   * Rule that compares (or several, as in {@link Threshold}), the part of the Rule and the
+   * comparison ({@code "when >"}), and the value. One with a {@code unit} of its own (a count of
+   * Events, a duration) is plotted on its own axis, under the Events. The Expression may refer to
+   * the Scenario's Rules.
    */
-  record Plot(String name, Expression expression, double threshold, String unit) {
-    Plot(String name, Expression expression, double threshold) {
-      this(name, expression, threshold, null);
+  record Plot(String name, Expression expression, String rule, String condition,
+      double threshold, String unit) {
+    Plot(String name, Expression expression, String rule, String condition, double threshold) {
+      this(name, expression, rule, condition, threshold, null);
     }
 
     /** One the Rules compare with another Expression, not with a value: it has no threshold. */
     Plot(String name, Expression expression) {
-      this(name, expression, Double.NaN, null);
+      this(name, expression, null, null, Double.NaN, null);
     }
   }
 

@@ -261,25 +261,13 @@ export function separateAxisOf({ rules, expressions, expressionRows }: ChartMode
 }
 
 /** The time axis' domain: the Samples' span with a little room at both ends, so a mark at the
-    first or last Sample does not reach into the axes' labels; and `labels`, a share of the span
-    more on the right for threshold labels (labelRoom). */
-export function timeDomain(rows: Row[], labels = 0): [number, number] {
+    first or last Sample does not reach into the axes' labels. (Threshold labels stand in their
+    axis' column; on a phone that axis has no title, EventChart, so they fit there.) */
+export function timeDomain(rows: Row[]): [number, number] {
   const first = rows[0].t;
   const last = rows[rows.length - 1].t;
   const room = (last - first) * 0.04;
-  return [first - room, last + room + (last - first) * labels];
-}
-
-/** The share of the time span to leave right of the last Sample for the threshold labels of the
-    first band's axis, its Channels' and Expressions': on a phone, charts puts a label wider than
-    the axis' column (even "> 100") into the plot at its right end, where it would hide the data. */
-export function labelRoom(model: ChartModel, axes: ChannelAxis[], narrow: boolean): number {
-  const widest = Math.max(
-    0,
-    ...thresholdLines(model.thresholds, axes, model.channels, narrow).filter((l) => l.axis === axes[0].id).map((l) => l.label.length),
-    ...model.expressions.filter((x) => !isSeparate(x) && x.threshold !== null).map((x) => expressionLabel(x).length),
-  );
-  return narrow && widest > 0 ? (widest * 6.5 + 12) / 250 : 0;
+  return [first - room, last + room];
 }
 
 /** The time axis' ticks: at the Samples where there are few, each at a whole unit (so no tick
@@ -418,16 +406,16 @@ export function thresholdLines(thresholds: Threshold[], axes: ChannelAxis[], cha
 export const tickText = (v: number) => v.toLocaleString('en-US', { maximumFractionDigits: 6 });
 
 /** Each Rule's within(...) windows as StateBand rows of one state, over the time it counts after
-    each Event of the Rule it follows (in the Scenario's unit); overlapping windows merge.
-    `forgetsAt` (ms) is a restart without History: the new Detector knows no earlier Event, so
-    a window opened before it ends there. */
+    each Event of the Rule it follows (in the Scenario's unit); overlapping windows merge. A
+    Detector restarted without History at `forgetsAt` (ms) knows no earlier Event, so a window
+    opened before it ends there. */
 export function windowRows(windows: Window[], lifecycle: Lifecycle, millis: number, forgetsAt?: number): Map<string, BandRow[]> {
   const byRule = new Map<string, BandRow[]>();
-  const cut = (end: number, to: number) => (forgetsAt !== undefined && end < forgetsAt ? Math.min(to, forgetsAt) : to);
+  const until = (end: number, to: number) => (forgetsAt !== undefined && end < forgetsAt ? Math.min(to, forgetsAt) : to);
   for (const rule of new Set(windows.map((w) => w.rule))) {
     const stretches = windows
       .filter((w) => w.rule === rule)
-      .flatMap((w) => ofRule(lifecycle, w.after).events.map((e) => [e.end / millis, cut(e.end, e.end + w.millis) / millis]))
+      .flatMap((w) => ofRule(lifecycle, w.after).events.map((e) => [e.end / millis, until(e.end, e.end + w.millis) / millis]))
       .sort((a, b) => a[0] - b[0]);
     const merged: number[][] = [];
     for (const [from, to] of stretches) {
@@ -464,7 +452,7 @@ export type ChartModel = {
   /** Timestamps time was advanced to without a Sample, and the restart, if any (ms). */
   advances: number[];
   restart?: number;
-  /** Whether the restarted Detector forgot the Events before it (no History). */
+  /** Whether the Detector was restarted without History (windowRows). */
   restartForgets?: boolean;
 };
 

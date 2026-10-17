@@ -9,7 +9,7 @@
 import { Alert, VisuallyHidden } from '@umriss-ui/core';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { type Result, run, type Scenario, source } from './bridge';
-import { type ChannelAxis, type ChartModel, channelAxesOf, expressionKey, expressionRows, forgetsAt, labelRoom, type Row, timeDomain } from './chartModel.ts';
+import { type ChannelAxis, type ChartModel, channelAxesOf, expressionKey, expressionRows, type Row, timeDomain } from './chartModel.ts';
 import { CodeBlock } from './CodeBlock';
 import { drawnSource, drawTo } from './draw.ts';
 import { DrawLayer } from './DrawLayer';
@@ -144,7 +144,7 @@ export function ScenarioView({ scenario, draw = false, hidden: hiddenAtFirst = [
             latest={result.events.find((e) => eventKey(e) === hoveredLatest)}
             select={select}
           />
-          {pen !== '' && <DrawLayer x={timeDomain(rows, labelRoom(model, channelAxes, narrow))} channelAxis={penAxis} draw={drawPoint} end={() => setFrozen(undefined)} />}
+          {pen !== '' && <DrawLayer x={timeDomain(rows)} channelAxis={penAxis} draw={drawPoint} end={() => setFrozen(undefined)} />}
         </div>
         <LifecycleKey model={model} />
         <EventSummary
@@ -153,7 +153,7 @@ export function ScenarioView({ scenario, draw = false, hidden: hiddenAtFirst = [
           lifecycle={result}
           also={
             expressionSummary(result.expressions, plotted, scenario.timeUnit.name) +
-            limitsSummary(result.thresholds, result.windows, scenario, forgetsAt(result)) +
+            limitsSummary(result.thresholds, result.windows, scenario) +
             timeSummary(result, scenario) +
             drawnSummary(Object.keys(drawn))
           }

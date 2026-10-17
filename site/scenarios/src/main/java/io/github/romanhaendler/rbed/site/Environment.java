@@ -87,7 +87,8 @@ final class Environment extends Scenario {
   @Override
   List<Plot> plots(Map<String, Double> values) {
     return List.of(new Plot("level.averageOverSamples(4).rate()",
-        LEVEL.averageOverSamples(4).rate().times(HOUR / 1000.0), values.get("rising"), "cm/h"));
+        LEVEL.averageOverSamples(4).rate().times(HOUR / 1000.0), "FloodWarning", "when >",
+        values.get("rising"), "cm/h"));
   }
 
   @Override

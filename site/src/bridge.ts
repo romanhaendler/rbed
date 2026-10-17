@@ -55,12 +55,12 @@ export type Discard = { name: string; start: number; discarded: number };
  *  Channels' scale. */
 export type PlottedExpression = {
   name: string;
-  unit?: string;
-  threshold: number | null;
-  /** The Rule, or Rules, whose Condition compares it with the threshold, and how, as a
-   *  Threshold's: "when >". */
+  /** With a threshold: the Rule (or Rules) that compare it, and the comparison ("when >"), as in
+   *  Threshold. */
   rule?: string;
   condition?: string;
+  unit?: string;
+  threshold: number | null;
   values: (number | null)[];
   /** Its value at each time advance (Result.advances), where time was advanced. */
   atAdvances?: (number | null)[];
@@ -85,8 +85,8 @@ export type Result =
       advances: number[];
       /** Timestamp of the first Sample after the Detector was restarted, if it was. */
       restart?: number;
-      /** Whether the restarted Detector got no History, so it knows no Event before the restart. */
-      restartForgets?: boolean;
+      /** True if the restarted Detector got no History, so it knows no Event from before. */
+      restartForgets?: true;
     }
   /** `by` is 'rbed' when rbed rejected the Rules or the Samples; otherwise the site cannot run
    *  the input. */
@@ -96,7 +96,8 @@ export function scenarios(): Scenario[] {
   return JSON.parse(compiled.scenarios());
 }
 
-/** Runs a Scenario, its Events in the order they started (forDisplay). `drawn`: Channel values the reader drew, by Channel name, one per Sample (null: absent), in place of the Scenario's own. */
+/** Runs a Scenario, its Events in the order they started (forDisplay). `drawn`: Channel values the
+ *  reader drew, by Channel name, one per Sample (null: absent), in place of the Scenario's own. */
 export function run(
   scenarioId: string,
   parameters: Record<string, number>,

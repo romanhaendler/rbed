@@ -79,7 +79,8 @@ final class SilentSensors extends Scenario {
   /** The age of the heart rate, in seconds, against the limit; rbed's own dividedBy. */
   @Override
   List<Plot> plots(Map<String, Double> values) {
-    return List.of(new Plot("hr.age()", HR.age().dividedBy(1_000), values.get("limit"), "s"));
+    return List.of(new Plot("hr.age()", HR.age().dividedBy(1_000), "SensorLost", "when >",
+        values.get("limit"), "s"));
   }
 
   /** Pushes the Samples and, if the timer is on, advances time every second of the silence. */
