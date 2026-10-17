@@ -21,6 +21,7 @@ public final class Rule {
   final Set<Channel> aggregated;
   private final boolean durationsApplyToEnd;
   private final String text;
+  private final String key;
 
   private Rule(String name, Phase when, Phase end, long maxGap, Set<Channel> aggregated,
       boolean durationsApplyToEnd) {
@@ -31,6 +32,8 @@ public final class Rule {
     this.aggregated = aggregated;
     this.durationsApplyToEnd = durationsApplyToEnd;
     this.text = describe(name, when, end, maxGap, aggregated);
+    this.key = Key.node("rule", Key.name(name), key(when), key(end), Key.number(maxGap),
+        Key.node("aggregate", aggregated.stream().map(Channel::key).toArray(String[]::new)));
   }
 
   private static String describe(
@@ -48,6 +51,17 @@ public final class Rule {
           aggregated.stream().map(Channel::toString).toList())).append(")");
     }
     return text.toString();
+  }
+
+  private static String key(Phase phase) {
+    return phase == null ? "none()"
+        : Key.node("phase", phase.condition().key(), Key.number(phase.samples()),
+            Key.number(phase.millis()));
+  }
+
+  /** The canonical encoding for the Snapshot fingerprint (see {@link Key}). */
+  String key() {
+    return key;
   }
 
   private static String timing(Phase phase) {

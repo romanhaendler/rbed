@@ -16,10 +16,16 @@ public final class After extends Condition {
   private final long within;
 
   After(Rule rule, List<Rule> unless, long within) {
-    super(describe(Objects.requireNonNull(rule, "rule"), unless, within));
+    super(describe(Objects.requireNonNull(rule, "rule"), unless, within), key(rule, unless, within));
     this.rule = rule;
     this.unless = unless;
     this.within = within;
+  }
+
+  private static String key(Rule rule, List<Rule> unless, long within) {
+    return Key.node("after", Key.name(rule.name()),
+        Key.node("unless", unless.stream().map(r -> Key.name(r.name())).toArray(String[]::new)),
+        Key.number(within));
   }
 
   private static String describe(Rule rule, List<Rule> unless, long within) {

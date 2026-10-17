@@ -10,7 +10,8 @@ public final class Conditions {
   /** True while an Event of the given Rule is Confirmed and has not Ended. */
   public static Condition during(Rule rule) {
     Objects.requireNonNull(rule, "rule");
-    return new Condition("during(" + rule.name() + ")") {
+    return new Condition("during(" + rule.name() + ")",
+        Key.node("during", Key.name(rule.name()))) {
       @Override Bound bind(Detector detector) {
         EventState event = detector.referencedEvent(rule);
         return () -> Truth.of(event.confirmed);
@@ -37,7 +38,8 @@ public final class Conditions {
    */
   public static Expression totalDuration(Rule rule) {
     Objects.requireNonNull(rule, "rule");
-    return new Expression("totalDuration(" + rule.name() + ")") {
+    return new Expression("totalDuration(" + rule.name() + ")",
+        Key.node("totalDuration", Key.name(rule.name()))) {
       @Override Bound bind(Detector detector) {
         EventState events = detector.referencedEvent(rule);
         return () -> events.totalDuration(detector.now());

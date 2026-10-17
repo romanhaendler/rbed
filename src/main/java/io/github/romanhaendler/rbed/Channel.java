@@ -12,7 +12,7 @@ public final class Channel extends ChannelExpression {
   final boolean pulse;
 
   private Channel(String name, boolean pulse) {
-    super(name);
+    super(name, Key.node(pulse ? "pulse" : "channel", Key.name(Objects.requireNonNull(name, "name"))));
     if (Objects.requireNonNull(name, "name").isEmpty()) {
       throw new IllegalArgumentException("Channel name is empty");
     }

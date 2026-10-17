@@ -12,7 +12,8 @@ public final class EventCount extends Expression {
   private final long window;
 
   EventCount(Rule rule, long window) {
-    super("count(" + rule.name() + ")" + (window < 0 ? "" : ".within(" + window + ")"));
+    super("count(" + rule.name() + ")" + (window < 0 ? "" : ".within(" + window + ")"),
+        Key.node("count", Key.name(rule.name()), Key.number(window)));
     this.rule = Objects.requireNonNull(rule, "rule");
     this.window = window;
   }

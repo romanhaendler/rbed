@@ -58,9 +58,9 @@ public final class Detector implements AutoCloseable {
   private boolean closed;
   /** A push, advance or close is running, so a listener callback may be on the stack. */
   private boolean processing;
-  /** Descriptions of the Rules, their Channels and the watched Expressions, for the Snapshot fingerprint. */
-  private final List<String> ruleDescriptions = new ArrayList<>();
-  private final List<String> watchedDescriptions = new ArrayList<>();
+  /** Canonical keys of the Rules, their Channels and the watched Expressions: the Snapshot fingerprint. */
+  private final List<String> ruleKeys = new ArrayList<>();
+  private final List<String> watchedKeys = new ArrayList<>();
   /** Entries held by moving-average windows and count timestamps; see {@link #retainedValues}. */
   private long retained;
   private final int retentionLimit;
@@ -123,11 +123,11 @@ public final class Detector implements AutoCloseable {
     for (RuleState rule : rules) anyGap |= rule.hasMaxGap();
     gaps = anyGap;
 
-    for (Rule rule : b.rules.values()) ruleDescriptions.add(rule.toString());
+    for (Rule rule : b.rules.values()) ruleKeys.add(rule.key());
     for (ChannelState state : sortedChannels()) {
-      ruleDescriptions.add((state.channel.pulse ? "pulse channel " : "channel ") + state.channel.name());
+      ruleKeys.add(state.channel.key());
     }
-    for (Expression expression : b.watched) watchedDescriptions.add(expression.toString());
+    for (Expression expression : b.watched) watchedKeys.add(expression.key());
 
     if (b.restore != null) {
       if (!b.history.isEmpty()) {
@@ -176,12 +176,12 @@ public final class Detector implements AutoCloseable {
     return Snapshots.write(this);
   }
 
-  List<String> ruleDescriptions() {
-    return ruleDescriptions;
+  List<String> ruleKeys() {
+    return ruleKeys;
   }
 
-  List<String> watchedDescriptions() {
-    return watchedDescriptions;
+  List<String> watchedKeys() {
+    return watchedKeys;
   }
 
   double samplingRate() {

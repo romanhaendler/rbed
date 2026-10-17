@@ -11,9 +11,16 @@ import java.util.Objects;
  */
 public abstract class Condition {
   private final String text;
+  private final String key;
 
-  Condition(String text) {
+  Condition(String text, String key) {
     this.text = text;
+    this.key = key;
+  }
+
+  /** The canonical encoding for the Snapshot fingerprint (see {@link Key}). */
+  final String key() {
+    return key;
   }
 
   /** Resolves this Condition against one Detector's state, once, when the Detector is built. */
@@ -28,7 +35,7 @@ public abstract class Condition {
   public Condition and(Condition other) {
     Objects.requireNonNull(other, "other");
     Condition self = this;
-    return new Condition(this + ".and(" + other + ")") {
+    return new Condition(this + ".and(" + other + ")", Key.node("and", key, other.key)) {
       @Override Bound bind(Detector detector) {
         Bound left = self.bind(detector);
         Bound right = other.bind(detector);
@@ -41,7 +48,7 @@ public abstract class Condition {
   public Condition or(Condition other) {
     Objects.requireNonNull(other, "other");
     Condition self = this;
-    return new Condition(this + ".or(" + other + ")") {
+    return new Condition(this + ".or(" + other + ")", Key.node("or", key, other.key)) {
       @Override Bound bind(Detector detector) {
         Bound left = self.bind(detector);
         Bound right = other.bind(detector);
@@ -53,7 +60,7 @@ public abstract class Condition {
   /** Negation; undefined stays undefined. */
   public Condition not() {
     Condition self = this;
-    return new Condition(this + ".not()") {
+    return new Condition(this + ".not()", Key.node("not", key)) {
       @Override Bound bind(Detector detector) {
         Bound inner = self.bind(detector);
         return () -> inner.test().not();

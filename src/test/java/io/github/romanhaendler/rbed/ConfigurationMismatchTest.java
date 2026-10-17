@@ -1,5 +1,6 @@
 package io.github.romanhaendler.rbed;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.romanhaendler.rbed.Differential.Difference;
@@ -26,7 +27,7 @@ import org.junit.jupiter.api.Test;
  */
 class ConfigurationMismatchTest {
   private static final int CASES = Math.max(1, Integer.getInteger("rbed.diff.cases", 3000) / 3);
-  private static final int MUTATIONS_PER_CASE = 8;
+  private static final int MUTATIONS_PER_CASE = 12;
   private static final boolean FRESH_SEEDS = Boolean.getBoolean("rbed.diff.fresh");
 
   private static final Map<Construct, Construct> SWAPS = Map.ofEntries(
@@ -46,6 +47,24 @@ class ConfigurationMismatchTest {
   private static final Set<Construct> CONDITIONS = Set.of(Construct.ABOVE_C, Construct.BELOW_C, Construct.ABOVE,
       Construct.BELOW, Construct.BETWEEN, Construct.RISING, Construct.FALLING, Construct.AND,
       Construct.OR, Construct.NOT, Construct.DURING, Construct.AFTER);
+
+  /** Names that spell other parts of a configuration, or that break naive encodings. */
+  static final List<String> ADVERSARIAL = List.of("a.abs()", "a.above(1.0)", "a b", "a,b", "a, b",
+      "a\")", "\"", "(", ")", ".", "pulse channel a", "channel a", "a pulse", "pulse", "\u00e9",
+      "\u0430", "\n", "a.rate()", "during(R0)", "R0).and(during(R1", "x\\", "5:abcde", "1:a");
+
+  /** The readable text of a tree, built against placeholder Rules (an Expression names a Rule by name). */
+  static String text(Node n, List<String> ruleNames) {
+    Map<String, Rule> known = new java.util.HashMap<>();
+    for (String r : ruleNames) {
+      known.put(r, Rule.named(r).when(Channel.named("a").above(0)));
+    }
+    try {
+      return n.build(known).toString();
+    } catch (RuntimeException e) {
+      return null;
+    }
+  }
 
   private static Node with(Node n, double a, double b, List<Node> kids, List<String> names) {
     return new Node(n.op(), n.name(), a, b, kids, names);
@@ -76,8 +95,16 @@ class ConfigurationMismatchTest {
     }
     if (op == Construct.CH || op == Construct.PULSE) {
       out.add(new Node(op == Construct.CH ? Construct.PULSE : Construct.CH, n.name(), 0, 0, n.kids(), n.names()));
-      for (String other : List.of("a", "b", "c", "p")) {
+      List<String> others = new ArrayList<>(List.of("a", "b", "c", "p"));
+      others.addAll(ADVERSARIAL);
+      for (String other : others) {
         if (!other.equals(n.name())) out.add(new Node(op, other, 0, 0, n.kids(), n.names()));
+      }
+    } else if (!CONDITIONS.contains(op)) { // a Channel named like this Expression reads
+      String spelled = text(n, ruleNames);
+      if (spelled != null) {
+        out.add(Node.named(Construct.CH, spelled, 0));
+        out.add(Node.named(Construct.PULSE, spelled, 0));
       }
     }
     if (n.name() != null && ruleNames.contains(n.name())) {
@@ -148,6 +175,11 @@ class ConfigurationMismatchTest {
       List<RuleSpec> renamed = new ArrayList<>();
       for (RuleSpec x : s.rules()) renamed.add(rename(x, r.name(), r.name() + "x"));
       out.add(s.withRules(renamed));
+      for (String adversarial : ADVERSARIAL) {
+        List<RuleSpec> spelled = new ArrayList<>();
+        for (RuleSpec x : s.rules()) spelled.add(rename(x, r.name(), adversarial));
+        out.add(s.withRules(spelled));
+      }
       Node w = r.when();
       Node e = r.endWhen();
       List<String> agg = r.aggregate();
@@ -170,7 +202,9 @@ class ConfigurationMismatchTest {
         // the durations of when and endWhen exchanged
         v.add(spec(r, w, r.endSamples(), r.endDuration(), e, r.forSamples(), r.forDuration(), r.maxGap(), agg));
       }
-      for (String c : List.of("a", "b", "c")) {
+      List<String> pool = new ArrayList<>(List.of("a", "b", "c"));
+      pool.addAll(ADVERSARIAL);
+      for (String c : pool) {
         if (agg.contains(c)) continue;
         List<String> last = new ArrayList<>(agg);
         last.add(c);
@@ -329,5 +363,50 @@ class ConfigurationMismatchTest {
     if (listener != null) builder.listener(listener);
     b.configWithoutHistory().accept(builder);
     return builder.restore(bytes).build();
+  }
+
+  private static void assertRejected(Rule[] original, Rule[] other, Channel... channels) {
+    Detector d = Detector.builder().rules(original).build();
+    byte[] bytes = d.snapshot();
+    assertThrows(IllegalArgumentException.class,
+        () -> Detector.builder().rules(other).restore(bytes).build());
+  }
+
+  @Test
+  void aChannelNamedLikeAnExpressionIsNotThatExpression() {
+    Channel x = Channel.named("x");
+    Channel spelled = Channel.named("x.abs()");
+    Rule r1 = Rule.named("R1").when(spelled.above(1.0)).forSamples(2);
+    Rule r2 = Rule.named("R2").when(x.abs().above(1.0)).forSamples(2);
+    Rule s1 = Rule.named("R1").when(x.abs().above(1.0)).forSamples(2);
+    Rule s2 = Rule.named("R2").when(spelled.above(1.0)).forSamples(2);
+    assertRejected(new Rule[] {r1, r2}, new Rule[] {s1, s2});
+  }
+
+  @Test
+  void aRuleNamedLikeTwoRulesInUnlessIsNotThoseRules() {
+    Rule a = Rule.named("A").when(Channel.named("x").above(1.0));
+    Rule b = Rule.named("B").when(Channel.named("x").above(2.0));
+    Rule both = Rule.named("A, B").when(Channel.named("x").above(3.0));
+    Rule p = Rule.named("P").when(Channel.named("x").above(4.0));
+    Rule two = Rule.named("T").when(Conditions.after(p).unless(a, b));
+    Rule one = Rule.named("T").when(Conditions.after(p).unless(both));
+    assertRejected(new Rule[] {a, b, both, p, two}, new Rule[] {a, b, both, p, one});
+  }
+
+  @Test
+  void anAggregatedChannelNamedLikeAListIsNotThatList() {
+    Rule two = Rule.named("R").when(Channel.named("x").above(1.0))
+        .aggregate(Channel.named("a"), Channel.named("b"));
+    Rule one = Rule.named("R").when(Channel.named("x").above(1.0))
+        .aggregate(Channel.named("a, b"));
+    assertRejected(new Rule[] {two}, new Rule[] {one});
+  }
+
+  @Test
+  void aPulseChannelIsNotAChannelNamedLikeIt() {
+    Rule a = Rule.named("R").when(Channel.named("x pulse").above(1.0));
+    Rule b = Rule.named("R").when(Channel.pulse("x").above(1.0));
+    assertRejected(new Rule[] {a}, new Rule[] {b});
   }
 }

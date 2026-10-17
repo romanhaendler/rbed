@@ -9,9 +9,16 @@ import java.util.function.DoubleBinaryOperator;
  */
 public abstract class Expression {
   private final String text;
+  private final String key;
 
-  Expression(String text) {
+  Expression(String text, String key) {
     this.text = text;
+    this.key = key;
+  }
+
+  /** The canonical encoding for the Snapshot fingerprint (see {@link Key}). */
+  final String key() {
+    return key;
   }
 
   /** Resolves this Expression against one Detector's state, once, when the Detector is built. */
@@ -57,7 +64,8 @@ public abstract class Expression {
     requireFinite(high);
     if (low > high) throw new IllegalArgumentException("between: " + low + " > " + high);
     Expression self = this;
-    return new Condition(this + ".between(" + low + ", " + high + ")") {
+    return new Condition(this + ".between(" + low + ", " + high + ")",
+        Key.node("between", key, Key.number(low), Key.number(high))) {
       @Override Bound bind(Detector detector) {
         Expression.Bound x = self.bind(detector);
         return () -> {
@@ -112,7 +120,7 @@ public abstract class Expression {
   /** The absolute value. */
   public Expression abs() {
     Expression self = this;
-    return new Expression(this + ".abs()") {
+    return new Expression(this + ".abs()", Key.node("abs", key)) {
       @Override Bound bind(Detector detector) {
         Bound inner = self.bind(detector);
         return () -> Math.abs(inner.value());
@@ -124,7 +132,8 @@ public abstract class Expression {
   private static Expression combine(
       Expression left, String name, Expression right, DoubleBinaryOperator op) {
     Objects.requireNonNull(right, "other");
-    return new Expression(left + "." + name + "(" + right + ")") {
+    return new Expression(left + "." + name + "(" + right + ")",
+        Key.node(name, left.key, right.key)) {
       @Override Bound bind(Detector detector) {
         Bound x = left.bind(detector);
         Bound y = right.bind(detector);
@@ -138,7 +147,7 @@ public abstract class Expression {
 
   private static Expression constant(double value) {
     requireFinite(value);
-    return new Expression(String.valueOf(value)) {
+    return new Expression(String.valueOf(value), Key.node("constant", Key.number(value))) {
       @Override Bound bind(Detector detector) {
         return () -> value;
       }
@@ -150,7 +159,9 @@ public abstract class Expression {
    * {@code temp.minus(5.0)} or {@code count(Run).within(60000)}: a Channel and a Rule by their
    * names, a constant as a {@code double} ({@code plus(5)} reads {@code plus(5.0)}), a duration
    * in milliseconds (also when given as a {@link java.time.Duration}). Error messages use it to
-   * name the Expression.
+   * name the Expression. Names are printed as they are, so two different Expressions can print
+   * alike (a Channel named {@code x.abs()} and {@code x.abs()} on Channel {@code x}); the Snapshot
+   * fingerprint therefore does not use this text.
    */
   @Override
   public String toString() {
@@ -163,7 +174,8 @@ public abstract class Expression {
 
   private static Condition comparison(Expression left, Expression right, boolean greater) {
     Objects.requireNonNull(right, "other");
-    return new Condition(left + (greater ? ".above(" : ".below(") + right + ")") {
+    return new Condition(left + (greater ? ".above(" : ".below(") + right + ")",
+        Key.node(greater ? "above" : "below", left.key, right.key)) {
       @Override Bound bind(Detector detector) {
         Expression.Bound x = left.bind(detector);
         Expression.Bound y = right.bind(detector);
