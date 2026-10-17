@@ -150,6 +150,13 @@ class ExpressionValueTest {
   }
 
   @Test
+  void readingNullFailsLikeWatchingNull() {
+    Detector d = Detector.builder().watch(X).build();
+    assertThrows(NullPointerException.class, () -> d.value(null));
+    assertThrows(NullPointerException.class, () -> Detector.builder().watch((Expression) null));
+  }
+
+  @Test
   void readingAnUnwatchedDerivedExpressionNamesIt() {
     Detector d = Detector.builder().build();
     IllegalArgumentException e =

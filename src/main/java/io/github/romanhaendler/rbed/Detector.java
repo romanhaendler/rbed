@@ -103,9 +103,10 @@ public final class Detector implements AutoCloseable {
    *
    * @throws IllegalArgumentException if the Expression was not registered with
    *     {@link Builder#watch}; a Channel matches by name, every other Expression by identity
+   * @throws NullPointerException if {@code expression} is null
    */
   public OptionalDouble value(Expression expression) {
-    Expression.Bound bound = watched.get(expression);
+    Expression.Bound bound = watched.get(Objects.requireNonNull(expression, "expression"));
     if (bound == null) {
       throw new IllegalArgumentException("Expression " + expression
           + " is not watched. Register it with Detector.builder().watch(...).");
