@@ -5,7 +5,8 @@
 // Blocks: # to ### headings, paragraphs, - and 1. lists (one level; a list of nothing but links is
 // shown as tiles), ``` fenced code (```lang Label), and a Scenario marker on a line of its own:
 // <!-- scenario first-rule -->, or <!-- scenario first-rule draw --> to let the reader draw its
-// Channels. A line <!-- live --> makes the paragraph or list after it a block of its own, marked
+// Channels, and ending in hide <names> (comma-separated) for Channels or Rules the chart hides
+// at first (<!-- scenario logistics hide door -->). A line <!-- live --> makes the paragraph or list after it a block of its own, marked
 // live: it speaks of the live page's controls, so the prerendered page and the twin leave it out.
 // Inline: `code`, **strong**, *em*, [text](url). Nothing else, and no raw HTML: every character
 // of the text is escaped.
@@ -13,9 +14,9 @@
 export type Block =
   | { kind: 'html'; html: string; live?: true }
   | { kind: 'code'; language: string; label: string; source: string }
-  | { kind: 'scenario'; id: string; draw: boolean };
+  | { kind: 'scenario'; id: string; draw: boolean; hidden?: string[] };
 
-export const SCENARIO_MARKER = /^<!-- scenario (\S+)( draw)? -->$/;
+export const SCENARIO_MARKER = /^<!-- scenario (\S+)( draw)?(?: hide (\S+))? -->$/;
 export const LIVE_MARKER = '<!-- live -->';
 
 const INLINE = /`([^`]+)`|\[((?:[^\]`]|`[^`]*`)+)\]\(([^)\s]+)\)|\*\*(.+?)\*\*|\*([^*\s][^*]*)\*/g;
@@ -50,7 +51,7 @@ export function inline(text: string): string {
 }
 
 /** The text of a heading without its inline marks, as its id is made from. */
-function plain(text: string): string {
+export function plain(text: string): string {
   return text.replace(/[`*]/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
 }
 
@@ -88,7 +89,7 @@ export function parse(markdown: string): Block[] {
       i = stop + 1;
     } else if ((m = SCENARIO_MARKER.exec(line))) {
       flush();
-      blocks.push({ kind: 'scenario', id: m[1], draw: m[2] !== undefined });
+      blocks.push({ kind: 'scenario', id: m[1], draw: m[2] !== undefined, ...(m[3] && { hidden: m[3].split(',') }) });
       i++;
     } else if ((m = /^(#{1,3}) +(.*)$/.exec(line))) {
       const level = m[1].length;

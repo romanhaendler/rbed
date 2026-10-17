@@ -8,9 +8,13 @@ import {
   hasGaps,
   heldChannels,
   heldRows,
+  expressionLabel,
   keyOf,
+  latestEvent,
   lineRows,
   readoutValue,
+  ruleState,
+  stateColor,
   thresholdLines,
   thresholdText,
   tickText,
@@ -23,12 +27,34 @@ const scenario = (channels, pulse = []) => ({ id: 's', channels, pulse, rules: [
 const rows = (columns) => columns[Object.keys(columns)[0]].map((_, i) => ({ t: i, ...Object.fromEntries(Object.entries(columns).map(([c, v]) => [c, v[i]])) }));
 
 test('Channels of one scale share a band; one of a very different scale gets its own', () => {
-  assert.deepEqual(channelBands(scenario(['hr', 'spo2']), rows({ hr: [80, 120], spo2: [97, 86] })), [['hr', 'spo2']]);
+  assert.deepEqual(channelBands(scenario(['hr', 'spo2']), rows({ hr: [80, 100], spo2: [97, 86] })), [['hr', 'spo2']]);
   assert.deepEqual(channelBands(scenario(['speed', 'rpm']), rows({ speed: [0, 20], rpm: [800, 0] })), [['speed'], ['rpm']]);
   assert.deepEqual(
     channelBands(scenario(['errors', 'cpu', 'speed']), rows({ errors: [3, 12], cpu: [50, 95], speed: [4, 9] })),
     [['errors', 'speed'], ['cpu']],
   );
+});
+
+test("a Channel whose span is under a third of its band's would-be span gets a band of its own; a constant one does not", () => {
+  // spo2 moves 11 within hr's 40: in one band its drop would be a few pixels.
+  assert.deepEqual(channelBands(scenario(['hr', 'spo2']), rows({ hr: [80, 120], spo2: [97, 86] })), [['hr'], ['spo2']]);
+  assert.deepEqual(channelBands(scenario(['spo2', 'hr']), rows({ hr: [80, 120], spo2: [97, 86] })), [['spo2'], ['hr']]);
+  assert.deepEqual(channelBands(scenario(['weight', 'ratedLoad']), rows({ weight: [0, 6000], ratedLoad: [5000, 5000] })), [['weight', 'ratedLoad']]);
+});
+
+test('a band whose Channels are all hidden is left out, but the first', () => {
+  const r = rows({ temp: [5, 10], door: [0, 1] });
+  const model = (channels) => ({ scenario: scenario(['temp', 'door']), rows: r, rules: ['R'], channels, expressions: [], expressionRows: [], thresholds: [] });
+  assert.deepEqual(channelAxesOf(model(['temp', 'door'])).map((a) => a.channels), [['temp'], ['door']]);
+  assert.deepEqual(channelAxesOf(model(['temp'])).map((a) => a.channels), [['temp']]);
+  assert.deepEqual(channelAxesOf(model(['door'])).map((a) => a.channels), [['temp'], ['door']]);
+});
+
+test('a band of a Channel that is only ever 0 or 1 has the ticks 0 and 1', () => {
+  const model = { scenario: scenario(['serviceMode']), rows: rows({ serviceMode: [0, 1, 0] }), rules: ['R'], channels: ['serviceMode'], expressions: [], expressionRows: [], thresholds: [] };
+  assert.deepEqual(channelAxesOf(model)[0].ticks, [0, 1]);
+  model.thresholds = [{ channel: 'serviceMode', rule: 'R', condition: 'when >', value: 0.5 }];
+  assert.deepEqual(channelAxesOf(model)[0].ticks, [0, 1]);
 });
 
 test('a Pulse Channel is drawn on the first band', () => {
@@ -44,6 +70,7 @@ test('each band has its own axis over its own Channels and thresholds, the first
     scenario: scenario(['speed', 'rpm']),
     rows: r,
     rules: ['R'],
+    channels: ['speed', 'rpm'],
     expressions: [],
     expressionRows: [],
     thresholds: [{ channel: 'rpm', rule: 'R', condition: 'when >', value: 1000 }],
@@ -115,6 +142,47 @@ test('the time a within(...) counts lies in the lane of the Rule that counts it,
   );
 });
 
+test('a restart without History cuts the within(...) strips there: the new Detector forgets the earlier Events', () => {
+  const lifecycle = { events: [{ name: 'Maintenance', start: 10, end: 11 }], discarded: [] };
+  const windows = [{ rule: 'OverdueService', after: 'Maintenance', millis: 90 }];
+  assert.deepEqual(windowRows(windows, lifecycle, 1).get('OverdueService'), [
+    { t: 11, s: 0 },
+    { t: 101, s: null },
+  ]);
+  assert.deepEqual(windowRows(windows, lifecycle, 1, 60).get('OverdueService'), [
+    { t: 11, s: 0 },
+    { t: 60, s: null },
+  ]);
+  // An Event after the restart opens its window in full.
+  const later = { events: [{ name: 'Maintenance', start: 70, end: 71 }], discarded: [] };
+  assert.deepEqual(windowRows(windows, later, 1, 60).get('OverdueService'), [
+    { t: 71, s: 0 },
+    { t: 161, s: null },
+  ]);
+});
+
+test("what a Rule is at a time: Pending, Confirmed, Ended, Discarded or no Event, and the readout chip's color", () => {
+  const lifecycle = { events: [{ name: 'R', start: 2000, confirmed: 4000, end: 6000 }], discarded: [{ name: 'R', start: 8000, discarded: 9000 }] };
+  assert.deepEqual(
+    [1, 2, 3, 4, 5, 6, 7, 8, 9].map((t) => ruleState(lifecycle, t, 1000)),
+    ['no Event', 'Pending', 'Pending', 'Confirmed', 'Confirmed', 'Ended', 'no Event', 'Pending', 'Discarded'],
+  );
+  assert.equal(stateColor('Pending'), 'var(--event-pending)');
+  assert.equal(stateColor('Confirmed'), 'var(--event-confirmed)');
+  assert.equal(stateColor('Ended'), 'var(--event-confirmed)');
+  assert.equal(stateColor('no Event'), 'transparent');
+});
+
+test('latest(...) reads nothing before the first Confirmed Event, then the running one, then the Ended one until the next is Confirmed', () => {
+  const lift = (start, end) => ({ name: 'Lift', start: start * 1000, confirmed: start * 1000, end: end * 1000 });
+  const events = [lift(10, 40), lift(60, 90)];
+  assert.equal(latestEvent(events, 5, 1000), undefined);
+  assert.equal(latestEvent(events, 20, 1000), events[0]);
+  assert.equal(latestEvent(events, 50, 1000), events[0]);
+  assert.equal(latestEvent(events, 60, 1000), events[1]);
+  assert.equal(latestEvent(events, 120, 1000), events[1]);
+});
+
 test('a Pulse Channel reads "–" where a Sample does not carry it; another Channel keeps its last value', () => {
   const s = scenario(['errors', 'deploy'], ['deploy']);
   const r = rows({ errors: [3, null, 5], deploy: [1, null, null] });
@@ -161,6 +229,24 @@ test('a threshold names its Rule, Channel and value in words', () => {
   assert.equal(thresholdText({ channel: 'hr', rule: 'Tachycardia', condition: 'when >', value: 100 }), 'Tachycardia when hr > 100');
   assert.equal(thresholdText({ channel: 'spo2', rule: 'Desaturation', condition: 'endWhen ≥', value: 92 }), 'Desaturation endWhen spo2 ≥ 92');
   assert.equal(thresholdText({ channel: 'speed', rule: 'Trip, Idling', condition: 'when <', value: 0.5 }), 'Trip, Idling when speed < 0.5');
+  // Compared with another Channel: the value is that Channel's, so it is named instead.
+  assert.equal(thresholdText({ channel: 'weight', rule: 'Overload', condition: 'when > ratedLoad', value: 5000 }), 'Overload when weight > ratedLoad');
+});
+
+test('an Expression threshold reads like a Channel one: its comparison on the line, its Rule in the key', () => {
+  const x = { name: 'count(run).within(60 min)', unit: 'Runs', threshold: 3, rule: 'FrequentStarts', condition: 'when >', values: [] };
+  assert.equal(expressionLabel(x), '> 3');
+  assert.equal(thresholdText({ channel: x.name, rule: x.rule, condition: x.condition, value: x.threshold }, x.unit), 'FrequentStarts when count(run).within(60 min) > 3 Runs');
+});
+
+test('no line is drawn for a threshold against a shown Channel: that Channel is the line', () => {
+  const axes = [{ id: 'band0', channels: ['weight', 'ratedLoad'], ticks: [0, 6000], domain: [0, 1], middle: '50%' }];
+  const thresholds = [
+    { channel: 'weight', rule: 'LoadLifted', condition: 'when >', value: 500 },
+    { channel: 'weight', rule: 'Overload', condition: 'when > ratedLoad', value: 5000 },
+  ];
+  assert.deepEqual(thresholdLines(thresholds, axes, ['weight', 'ratedLoad']).map((l) => l.value), [500]);
+  assert.deepEqual(thresholdLines(thresholds, axes, ['weight']).map((l) => l.value), [500, 5000]);
 });
 
 test('thresholds at one value share a line; a line close to a labelled one is left unlabelled; the Channel is named where an axis has several', () => {

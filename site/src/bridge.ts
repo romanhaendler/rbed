@@ -57,6 +57,10 @@ export type PlottedExpression = {
   name: string;
   unit?: string;
   threshold: number | null;
+  /** The Rule, or Rules, whose Condition compares it with the threshold, and how, as a
+   *  Threshold's: "when >". */
+  rule?: string;
+  condition?: string;
   values: (number | null)[];
   /** Its value at each time advance (Result.advances), where time was advanced. */
   atAdvances?: (number | null)[];
@@ -81,6 +85,8 @@ export type Result =
       advances: number[];
       /** Timestamp of the first Sample after the Detector was restarted, if it was. */
       restart?: number;
+      /** Whether the restarted Detector got no History, so it knows no Event before the restart. */
+      restartForgets?: boolean;
     }
   /** `by` is 'rbed' when rbed rejected the Rules or the Samples; otherwise the site cannot run
    *  the input. */

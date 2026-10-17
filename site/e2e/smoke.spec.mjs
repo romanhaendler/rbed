@@ -41,7 +41,7 @@ for (const { path, control } of [
 
 test('drawing a Channel puts the drawn values into the Java source', async ({ page }) => {
   await page.goto('event-lifecycle/');
-  const code = page.locator('.configuratorCode');
+  const code = page.locator('.scenarioCode');
   await expect(code).toContainText('double[] values = {70, 72, 75, 85,');
   await page.getByRole('radiogroup', { name: 'Draw' }).locator('label', { hasText: 'temp' }).click();
   // A level stroke across the whole plot (its rectangle as plotArea.ts reads it, the ends past

@@ -16,8 +16,8 @@ export type MarkRow = { t: number; y: number };
 /** The Event lanes take the bottom of the plot, one unit each; each band of Channels three units
     above them, the first band on top. Expressions with a unit of their own take two units
     between the Channels and the lanes. */
-export const CHANNEL_UNITS = 3;
-export const SEPARATE_UNITS = 2;
+const CHANNEL_UNITS = 3;
+const SEPARATE_UNITS = 2;
 /** The Events' colors (site.css): Pending a lighter tone of Confirmed in light, a darker one in
     dark, each at least 3:1 against the surface. */
 export const EVENT_COLOR = 'var(--event-confirmed)';
@@ -36,7 +36,7 @@ export const MARKS = [
 
 /** Whether some Event, or Discarded Pending Event, was Pending for a while: only then does the
     chart show a Pending stretch and a Went Pending mark apart from the Confirmed one. */
-export const somePending = (l: Lifecycle) =>
+const somePending = (l: Lifecycle) =>
   l.events.some((e) => e.confirmed > e.start) || l.discarded.some((d) => d.discarded > d.start);
 
 /** The key's bands and marks, in lifecycle order, of those the chart shows. */
@@ -122,12 +122,13 @@ function niceStep(rough: number): number {
 }
 
 /** An axis with ticks over the values only, and a domain that puts them into the band from `below`
-    to `below + units` of the plot's `total` units, counted from its bottom. */
-export function bandAxis(values: (number | null | undefined)[], below: number, units: number, total: number) {
+    to `below + units` of the plot's `total` units, counted from its bottom; `binary` (values only
+    ever 0 or 1) ticks at 0 and 1 alone, since a half-on Channel means nothing. */
+function bandAxis(values: (number | null | undefined)[], below: number, units: number, total: number, binary = false) {
   const finite = values.filter(Number.isFinite) as number[];
   const lo = Math.min(...finite);
   const hi = Math.max(...finite);
-  const step = niceStep((hi - lo) / 4 || Math.abs(hi) || 1);
+  const step = binary ? 1 : niceStep((hi - lo) / 4 || Math.abs(hi) || 1);
   const first = Math.floor(lo / step);
   const last = Math.max(Math.ceil(hi / step), first + 1);
   const ticks = [];
@@ -148,21 +149,35 @@ export type ChannelAxis = ReturnType<typeof bandAxis> & { id: string; channels: 
 /** Channels whose largest values differ by more than this factor get bands of their own. */
 const SCALE_FACTOR = 4;
 
+/** A Channel moving over less than this share of its band's span gets a band of its own. */
+const SPAN_SHARE = 1 / 3;
+
 /** The Channels in bands by scale, in their order: a Channel joins the first band whose
-    Channels' largest absolute values are within SCALE_FACTOR of its own. A Pulse Channel is
-    drawn as marks on the first band. */
+    Channels' largest absolute values are within SCALE_FACTOR of its own, and in which no
+    Channel that changes (its own span above 0) would move over less than SPAN_SHARE of the
+    band's span, so a small drop does not shrink to a few pixels. A Pulse Channel is drawn as
+    marks on the first band. */
 export function channelBands(scenario: Scenario, rows: Row[]): string[][] {
-  const bands: { channels: string[]; magnitude: number }[] = [];
+  type Range = { lo: number; hi: number };
+  const bands: { channels: string[]; magnitude: number; ranges: Range[] }[] = [];
+  const span = (ranges: Range[]) => Math.max(...ranges.map((r) => r.hi)) - Math.min(...ranges.map((r) => r.lo));
   for (const c of scenario.channels) {
     if (scenario.pulse.includes(c)) continue;
-    const magnitude = Math.max(...rows.map((r) => Math.abs(r[c] ?? 0))) || 1;
-    const band = bands.find((b) => Math.max(b.magnitude, magnitude) / Math.min(b.magnitude, magnitude) <= SCALE_FACTOR);
+    const values = rows.map((r) => r[c]).filter((v) => v != null) as number[];
+    const range = values.length > 0 ? { lo: Math.min(...values), hi: Math.max(...values) } : { lo: 0, hi: 0 };
+    const magnitude = Math.max(Math.abs(range.lo), Math.abs(range.hi)) || 1;
+    const band = bands.find((b) => {
+      if (Math.max(b.magnitude, magnitude) / Math.min(b.magnitude, magnitude) > SCALE_FACTOR) return false;
+      const ranges = [...b.ranges, range];
+      return ranges.every((r) => r.hi === r.lo || r.hi - r.lo >= span(ranges) * SPAN_SHARE);
+    });
     if (band) {
       band.channels.push(c);
       band.magnitude = Math.max(band.magnitude, magnitude);
-    } else bands.push({ channels: [c], magnitude });
+      band.ranges.push(range);
+    } else bands.push({ channels: [c], magnitude, ranges: [range] });
   }
-  if (bands.length === 0) bands.push({ channels: [], magnitude: 1 });
+  if (bands.length === 0) bands.push({ channels: [], magnitude: 1, ranges: [] });
   bands[0].channels.push(...scenario.pulse);
   return bands.map((b) => b.channels);
 }
@@ -217,15 +232,17 @@ export const plotUnits = (lanes: number, separate: boolean, bands: number) =>
 
 /** The Channels' axes of what is shown, one per band (with the Expressions on the Channels'
     scale and the thresholds on the first, or on their Channel's); they keep their scale while
-    Channels are hidden. */
-export function channelAxesOf({ scenario, rows, rules, expressions, expressionRows, thresholds }: ChartModel): ChannelAxis[] {
-  const bands = channelBands(scenario, rows);
+    Channels are hidden, and a band whose Channels are all hidden is left out, but the first. */
+export function channelAxesOf({ scenario, rows, rules, channels: shown, expressions, expressionRows, thresholds }: ChartModel): ChannelAxis[] {
+  const bands = channelBands(scenario, rows).filter((channels, b) => b === 0 || channels.some((c) => shown.includes(c)));
   const separate = expressions.some(isSeparate);
   const total = plotUnits(rules.length, separate, bands.length);
   return bands.map((channels, b) => {
     const below = total - (b + 1) * CHANNEL_UNITS;
+    const own = rows.flatMap((r) => channels.map((c) => r[c])).filter((v) => v != null);
+    const binary = own.length > 0 && own.every((v) => v === 0 || v === 1) && (b > 0 || !expressions.some((x) => !isSeparate(x)));
     const values = [
-      ...rows.flatMap((r) => channels.map((c) => r[c])),
+      ...own,
       ...thresholds.filter((t) => channels.includes(t.channel)).map((t) => t.value),
       ...(b > 0
         ? []
@@ -233,7 +250,7 @@ export function channelAxesOf({ scenario, rows, rules, expressions, expressionRo
             isSeparate(x) ? [] : [...expressionRows.map((r) => r[expressionKey(k)]), x.threshold],
           )),
     ];
-    return { id: `band${b}`, channels, ...bandAxis(values, below, CHANNEL_UNITS, total) };
+    return { id: `band${b}`, channels, ...bandAxis(values, below, CHANNEL_UNITS, total, binary) };
   });
 }
 
@@ -254,10 +271,14 @@ export function timeDomain(rows: Row[], labels = 0): [number, number] {
 }
 
 /** The share of the time span to leave right of the last Sample for the threshold labels of the
-    first band's axis: on a phone, charts puts a label wider than the axis' column (even "> 100")
-    into the plot at its right end, where it would hide the data. */
+    first band's axis, its Channels' and Expressions': on a phone, charts puts a label wider than
+    the axis' column (even "> 100") into the plot at its right end, where it would hide the data. */
 export function labelRoom(model: ChartModel, axes: ChannelAxis[], narrow: boolean): number {
-  const widest = Math.max(0, ...thresholdLines(model.thresholds, axes, model.channels, narrow).filter((l) => l.axis === axes[0].id).map((l) => l.label.length));
+  const widest = Math.max(
+    0,
+    ...thresholdLines(model.thresholds, axes, model.channels, narrow).filter((l) => l.axis === axes[0].id).map((l) => l.label.length),
+    ...model.expressions.filter((x) => !isSeparate(x) && x.threshold !== null).map((x) => expressionLabel(x).length),
+  );
   return narrow && widest > 0 ? (widest * 6.5 + 12) / 250 : 0;
 }
 
@@ -320,15 +341,43 @@ export function ruleState(lifecycle: Lifecycle, t: number, millis: number): stri
   return 'no Event';
 }
 
+/** The color of a Rule's state in the readout: its band's, Pending or Confirmed (an Ended
+    Event was Confirmed, a Discarded one Pending); none where there is no Event. */
+export const stateColor = (state: string) =>
+  state === 'Pending' || state === 'Discarded' ? EVENT_STATES[0].color : state === 'no Event' ? 'transparent' : EVENT_COLOR;
+
 /** The Event latest(...) reads at time t: the most recently Confirmed one, running or Ended. */
 export const latestEvent = (events: Event[], t: number, millis: number) => events.findLast((e) => e.confirmed / millis <= t);
 
 /** The comparison in a threshold's condition: "when >" gives ">". */
 const COMPARISON = /[<>≤≥]=?/;
 
-/** A threshold in words, naming its Rule, Channel and value: "Tachycardia when hr > 100". */
-export const thresholdText = (t: Threshold) =>
-  `${t.rule} ${COMPARISON.test(t.condition) ? t.condition.replace(COMPARISON, `${t.channel} $&`) : `${t.condition} ${t.channel}`} ${t.value}`;
+/** The Channel a threshold compares with, where its condition names one ("when > ratedLoad"):
+    its value is that Channel's, so the Channel's own line is the threshold. */
+const against = (t: Threshold) => /[<>≤≥]=?\s+(\S+)/.exec(t.condition)?.[1];
+
+/** A threshold in words, naming its Rule, Channel (or Expression) and value, and the value's
+    unit if it has one: "Tachycardia when hr > 100"; the Channel it is compared with instead of
+    the value: "Overload when weight > ratedLoad". */
+export const thresholdText = (t: Threshold, unit?: string) =>
+  [
+    t.rule,
+    COMPARISON.test(t.condition) ? t.condition.replace(COMPARISON, `${t.channel} $&`) : `${t.condition} ${t.channel}`.trim(),
+    ...(against(t) ? [] : [t.value, unit]),
+  ]
+    .filter((part) => part !== undefined && part !== '')
+    .join(' ');
+
+/** A plotted Expression's threshold as a threshold of its Rule: the Expression in place of a Channel. */
+export const expressionThreshold = (x: PlottedExpression & { threshold: number }): Threshold => ({
+  channel: x.name,
+  rule: x.rule ?? '',
+  condition: x.condition ?? '',
+  value: x.threshold,
+});
+
+/** An Expression threshold's line label, the comparison and the value as on a Channel's: "> 3". */
+export const expressionLabel = (x: PlottedExpression) => `${x.condition?.match(COMPARISON)?.[0] ?? ''} ${x.threshold}`.trim();
 
 /** A line the chart draws at a threshold: its axis, its value, its label (empty where the line
     lies too close to a labelled one to tell them apart; the key names it) and the thresholds
@@ -341,11 +390,12 @@ const LABEL_SPACING = 0.04;
 /** The lines of the thresholds of the shown Channels: one per axis and value, labelled with
     the comparison alone ("> 100"; the key says the rest), or with the Channel too where the
     axis has several shown Channels ("temp > 26"), but on a phone (`narrow`), where the column
-    is narrow; from the top, a line too close to a labelled one has no label. */
+    is narrow; from the top, a line too close to a labelled one has no label. None where the
+    threshold is a shown Channel. */
 export function thresholdLines(thresholds: Threshold[], axes: ChannelAxis[], channels: string[], narrow = false): ThresholdLine[] {
   const lines: ThresholdLine[] = [];
   for (const t of thresholds) {
-    if (!channels.includes(t.channel)) continue;
+    if (!channels.includes(t.channel) || channels.includes(against(t) ?? '')) continue;
     const axis = axes.find((a) => a.channels.includes(t.channel)) ?? axes[0];
     const line = lines.find((l) => l.axis === axis.id && l.value === t.value);
     if (line) line.thresholds.push(t);
@@ -368,13 +418,16 @@ export function thresholdLines(thresholds: Threshold[], axes: ChannelAxis[], cha
 export const tickText = (v: number) => v.toLocaleString('en-US', { maximumFractionDigits: 6 });
 
 /** Each Rule's within(...) windows as StateBand rows of one state, over the time it counts after
-    each Event of the Rule it follows (in the Scenario's unit); overlapping windows merge. */
-export function windowRows(windows: Window[], lifecycle: Lifecycle, millis: number): Map<string, BandRow[]> {
+    each Event of the Rule it follows (in the Scenario's unit); overlapping windows merge.
+    `forgetsAt` (ms) is a restart without History: the new Detector knows no earlier Event, so
+    a window opened before it ends there. */
+export function windowRows(windows: Window[], lifecycle: Lifecycle, millis: number, forgetsAt?: number): Map<string, BandRow[]> {
   const byRule = new Map<string, BandRow[]>();
+  const cut = (end: number, to: number) => (forgetsAt !== undefined && end < forgetsAt ? Math.min(to, forgetsAt) : to);
   for (const rule of new Set(windows.map((w) => w.rule))) {
     const stretches = windows
       .filter((w) => w.rule === rule)
-      .flatMap((w) => ofRule(lifecycle, w.after).events.map((e) => [e.end / millis, (e.end + w.millis) / millis]))
+      .flatMap((w) => ofRule(lifecycle, w.after).events.map((e) => [e.end / millis, cut(e.end, e.end + w.millis) / millis]))
       .sort((a, b) => a[0] - b[0]);
     const merged: number[][] = [];
     for (const [from, to] of stretches) {
@@ -411,4 +464,9 @@ export type ChartModel = {
   /** Timestamps time was advanced to without a Sample, and the restart, if any (ms). */
   advances: number[];
   restart?: number;
+  /** Whether the restarted Detector forgot the Events before it (no History). */
+  restartForgets?: boolean;
 };
+
+/** Where the run forgets its earlier Events (ms): the restart, if its Detector got no History. */
+export const forgetsAt = (model: { restart?: number; restartForgets?: boolean }) => (model.restartForgets ? model.restart : undefined);

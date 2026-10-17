@@ -62,6 +62,11 @@ test('a Scenario marker ending in draw lets the reader draw its Channels', () =>
   assert.deepEqual(parse('<!-- scenario first-rule draw -->'), [{ kind: 'scenario', id: 'first-rule', draw: true }]);
 });
 
+test('a Scenario marker can name Channels or Rules the chart hides at first', () => {
+  assert.deepEqual(parse('<!-- scenario after draw hide door -->'), [{ kind: 'scenario', id: 'after', draw: true, hidden: ['door'] }]);
+  assert.deepEqual(parse('<!-- scenario logistics hide door,temp -->'), [{ kind: 'scenario', id: 'logistics', draw: false, hidden: ['door', 'temp'] }]);
+});
+
 test('a paragraph or list after a live marker is only for the live page', () => {
   assert.deepEqual(parse('Before\n\n<!-- live -->\nMove the slider\nnow.\n\nAfter\n\n<!-- live -->\n- drag\n\nEnd'), [
     { kind: 'html', html: '<p>Before</p>' },
