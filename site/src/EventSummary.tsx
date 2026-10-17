@@ -1,9 +1,9 @@
 // The chart's text alternative: its Events, Discarded Pending Events, plotted Expression, time
 // advances and restart in words, for a screen reader.
 import { VisuallyHidden } from '@umriss-ui/core';
-import type { PlottedExpression, Scenario, Threshold, Window } from './bridge';
+import type { Event, PlottedExpression, Resume, Scenario, Threshold, Window } from './bridge';
 import { expressionThreshold, type Row, thresholdText, undefinedStretches } from './chartModel.ts';
-import { type Lifecycle, timeIn } from './events.ts';
+import { differences, type Lifecycle, timeIn } from './events.ts';
 
 /** The plotted Expressions in words: what each is compared to and where they are undefined;
     `rows` are their expressionRows. */
@@ -56,6 +56,28 @@ export function timeSummary(
       : ` The Detector is restarted at ${at(restart)}${
           restartForgets ? ' without History: it knows no earlier Event, so a within(...) strip from before it ends there' : ' with History'
         }.`)
+  );
+}
+
+/** The Memory Horizon in words: "60 s", "5 Samples" or both. */
+export function memoryHorizonText({ millis, samples }: Resume['memoryHorizon'], unit: { name: string; millis: number }): string {
+  return [millis > 0 && timeIn(unit)(millis), samples > 0 && `${samples} Samples`].filter(Boolean).join(' and ') || 'none';
+}
+
+/** A resumed stream in words, for the text alternative: the stop, the Replay Point, the Memory
+    Horizon, and which Events differ from the uninterrupted run. */
+export function resumeSummary(resume: Resume, events: Event[], scenario: Scenario): string {
+  const at = timeIn(scenario.timeUnit);
+  const { extra, missing } = differences(events, resume.uninterrupted);
+  const describe = (e: Event) => `${e.name} from ${at(e.start)} to ${at(e.end)}${e.truncatedStart ? ' (start Truncated)' : ''}${e.truncatedEnd ? ' (end Truncated)' : ''}`;
+  return (
+    ` The process stops after the message at ${at(resume.stop)}; there the Replay Point is ${resume.replayPoint === null ? 'not set' : at(resume.replayPoint)}` +
+    ` and the Memory Horizon is ${memoryHorizonText(resume.memoryHorizon, scenario.timeUnit)}, shaded before the stop.` +
+    (extra.length + missing.length === 0
+      ? ' The restarted run reports exactly the Events of the uninterrupted run.'
+      : ' Shaded Events differ from the uninterrupted run.' +
+        (extra.length === 0 ? '' : ` It reports in addition: ${extra.map(describe).join('; ')}.`) +
+        (missing.length === 0 ? '' : ` It lacks: ${missing.map(describe).join('; ')}.`))
   );
 }
 

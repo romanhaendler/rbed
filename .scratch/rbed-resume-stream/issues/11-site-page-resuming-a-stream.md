@@ -4,11 +4,21 @@
 
 **Blocked by:** 10
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The page exists in the Guide after "Restarts: History", with prose adapted from the README section and links to its Javadoc members
-- [ ] At the defaults, the Replay Point and Snapshot restarts equal the uninterrupted run and the naive and History-only restarts do not (BridgeTest), and the page says so verifiably
-- [ ] The chart marks the stop, the Replay Point and the Memory Horizon, and differing Events are visible and named in the text alternative
-- [ ] Parity: Snapshots cross between the JVM and the compiled module in both directions and continue identically
-- [ ] SourceTest compiles and runs the page's Java; the twin and llms-full.txt read correctly without the live parts
-- [ ] All site checks pass (`npm test`, `test:browser`, every page at 1280/375 light/dark without page errors or axe violations)
+- [x] The page exists in the Guide after "Restarts: History", with prose adapted from the README section and links to its Javadoc members
+- [x] At the defaults, the Replay Point and Snapshot restarts equal the uninterrupted run and the naive and History-only restarts do not (BridgeTest), and the page says so verifiably
+- [x] The chart marks the stop, the Replay Point and the Memory Horizon, and differing Events are visible and named in the text alternative
+- [x] Parity: Snapshots cross between the JVM and the compiled module in both directions and continue identically
+- [x] SourceTest compiles and runs the page's Java; the twin and llms-full.txt read correctly without the live parts
+- [x] All site checks pass (`npm test`, `test:browser`, every page at 1280/375 light/dark without page errors or axe violations)
+
+## Comments
+
+- New: Guide page `/resuming-a-stream/` after "Restarts: History" (`src/content/resuming-a-stream.md`, manifest entry, a link from the front page's "Good to know"), Scenario `Resuming` (id `resuming`; parameters `stop` 1..119 messages, default 45, and the choice `restart`: Naive, History only, Replay Point, Snapshot, default Snapshot). The Rules are Overheat (End Condition on load while temp still holds) and Repeated (`count(...).within`) of the README example, without its moving-average Rule (see below).
+- Bridge: the result has `resume: {stop, replayPoint (null if empty), memoryHorizon {millis, samples}, uninterrupted: [Events]}` (stop is the timestamp of the last message before it). `Lifecycle` got `resume`, `snapshot`, `given` and `replaying` (a replay's Ended and Discarded Events are not recorded). Two more exports for the parity test only: `Bridge.snapshot(id, params)` (hex of the Snapshot taken at the stop, "" for other Scenarios) and `Bridge.resume(id, params, hex)` (a run that restores the given Snapshot).
+- Chart: stop line, Replay Point line, Memory Horizon band before the stop (clamped at the first Sample) and a red band over every Event that differs from the uninterrupted run (`differences` in `events.ts`, tested in `events.test.mjs`); the key names them and the text alternative lists the Events it adds and lacks (`resumeSummary`). The Event table is unchanged.
+- Verified (BridgeTest): at stop 45 Replay Point and Snapshot equal the uninterrupted run (Overheat 10..20, 40..60, 90..100; Repeated 43..74, 93..104), Naive and History only do not (Overheat 45..60 Truncated start; Repeated 93..109 resp. 48..74 and 93..109); the Replay Point is 39 s, the Memory Horizon 60 s and 0 Samples; for every stop 1..119 Replay Point and Snapshot equal the uninterrupted run; the page's "things to try" (stops 5, 80, 100, 105) are asserted. SourceTest compiles and runs the source at the defaults and, in a new test, runs each of the four restart options (a replay reports some Events twice to its Tee only).
+- Parity: the Snapshot is byte for byte the same on the JVM and in the compiled module (stops 1, 20, 45, 80, 119, in `parity.json`); the JVM's Snapshot restored in the compiled module gives the JVM's result, and the compiled module's own restores identically (`parity.test.mjs`). Since the bytes are equal, both directions are covered.
+- FINDING (library, not changed): a Rule with a moving average (here `temp.averageOverSamples(5).above(60)`, with or without `forSamples`) holds `replayPoint()` at 0 for the whole run, because a window entry's need is the closed point of its moment, which includes the window's own need, so the chain never lets go. Replays stay exact but start from the beginning, so retention for such Rules is unbounded. The page's Scenario therefore leaves the README example's Warm Rule out; the example test is unaffected (it only checks equality).
+- Checks: `mvn -q verify`, site `npm ci`, `npm run build`, `npm test` (326), `CI=1 PORT=4893 npm run test:browser` (21) pass. The new page was also checked in headless Chromium at 1280 and 375 px, light and dark, for each of the four restarts: no page errors, no horizontal scroll, and the screenshots read well. The repo has no axe dependency, so no axe run.

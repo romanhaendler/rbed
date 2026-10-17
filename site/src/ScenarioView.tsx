@@ -14,7 +14,7 @@ import { CodeBlock } from './CodeBlock';
 import { drawnSource, drawTo } from './draw.ts';
 import { DrawLayer } from './DrawLayer';
 import { EventChart, LifecycleKey, useNarrow } from './EventChart';
-import { drawnSummary, EventSummary, expressionSummary, limitsSummary, timeSummary } from './EventSummary';
+import { drawnSummary, EventSummary, expressionSummary, limitsSummary, resumeSummary, timeSummary } from './EventSummary';
 import { AggregatesPanel, DiscardedTable, EventTable } from './EventTables';
 import { eventKey } from './events.ts';
 import { defaultsOf, fromQuery } from './parameters';
@@ -120,6 +120,7 @@ export function ScenarioView({ scenario, draw = false, hidden: hiddenAtFirst = [
       advances: result.advances,
       restart: result.restart,
       restartForgets: result.restartForgets,
+      resume: result.resume,
     };
     const channelAxes = frozen ?? channelAxesOf(model);
     const penAxis = channelAxes.find((a) => a.channels.includes(pen)) ?? channelAxes[0];
@@ -155,6 +156,7 @@ export function ScenarioView({ scenario, draw = false, hidden: hiddenAtFirst = [
             expressionSummary(result.expressions, plotted, scenario.timeUnit.name) +
             limitsSummary(result.thresholds, result.windows, scenario) +
             timeSummary(result, scenario) +
+            (result.resume ? resumeSummary(result.resume, result.events, scenario) : '') +
             drawnSummary(Object.keys(drawn))
           }
         />

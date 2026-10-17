@@ -35,6 +35,7 @@ public final class Bridge {
       new TotalDuration(),
       new Latest(),
       new History(),
+      new Resuming(),
       new Validation(),
       new Cranes(),
       new Manufacturing(),
@@ -135,11 +136,60 @@ public final class Bridge {
     } catch (RuntimeException e) {
       return error(e, "");
     }
-    return run(scenario, parameters, drawnChannels);
+    return run(scenario, parameters, drawnChannels, null);
+  }
+
+  /**
+   * The Snapshot a resuming Scenario takes at its stop, at the given parameters, as hexadecimal
+   * text; empty for a Scenario that takes none or a run rbed rejects. It lets the parity test
+   * restore a Snapshot written by the other runtime.
+   */
+  @JSExport
+  public static String snapshot(String scenarioId, String parameters) {
+    Lifecycle[] made = new Lifecycle[1];
+    run(scenario(scenarioId), parameters, "{}", null, made);
+    return made[0] == null || made[0].snapshot == null ? "" : hex(made[0].snapshot);
+  }
+
+  /**
+   * {@link #run} of a resuming Scenario that restores {@code snapshot} (hexadecimal text, as
+   * {@link #snapshot} writes it) where it would restore the one it took itself.
+   */
+  @JSExport
+  public static String resume(String scenarioId, String parameters, String snapshot) {
+    return run(scenario(scenarioId), parameters, "{}", unhex(snapshot));
+  }
+
+  private static String hex(byte[] bytes) {
+    StringBuilder out = new StringBuilder();
+    for (byte b : bytes) {
+      out.append(Character.forDigit((b >> 4) & 15, 16)).append(Character.forDigit(b & 15, 16));
+    }
+    return out.toString();
+  }
+
+  private static byte[] unhex(String text) {
+    byte[] bytes = new byte[text.length() / 2];
+    for (int i = 0; i < bytes.length; i++) {
+      bytes[i] = (byte) (Character.digit(text.charAt(2 * i), 16) << 4
+          | Character.digit(text.charAt(2 * i + 1), 16));
+    }
+    return bytes;
   }
 
   /** {@link #run(String, String, String)} for a Scenario given, not looked up. */
   static String run(Scenario scenario, String parameters, String drawnChannels) {
+    return run(scenario, parameters, drawnChannels, null);
+  }
+
+  private static String run(Scenario scenario, String parameters, String drawnChannels,
+      byte[] given) {
+    return run(scenario, parameters, drawnChannels, given, new Lifecycle[1]);
+  }
+
+  /** As above; {@code made[0]} receives the Lifecycle of the run, once it has one. */
+  private static String run(Scenario scenario, String parameters, String drawnChannels,
+      byte[] given, Lifecycle[] made) {
     Map<String, Double> values;
     List<Sample> samples;
     try {
@@ -153,6 +203,8 @@ public final class Bridge {
       List<Expression> plotted = new ArrayList<>();
       for (Scenario.Plot plot : scenario.plots(values)) plotted.add(plot.expression());
       lifecycle = new Lifecycle(plotted);
+      lifecycle.given = given;
+      made[0] = lifecycle;
     } catch (RuntimeException e) {
       return error(e, "");
     }
@@ -292,17 +344,8 @@ public final class Bridge {
     for (int i = 0; i < events.size(); i++) {
       Event e = events.get(i);
       if (i > 0) out.append(',');
-      Json.string(out.append("{\"name\":"), e.name())
-          .append(",\"start\":").append(e.start())
-          .append(",\"confirmed\":").append(e.confirmed().getAsLong())
-          .append(",\"end\":").append(e.end().getAsLong())
-          .append(",\"truncatedStart\":").append(e.truncatedStart())
-          .append(",\"truncatedEnd\":").append(e.truncatedEnd());
-      aggregates(out.append(",\"aggregates\":"), scenario, e);
       String note = lifecycle.noteOf(e);
-      if (note == null) note = scenario.note(e, values);
-      if (note != null) Json.string(out.append(",\"note\":"), note);
-      out.append('}');
+      event(out, scenario, e, note != null ? note : scenario.note(e, values));
     }
     out.append("],\"discarded\":[");
     for (int i = 0; i < lifecycle.discarded.size(); i++) {
@@ -321,6 +364,20 @@ public final class Bridge {
     out.append(']');
     if (lifecycle.restart != null) out.append(",\"restart\":").append(lifecycle.restart);
     if (lifecycle.restartForgets) out.append(",\"restartForgets\":true");
+    if (lifecycle.resume != null) {
+      Lifecycle.Resume r = lifecycle.resume;
+      out.append(",\"resume\":{\"stop\":").append(r.stop()).append(",\"replayPoint\":");
+      if (r.replayPoint().isPresent()) out.append(r.replayPoint().getAsLong());
+      else out.append("null");
+      out.append(",\"memoryHorizon\":{\"millis\":").append(r.horizon().millis())
+          .append(",\"samples\":").append(r.horizon().samples())
+          .append("},\"uninterrupted\":[");
+      for (int i = 0; i < r.uninterrupted().size(); i++) {
+        if (i > 0) out.append(',');
+        event(out, scenario, r.uninterrupted().get(i), null);
+      }
+      out.append("]}");
+    }
     out.append(",\"expressions\":[");
     List<Scenario.Plot> plots = scenario.plots(values);
     for (int i = 0; i < plots.size(); i++) {
@@ -357,6 +414,19 @@ public final class Bridge {
     }
     out.append(']');
     return out.append('}').toString();
+  }
+
+  /** One Ended Event as JSON, with its note if it has one. */
+  private static void event(StringBuilder out, Scenario scenario, Event e, String note) {
+    Json.string(out.append("{\"name\":"), e.name())
+        .append(",\"start\":").append(e.start())
+        .append(",\"confirmed\":").append(e.confirmed().getAsLong())
+        .append(",\"end\":").append(e.end().getAsLong())
+        .append(",\"truncatedStart\":").append(e.truncatedStart())
+        .append(",\"truncatedEnd\":").append(e.truncatedEnd());
+    aggregates(out.append(",\"aggregates\":"), scenario, e);
+    if (note != null) Json.string(out.append(",\"note\":"), note);
+    out.append('}');
   }
 
   /** A JSON array of the k-th value of each moment; NaN becomes null. */

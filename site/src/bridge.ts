@@ -73,6 +73,16 @@ export type Threshold = { channel: string; rule: string; condition: string; valu
 /** The time after each Event of the Rule `after` that the within(...) of the Rule `rule` counts. */
 export type Window = { rule: string; after: string; millis: number };
 
+/** Where a stopped stream was resumed (the Resuming Scenario): the timestamp of the last message
+ *  before the stop, the Replay Point and Memory Horizon there (null: no Replay Point), and the
+ *  Events an uninterrupted Detector reports, which the run's own Events are compared with. */
+export type Resume = {
+  stop: number;
+  replayPoint: number | null;
+  memoryHorizon: { millis: number; samples: number };
+  uninterrupted: Event[];
+};
+
 export type Result =
   | {
       samples: { timestamp: number; values: Record<string, number | null> }[];
@@ -87,6 +97,7 @@ export type Result =
       restart?: number;
       /** True if the restarted Detector got no History, so it knows no Event from before. */
       restartForgets?: true;
+      resume?: Resume;
     }
   /** `by` is 'rbed' when rbed rejected the Rules or the Samples; otherwise the site cannot run
    *  the input. */

@@ -40,6 +40,9 @@ import {
   type MarkRow,
   plotUnits,
   RESTART_COLOR,
+  REPLAY_COLOR,
+  HORIZON_COLOR,
+  DIFFERS_COLOR,
   RING_COLOR,
   type Row,
   readoutValue,
@@ -59,7 +62,8 @@ import {
   WINDOW_COLOR,
   windowRows,
 } from './chartModel.ts';
-import { eventKey, ofRule } from './events.ts';
+import { differences, eventKey, ofRule } from './events.ts';
+import { memoryHorizonText } from './EventSummary';
 import { plotRect } from './plotArea.ts';
 
 const NARROW = '(max-width: 600px)';
@@ -295,6 +299,7 @@ export function EventChart({
           <LimitBand orientation="x" from={selected.start / millis} to={selected.end / millis} color="var(--u-color-accent)" />
         )}
         {latest && <LimitBand orientation="x" from={latest.start / millis} to={latest.end / millis} color={LATEST_COLOR} />}
+        {model.resume && <ResumeMarks model={model} millis={millis} />}
         {model.restart !== undefined && (
           // No label: on the x axis it would cover a tick on a phone; the key under the chart names it.
           <LimitLine orientation="x" value={model.restart / millis} color={RESTART_COLOR} />
@@ -393,10 +398,29 @@ export function EventChart({
   );
 }
 
+/** A resumed stream: the Memory Horizon before the stop, the Events that differ from the
+    uninterrupted run, the Replay Point and the stop. No labels (on the x axis they would cover a
+    tick on a phone); the key names them. */
+function ResumeMarks({ model, millis }: { model: ChartModel; millis: number }) {
+  const { stop, replayPoint, memoryHorizon, uninterrupted } = model.resume!;
+  const { extra, missing } = differences(model.lifecycle.events, uninterrupted);
+  const first = model.rows[0]?.t ?? 0;
+  return (
+    <>
+      <LimitBand orientation="x" from={Math.max(first, (stop - memoryHorizon.millis) / millis)} to={stop / millis} color={HORIZON_COLOR} />
+      {[...extra, ...missing].map((e) => (
+        <LimitBand key={`differs ${e.name} ${e.start} ${e.end}`} orientation="x" from={e.start / millis} to={e.end / millis} color={DIFFERS_COLOR} />
+      ))}
+      {replayPoint !== null && <LimitLine orientation="x" value={replayPoint / millis} color={REPLAY_COLOR} />}
+      <LimitLine orientation="x" value={stop / millis} color={RESTART_COLOR} />
+    </>
+  );
+}
+
 /** What the bands' colors, the lines and the marks mean; the text alternative says it in words.
     Each group keeps its heading with its first item, and its items wrap under one another. */
 export function LifecycleKey({ model }: { model: ChartModel }) {
-  const { scenario, lifecycle, expressions, windows, advances, restart, thresholds, channels } = model;
+  const { scenario, lifecycle, expressions, windows, advances, restart, thresholds, channels, resume } = model;
   const key = keyOf(lifecycle);
   const item = (label: string, color: string, kind = '') => (
     <span key={label} className="keyItem">
@@ -431,6 +455,8 @@ export function LifecycleKey({ model }: { model: ChartModel }) {
       {group('Lines:', [
         ...expressions.map((x, k) => item(x.name, expressionColor(scenario, k), 'dash')),
         restart !== undefined && item('Restart', RESTART_COLOR, 'line'),
+        resume && item('Stop', RESTART_COLOR, 'line'),
+        resume && resume.replayPoint !== null && item('Replay Point', REPLAY_COLOR, 'line'),
       ])}
       {group(
         'Thresholds:',
@@ -440,6 +466,9 @@ export function LifecycleKey({ model }: { model: ChartModel }) {
         ].map((text) => item(text, THRESHOLD_COLOR, 'dash')),
       )}
       {group('Shaded:', [
+        resume && item(`Memory Horizon (${memoryHorizonText(resume.memoryHorizon, scenario.timeUnit)})`, HORIZON_COLOR),
+        resume && Object.values(differences(lifecycle.events, resume.uninterrupted)).some((d) => d.length > 0) &&
+          item('Differs from the uninterrupted run', DIFFERS_COLOR),
         undefinedStretches(model.expressionRows, expressions.length).length > 0 &&
           item(expressions.length > 1 ? 'An Expression undefined' : 'Expression undefined', `color-mix(in srgb, ${UNDEFINED_COLOR} 30%, transparent)`),
       ])}

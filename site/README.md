@@ -17,7 +17,7 @@ npm run test:browser  # after build: the Playwright smoke tests against dist/, e
 
 ## Where things are
 
-- `src/bridge.ts`: the compiled module's two functions (`scenarios`, `run`), typed.
+- `src/bridge.ts`: the compiled module's functions the app calls (`scenarios`, `run`), typed. `Bridge` exports two more for the parity test alone: `snapshot` and `resume` (see `Resuming`).
 - `src/ScenarioView.tsx`: one Scenario: chart and panel, tables, source.
 - `src/EventChart.tsx`: draws what `src/chartModel.ts` computes, with the umriss charts.
 - `src/chartModel.ts`: everything the chart computes (bands, axes, lanes, thresholds, windows, the readout), pure, tested in `test/chartModel.test.mjs`.
@@ -45,6 +45,7 @@ A page is three things; the build does the rest.
      - `plots(values)`: Expressions to draw as dashed lines. Every Detector of the run watches them, and `Lifecycle` reads them with `detector.value(...)` after every push and every advance, so a plot costs no extra run and has a value at every Sample and every advance. A `Plot` with a threshold names its Rule and comparison as a `Threshold` does, and one with a `unit` of its own gets its own axis.
      - `thresholds(values)`: where its Rules compare a Channel with a value, one `Threshold` per Rule part and comparison (`"when >"`, `"endWhen <"`).
      - `windows(values)`: the time each `after(...).within(...)` counts (`Window(rule, after, millis)`).
+     - A Scenario that resumes a stream (`Resuming`) sets `lifecycle.resume` (the stop, the Replay Point, the Memory Horizon and the uninterrupted run's Events, which the result carries and the chart marks), `lifecycle.snapshot` (the Snapshot it took) and restores `lifecycle.given` instead when the bridge has one from the other runtime; while `lifecycle.replaying` is set, Events Ended are not recorded.
      - `pulseChannels()`: its Pulse Channels; rbed does not tell a Channel's kind, and without it a Pulse Channel is drawn as a held line.
      - `readsLatest()`: the Rule whose latest Event its Rules read, which gives the readout its `latest(...)` line and the chart its highlight.
    - **What the chart does with them.**
