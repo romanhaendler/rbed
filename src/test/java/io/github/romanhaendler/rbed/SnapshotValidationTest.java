@@ -96,8 +96,13 @@ class SnapshotValidationTest {
   }
 
   private static StateWriter overSamples(int length, int size, int next) {
+    return overSamples(length, length, size, next);
+  }
+
+  private static StateWriter overSamples(int length, int needsLength, int size, int next) {
     return writer(s -> {
       s.float64s(new double[length]);
+      s.int64s(new long[needsLength]);
       s.int32(size);
       s.int32(next);
       s.int32(0);
@@ -110,6 +115,8 @@ class SnapshotValidationTest {
   void anOverSamplesWindowOfTheWrongSizeOrPositionIsRejected() throws Exception {
     Detector d = detector(10);
     new Window.OverSamples(d, 3).load(reader(overSamples(3, 3, 2))); // control
+    assertThrows(IOException.class,
+        () -> new Window.OverSamples(d, 3).load(reader(overSamples(3, 4, 0, 0))), "needs");
     int[][] bad = {{4, 0, 0}, {2, 0, 0}, {3, 4, 0}, {3, -1, 0}, {3, 0, 3}, {3, 0, -1}};
     for (int[] b : bad) {
       assertThrows(IOException.class,
@@ -124,7 +131,9 @@ class SnapshotValidationTest {
       for (int i = 0; i < entries; i++) {
         s.int64(i);
         s.float64(i);
+        s.int64(i);
       }
+      s.int64(0);
       s.int32(0);
       s.float64(0);
       s.float64(0);

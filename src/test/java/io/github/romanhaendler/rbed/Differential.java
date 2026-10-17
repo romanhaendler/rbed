@@ -327,7 +327,8 @@ final class Differential {
     /** What is observable between two moments: counters and watched values, no callbacks. */
     List<String> stateLines() {
       return observe().stream().filter(l -> l.startsWith("retainedValues")
-          || l.startsWith("droppedValues") || l.startsWith("value(")).toList();
+          || l.startsWith("droppedValues") || l.startsWith("replayPoint")
+          || l.startsWith("value(")).toList();
     }
 
     List<String> apply(Op op) {

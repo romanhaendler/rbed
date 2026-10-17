@@ -104,10 +104,10 @@ class SnapshotGuaranteeTest {
     }
     int later = d.snapshot().length;
     assertTrue(atLimit > 100 * 16, "windows should be full by now: " + atLimit);
-    // two windows of at most 100 entries of 16 bytes (time and value; the timestamps of count are
-    // 8), plus a few hundred bytes of fixed state
+    // a window of at most 100 entries of 24 bytes (time, value, replay need) and the timestamps
+    // of count at 8, plus a few hundred bytes of fixed state
     assertTrue(later <= atLimit + 8, "grew from " + atLimit + " to " + later + " bytes");
-    assertTrue(later < 2 * 100 * 16 + 1_000, later + " bytes for a limit of 100");
+    assertTrue(later < 100 * (24 + 8) + 2_000, later + " bytes for a limit of 100");
     assertTrue(d.retainedValues() <= 2 * 100 + 10,"retained " + d.retainedValues());
     Detector twin = Detector.builder().retentionLimit(100)
         .rules(hit,
