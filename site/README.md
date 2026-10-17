@@ -2,18 +2,30 @@
 
 The web app (React, Vite, TypeScript) is in this directory; `scenarios/` is the Scenario module, a Maven project that TeaVM compiles together with rbed to `scenarios/target/js/rbed.js`. See [ADR-0005](../docs/adr/0005-site-runs-rbed-through-teavm.md).
 
-Needs Java 17+, Maven and Node 22+. From a clean checkout, in this directory:
+Needs Java 17+, Maven and Node 22.18+ (it runs the tests' TypeScript imports without a flag). From a clean checkout, in this directory:
 
 ```sh
 npm ci
 npm run build     # installs rbed from the repository root and builds its Javadoc, compiles the Scenarios with TeaVM, builds dist/
-npm test          # installs rbed (and its Javadoc), runs the JUnit tests and TeaVM, then the Node parity tests
+npm test          # installs rbed (and its Javadoc), runs the JUnit tests and TeaVM, then the Node tests
 npm run build:web # builds dist/ from the module npm test compiled, as the Pages workflow does
 npm run preview   # serves dist/ at http://localhost:4173/rbed/
 npm run test:browser  # after build: the Playwright smoke tests against dist/, every page at 1280 and 375 px (once: npx playwright install chromium)
 ```
 
 `npm run dev` serves the app with hot reload once `npm run build:java` has produced the compiled module.
+
+## Where things are
+
+- `src/bridge.ts`: the compiled module's two functions (`scenarios`, `run`), typed.
+- `src/ScenarioView.tsx`: one Scenario: chart and panel, tables, source.
+- `src/EventChart.tsx`: draws what `src/chartModel.ts` computes, with the umriss charts.
+- `src/chartModel.ts`: everything the chart computes (bands, axes, lanes, thresholds, windows, the readout), pure, tested in `test/chartModel.test.mjs`.
+- `src/plotArea.ts`: the only dependency on @umriss-ui/charts internals, which is why the package is pinned.
+- `src/events.ts`, `src/aggregates.ts`: the Event tables' text, shared by the app and `prerender.mjs`.
+- `src/markdown.ts`: the pages' Markdown subset; `src/pages.ts`: the page list; `src/search.ts`: the search.
+- `prerender.mjs`: the prerendered pages, the twins, llms.txt and the rest (see below).
+- `test/`: the Node tests (`npm test`); `e2e/`: the Playwright tests (`npm run test:browser`).
 
 ## Adding a page
 
@@ -48,8 +60,8 @@ The Markdown is a small subset (`src/markdown.ts`): `#` to `###` headings, parag
 
 From these, `npm run build` (`prerender.mjs`, run at the end of `vite build`) writes for every page in the manifest:
 
-- `dist/<path>/index.html`: the app with the page's head (title, description, canonical, Open Graph, the twin link) and its text prerendered in the site's header and navigation, each Scenario as its Java source and Event table at the default parameters; the app replaces it when it starts, and a reader without JavaScript reads it;
-- `dist/<name>.md`: the Markdown twin, the same text with each Scenario written out the same way, with its parameters listed;
+- `dist/<path>/index.html`: the app with the page's head (title, description, canonical, Open Graph, the twin link) and its text prerendered in the site's header and navigation, each Scenario as its Event table and Java source at the default parameters; the app replaces it when it starts, and a reader without JavaScript reads it;
+- `dist/<name>.md`: the Markdown twin, the same text with each Scenario written out the same way, its parameters listed first;
 - `llms.txt`, `llms-full.txt` (README, glossary, every twin in navigation order), `sitemap.xml` and `404.html`;
 - `dist/api/`: rbed's Javadoc of the same commit, which `npm run install:rbed` builds (`mvn -Prelease javadoc:javadoc`, with a link back to the site as its `-header` and the MIT licence as its `-bottom`), in the site's fonts and colors (`api.css`, which sets the custom properties of JDK 21's Javadoc stylesheet; the Pages workflow uses JDK 21).
 

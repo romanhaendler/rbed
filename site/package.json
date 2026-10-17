@@ -2,6 +2,9 @@
   "name": "rbed-site",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
   "scripts": {
     "build": "npm run build:java && npm run build:web",
     "build:web": "tsc --noEmit && vite build",
