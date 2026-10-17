@@ -23,6 +23,7 @@ Vocabulary (Sample, Channel, Condition, Rule, Event, Detector, ...) is defined i
 - [Silent sensors: advancing time](#silent-sensors-advancing-time)
 - [Pulse Channels](#pulse-channels)
 - [Restarts: History](#restarts-history)
+- [Resuming a stream](#resuming-a-stream): Snapshot, Replay Point, Memory Horizon
 - [Errors and validation](#errors-and-validation)
 - [Examples](#examples), [Performance](#performance), [Notes](#notes), [License](#license)
 
@@ -34,14 +35,14 @@ rbed is on Maven Central and needs Java 17 or later. Maven:
 <dependency>
   <groupId>io.github.romanhaendler</groupId>
   <artifactId>rbed</artifactId>
-  <version>0.3.0</version>
+  <version>0.4.0</version>
 </dependency>
 ```
 
 Gradle:
 
 ```kotlin
-implementation("io.github.romanhaendler:rbed:0.3.0")
+implementation("io.github.romanhaendler:rbed:0.4.0")
 ```
 
 The library is the Java module `io.github.romanhaendler.rbed` (`requires io.github.romanhaendler.rbed;`) and has a single package of the same name. It also works on the class path.
@@ -692,6 +693,133 @@ Detector detector = Detector.builder()
 
 History Events are matched to Rules by `name()`, so each must belong to a Rule added to the Detector. They must be Confirmed and Ended (both `confirmed()` and `end()` present), and the first Sample must come after the latest of their ends. `after`, `unless`, `count`, `totalDuration` and `latest(...).duration()` take them into account. They carry no Aggregates for `latest(...).min/max/mean`, and they are not reported to the listener again.
 
+## Resuming a stream
+
+An application that reads a message stream (a Kafka topic, say) wants to stop and start again, for a deployment or after a crash, and continue as if it had never stopped: the same Events at the same timestamps with the same flags and Aggregates, each reported once. [History](#restarts-history) restores only Ended Events. Three capabilities restore the rest (Events in progress, running durations, moving-average windows, `rate()`, `age()`, `maxGap`, `latest(...)` Aggregates):
+
+- **Snapshot.** `detector.snapshot()` returns the complete state as a `byte[]`. `Detector.builder().rules(...).restore(bytes).build()` continues from it, with nothing to replay. A restored Detector is indistinguishable from the original in everything observable: callbacks, Events bit for bit, `value(...)`, `retainedValues()`, exceptions. Take it between moments (after `push`, `advanceTo` or `close` returned, never inside a listener callback), store it anywhere (a database column, a compacted topic, a file) together with the position of the next message. Its size is bounded by the Retention Limit.
+- **Replay Point.** `detector.replayPoint()` is the earliest timestamp from which replaying the stream into a fresh Detector reproduces the state, when the Events that Ended before it are supplied as History. Nothing is stored but a timestamp and Ended Events, so there is no format to keep readable. It is the way to continue when there is no usable Snapshot (none taken yet, the Rules changed, a Snapshot of another format version), and it bounds the replay after an older Snapshot. It is empty before the first Sample and with a sampling rate. Reading it costs a loop over the Channels, moving averages and Rules, so it can be stored with every message.
+- **Memory Horizon.** `detector.memoryHorizon()` is a `MemoryHorizon(millis, samples)`: the longest time window and the largest Sample count the Rules use. It sizes the topic's retention and the Snapshot interval. It is a configuration bound, not a guarantee: an Event in progress, a Rule waiting for its `when` Condition to stop holding and `latest(...)` can reach further back. Only the Replay Point is exact.
+
+### What to persist
+
+After each message (or each batch), in one transaction with its side effects, or idempotently:
+
+- the position of the next message to process;
+- for the Snapshot recipe, the Snapshot and the position of the next message after it (every message, or every few seconds or minutes);
+- for the replay recipe, the Replay Point, and the Ended Events (from `onEnded`) keyed by Rule name and start, so that storing one twice changes nothing.
+
+### Restarting
+
+1. **Restore and continue.** Build the Detector with the same Rules and options and `.restore(snapshot)`, seek to the position after the Snapshot and go on.
+2. **Replay from the Replay Point.** Build the Detector with `.history(...)` of the stored Ended Events that ended before the stored Replay Point, seek to the first message at or after the Replay Point (Kafka: `offsetsForTimes`), and feed the messages from there. The replay reports Events that already happened, so suppress the listener's side effects until the replay reaches the last processed position.
+3. **An older Snapshot plus the tail.** Restore as in 1, then replay the messages from the Snapshot's position to the last processed one with side effects suppressed, then continue. Snapshots can be taken rarely; the Replay Point is not needed.
+
+```java
+/** What the application keeps in its database, written together with each message's effects. */
+static final class Store {
+  byte[] snapshot;                  // the latest Snapshot ...
+  int snapshotNext;                 // ... and the offset of the next message after it
+  int next;                         // the next message to process: everything before is done
+  OptionalLong replayPoint = OptionalLong.empty();       // for the replay recipe
+  final Map<String, Event> ended = new TreeMap<>();      // Ended Events, keyed by Rule and start
+}
+
+/** One consumer: reads the topic from {@code next} on and reports what the Detector finds. */
+static final class Consumer implements EventListener {
+  final List<Sample> topic;
+  final List<String> output;        // the side effects: alerts, rows, ...
+  final Store store;
+  final int snapshotEvery;
+  Detector detector;
+  int next;                         // offset of the message being processed
+  int quietUntil;                   // replayed messages: their effects were done before
+
+  Consumer(List<Sample> topic, List<String> output, Store store, int snapshotEvery) {
+    this.topic = topic;
+    this.output = output;
+    this.store = store;
+    this.snapshotEvery = snapshotEvery;
+  }
+
+  Detector.Builder builder() {
+    return Detector.builder().rules(OVERHEAT, WARM, REPEATED).listener(this);
+  }
+
+  @Override public void onConfirmed(Event e) { report("confirmed", e); }
+  @Override public void onEnded(Event e) {
+    store.ended.put(e.name() + "@" + e.start(), e);
+    report("ended", e);
+  }
+
+  private void report(String kind, Event e) {
+    if (next >= quietUntil) output.add(kind + " " + e.name() + " " + e.start());
+  }
+
+  /** Processes messages up to (not including) {@code end}, keeping the Store up to date. */
+  void run(int end) {
+    for (; next < end; next++) {
+      Sample message = topic.get(next);
+      detector.push(message.timestamp(), message.values());
+      store.next = next + 1;
+      store.replayPoint = detector.replayPoint();
+      if (store.next % snapshotEvery == 0) {
+        store.snapshot = detector.snapshot();
+        store.snapshotNext = store.next;
+      }
+    }
+  }
+
+  /** First start: nothing is stored yet. */
+  static Consumer fresh(List<Sample> topic, List<String> output, Store store, int every) {
+    Consumer c = new Consumer(topic, output, store, every);
+    c.detector = c.builder().build();
+    return c;
+  }
+
+  /** Restart 1 and 3: restore the latest Snapshot, replay the messages after it (if any). */
+  static Consumer restore(List<Sample> topic, List<String> output, Store store, int every) {
+    Consumer c = new Consumer(topic, output, store, every);
+    c.detector = store.snapshot == null            // none taken yet: replay everything
+        ? c.builder().build() : c.builder().restore(store.snapshot).build();
+    c.next = store.snapshot == null ? 0 : store.snapshotNext;
+    c.quietUntil = store.next;      // the effects of the tail were done before the crash
+    return c;
+  }
+
+  /** Restart 2: History of the Events Ended before the Replay Point, replay from there. */
+  static Consumer replay(List<Sample> topic, List<String> output, Store store, int every) {
+    Consumer c = new Consumer(topic, output, store, every);
+    long from = store.replayPoint.orElse(Long.MIN_VALUE);
+    List<Event> history = store.ended.values().stream()
+        .filter(e -> e.end().getAsLong() < from).toList();
+    c.detector = c.builder().history(history).build();
+    while (c.next < topic.size() && topic.get(c.next).timestamp() < from) c.next++;
+    c.quietUntil = store.next;
+    return c;
+  }
+}
+```
+
+This is the example [ResumingAStreamExample](src/test/java/io/github/romanhaendler/rbed/examples/ResumingAStreamExample.java): an in-memory list as the topic, a store, and an output list for the side effects. For a Rule set with an End Condition that ends an Event while its `when` Condition still holds, a moving average and a `count`, it stops after every possible message and checks that each of the three restarts produces exactly the output of the uninterrupted run.
+
+### Preconditions
+
+- Restoring needs a Detector built with the same Rules (also names and order), watched Expressions, sampling rate and Retention Limit, and no `history(...)`. Anything else is rejected, so a deployment that changed a Rule falls back to the replay.
+- A Snapshot can be read by any rbed version with the same format version (currently 1). A release that changes the format says so in its notes, and rejects older Snapshots with a message that points to the Replay Point. There is no migration across format versions.
+- The listener is not part of a Snapshot. Pass it to the Builder on every start.
+- A replay needs the same input in the same order: all Samples and all `advanceTo` calls from the Replay Point on, and `close()`. Record time advances in the stream like messages, or derive them from the Samples' timestamps in the same way every time.
+- A replay is exact only while `droppedValues()` is 0. Once the Retention Limit dropped an entry, which entries a window holds depends on when they arrived. `droppedValues()` itself and the warning of the first drop are not reproduced by a replay (a Snapshot does).
+- A moving average is recomputed from the replayed values. In theory its last bit can differ after a replay; no difference has been observed. A Snapshot reproduces it exactly.
+- With a sampling rate there is no Replay Point (a fresh Detector cannot continue the Sample index). Use a Snapshot.
+
+### Kafka notes
+
+- One Detector per key (per sensor, per machine), and messages of a key in order, which a partition guarantees. Processing a key from two threads, or out of order, breaks the Detector.
+- Keep the topic back to the oldest position you may start from: the oldest stored Replay Point for the replay recipe, the oldest kept Snapshot for the others. `memoryHorizon()` tells how long the longest window is, to size retention and the Snapshot interval; the Replay Point is the exact answer.
+- A compacted topic keyed by Detector key is a good home for Snapshots.
+- Commit the consumer position, the Snapshot or Replay Point and the Ended Events together, or make the side effects idempotent, so that a crash between them neither loses nor repeats an Event. rbed does not do exactly-once delivery; the example shows the structure.
+
 ## Errors and validation
 
 Mistakes are reported as early as possible, most of them when the Detector is built:
@@ -715,6 +843,12 @@ Mistakes are reported as early as possible, most of them when the Detector is bu
 | Pushing after `close()`, or the wrong `push` for the sampling mode    | `IllegalStateException`             |
 | Reading Aggregates of a Channel the Rule does not aggregate           | `Event.aggregates(...)`: `IllegalArgumentException` |
 | Reading the value of an Expression that was not watched               | `value(...)`: `IllegalArgumentException`, naming the Expression |
+| Restoring an array that is not a Snapshot ("Not an rbed Snapshot: it does not start with the rbed magic header"), is corrupted or truncated ("Snapshot is corrupted or truncated") | `build()`: `IllegalArgumentException` |
+| Restoring a Snapshot of another format version ("Snapshot has format version N, but this rbed reads format version 1. Continue by replaying the stream from the Replay Point instead.") | `build()`: `IllegalArgumentException` |
+| Restoring a Snapshot taken with other Rules ("Snapshot was taken with different Rules ..."), other watched Expressions, another sampling rate or Retention Limit ("Snapshot was taken with sampling rate ... but this Builder has ...") | `build()`: `IllegalArgumentException` |
+| `restore(...)` together with `history(...)` ("restore(...) and history(...) cannot be combined ...") | `build()`: `IllegalArgumentException` |
+| `restore(null)` | `restore(...)`: `NullPointerException` |
+| `snapshot()` inside a listener callback ("snapshot() cannot be called from a listener callback ...") | `snapshot()`: `IllegalStateException` |
 
 ## Examples
 
