@@ -8,7 +8,11 @@ import java.util.function.DoubleBinaryOperator;
  * available. A {@link Channel} is one; others derive from it or come from {@link Conditions}.
  */
 public abstract class Expression {
-  Expression() {}
+  private final String text;
+
+  Expression(String text) {
+    this.text = text;
+  }
 
   /** Resolves this Expression against one Detector's state, once, when the Detector is built. */
   abstract Bound bind(Detector detector);
@@ -67,7 +71,7 @@ public abstract class Expression {
 
   /** This value plus {@code other}. */
   public Expression plus(Expression other) {
-    return combine(this, other, (x, y) -> x + y);
+    return combine(this, "plus", other, (x, y) -> x + y);
   }
 
   /** This value plus {@code c}. */
@@ -77,7 +81,7 @@ public abstract class Expression {
 
   /** This value minus {@code other}. */
   public Expression minus(Expression other) {
-    return combine(this, other, (x, y) -> x - y);
+    return combine(this, "minus", other, (x, y) -> x - y);
   }
 
   /** This value minus {@code c}. */
@@ -87,7 +91,7 @@ public abstract class Expression {
 
   /** This value times {@code other}. */
   public Expression times(Expression other) {
-    return combine(this, other, (x, y) -> x * y);
+    return combine(this, "times", other, (x, y) -> x * y);
   }
 
   /** This value times {@code c}. */
@@ -97,7 +101,7 @@ public abstract class Expression {
 
   /** This value divided by {@code other}; undefined when {@code other} is 0. */
   public Expression dividedBy(Expression other) {
-    return combine(this, other, (x, y) -> x / y);
+    return combine(this, "dividedBy", other, (x, y) -> x / y);
   }
 
   /** This value divided by {@code c}; undefined when {@code c} is 0. */
@@ -108,7 +112,7 @@ public abstract class Expression {
   /** The absolute value. */
   public Expression abs() {
     Expression self = this;
-    return new Expression() {
+    return new Expression(this + ".abs()") {
       @Override Bound bind(Detector detector) {
         Bound inner = self.bind(detector);
         return () -> Math.abs(inner.value());
@@ -117,9 +121,10 @@ public abstract class Expression {
   }
 
   /** Undefined if an operand is undefined or the result is not finite. */
-  private static Expression combine(Expression left, Expression right, DoubleBinaryOperator op) {
+  private static Expression combine(
+      Expression left, String name, Expression right, DoubleBinaryOperator op) {
     Objects.requireNonNull(right, "other");
-    return new Expression() {
+    return new Expression(left + "." + name + "(" + right + ")") {
       @Override Bound bind(Detector detector) {
         Bound x = left.bind(detector);
         Bound y = right.bind(detector);
@@ -133,11 +138,21 @@ public abstract class Expression {
 
   private static Expression constant(double value) {
     requireFinite(value);
-    return new Expression() {
+    return new Expression(String.valueOf(value)) {
       @Override Bound bind(Detector detector) {
         return () -> value;
       }
     };
+  }
+
+  /**
+   * How this Expression is written in Java, such as {@code temp.averageOverSamples(5)} or
+   * {@code count(Run).within(60000)}: a Channel by its name, a Rule by its name, a duration in
+   * milliseconds. Error messages use it to name the Expression.
+   */
+  @Override
+  public String toString() {
+    return text;
   }
 
   private static void requireFinite(double limit) {

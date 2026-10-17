@@ -12,6 +12,7 @@ public final class Channel extends ChannelExpression {
   final boolean pulse;
 
   private Channel(String name, boolean pulse) {
+    super(name);
     if (Objects.requireNonNull(name, "name").isEmpty()) {
       throw new IllegalArgumentException("Channel name is empty");
     }
@@ -56,10 +57,5 @@ public final class Channel extends ChannelExpression {
   @Override
   public int hashCode() {
     return name.hashCode();
-  }
-
-  @Override
-  public String toString() {
-    return name;
   }
 }
