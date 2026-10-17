@@ -144,16 +144,20 @@ detector.push(6_000, Map.of(temp, 70.0));  // discarded: only held for 1 s
 
 The Event's `start()` is 1000, where the Conditions started holding, not 3000, where it was Confirmed. Without a duration, an Event is Pending and Confirmed at the same moment.
 
-Each Rule has at most one Event in progress. A new Event of a Rule only starts after its `when` Condition has stopped holding since the previous Event started. With an End Condition that overlaps `when` (see [End Conditions](#end-conditions-and-hysteresis)), a Rule therefore does not flicker.
+Each Rule has at most one Event in progress. After an Event, the Rule's next Event only starts once its `when` Condition has been seen not holding. When an Event Ends because `when` stopped holding, or a Pending Event is Discarded, that Sample already counts, so the next Sample can start a new Event. While a Confirmed Event runs on its End Condition, however, `when` is not evaluated: a moment in which `when` stopped holding during that Event does not count, and after the Event has Ended, `when` must be seen not holding at a later Sample. After a data gap longer than `maxGap`, the next Sample can start an Event at once, marked `truncatedStart()`. With an End Condition that overlaps `when` (see [End Conditions](#end-conditions-and-hysteresis)), a Rule therefore does not flicker.
 
 **Truncation.** Two flags mark Events whose true extent is not known:
 
 - `truncatedEnd()`: observation stopped while the Event was running. `close()` Ends a Confirmed Event this way (and Discards a Pending one), and so does a [data gap](#data-gaps-maxgap).
 - `truncatedStart()`: the Event may have begun before its `start()`. This is the case whenever its Rule had not yet seen its Conditions *not* holding: when the very first Sample already satisfies them, while a moving average was warming up, or right after a data gap.
 
+On a fresh Detector with `Overheat` from above:
+
 ```java
 detector.push(0,     Map.of(temp, 90.0));  // already hot at the first Sample
-detector.push(1_000, Map.of(temp, 70.0));  // Overheat 0..1000 with truncatedStart() == true
+detector.push(1_000, Map.of(temp, 92.0));
+detector.push(2_000, Map.of(temp, 91.0));
+detector.push(3_000, Map.of(temp, 70.0));  // Overheat 0..3000, Confirmed at 2000, truncatedStart() == true
 ```
 
 ## Events

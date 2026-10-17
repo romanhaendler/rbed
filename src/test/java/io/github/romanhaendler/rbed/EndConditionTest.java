@@ -91,6 +91,73 @@ class EndConditionTest {
   }
 
   @Test
+  void whenStoppingDuringTheEventDoesNotReArmTheRule() {
+    // The README's restart rule: while an Event runs on its End Condition, when() is not evaluated.
+    Detector d = Detector.builder()
+        .rules(Rule.named("E").when(X.above(10)).endWhen(Y.above(0)))
+        .listener(rec).build();
+    d.push(0, Map.of(X, 0.0, Y, 0.0));
+    d.push(1, Map.of(X, 20.0));
+    d.push(2, Map.of(X, 0.0));   // when() stops holding, but the Event runs on its End Condition
+    d.push(3, Map.of(X, 20.0));
+    d.push(4, Map.of(Y, 1.0));   // Ended
+    d.push(5, Map.of(Y, 0.0));   // when() holds: the dip at 2 does not count, no new Event
+    d.push(6, Map.of(X, 0.0));   // when() seen not holding after the End: re-armed
+    d.push(7, Map.of(X, 20.0));
+    assertEquals(List.of("pending E 1", "confirmed E 1", "ended E 1..4",
+        "pending E 7", "confirmed E 7"), rec.log);
+  }
+
+  @Test
+  void whenNotHoldingAtTheEndingSampleDoesNotReArmTheRule() {
+    Detector d = Detector.builder()
+        .rules(Rule.named("E").when(X.above(10)).endWhen(Y.above(0)))
+        .listener(rec).build();
+    d.push(0, Map.of(X, 0.0, Y, 0.0));
+    d.push(1, Map.of(X, 20.0));
+    d.push(2, Map.of(X, 0.0, Y, 1.0));  // Ended; when() is not evaluated at this Sample either
+    d.push(3, Map.of(X, 20.0, Y, 0.0));
+    d.push(4, Map.of(X, 0.0));
+    d.push(5, Map.of(X, 20.0));
+    assertEquals(List.of("pending E 1", "confirmed E 1", "ended E 1..2",
+        "pending E 5", "confirmed E 5"), rec.log);
+  }
+
+  @Test
+  void withoutEndConditionTheEndingSampleReArmsTheRule() {
+    Detector d = Detector.builder().rules(Rule.named("E").when(X.above(10))).listener(rec).build();
+    d.push(0, Map.of(X, 0.0));
+    d.push(1, Map.of(X, 20.0));
+    d.push(2, Map.of(X, 0.0));   // Ended because when() stopped holding: that is the edge
+    d.push(3, Map.of(X, 20.0));
+    assertEquals(List.of("pending E 1", "confirmed E 1", "ended E 1..2",
+        "pending E 3", "confirmed E 3"), rec.log);
+  }
+
+  @Test
+  void discardingSampleReArmsTheRuleEvenWithAnEndCondition() {
+    // Until it is Confirmed, an Event with an End Condition still follows when().
+    Detector d = Detector.builder()
+        .rules(Rule.named("E").when(X.above(10)).forSamples(2).endWhen(Y.above(0)))
+        .listener(rec).build();
+    d.push(0, Map.of(X, 0.0, Y, 0.0));
+    d.push(1, Map.of(X, 20.0));
+    d.push(2, Map.of(X, 0.0));   // Discarded because when() stopped holding: that is the edge
+    d.push(3, Map.of(X, 20.0));
+    assertEquals(List.of("pending E 1", "discarded E 1", "pending E 3"), rec.log);
+  }
+
+  @Test
+  void dataGapLetsTheNextSampleStartAnEventAtOnce() {
+    // The README's exception to the restart rule: after a gap longer than maxGap, no edge is needed.
+    Detector d = detector(r -> r.when(WEIGHT.above(500)).endWhen(WEIGHT.below(50)).maxGap(100));
+    push(d, new long[] {0, 10, 20, 30, 500, 510},
+        0, 600, 10, 600, 600, 10);
+    assertEquals(List.of("pending Lift 10", "confirmed Lift 10", "ended Lift 10..20",
+        "pending Lift 500", "confirmed Lift 500", "ended Lift 500..510 truncatedStart"), rec.log);
+  }
+
+  @Test
   void maxGapDuringEndPhaseEndsTruncatedAtLastSampleBeforeGap() {
     Detector d = detector(r -> r
         .when(WEIGHT.above(500))

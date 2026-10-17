@@ -44,7 +44,7 @@ A Detector only sees what its Samples show. The Discarded moment on this page is
 
 ## One Event at a time
 
-Each Rule has at most one Event in progress. A new Event only starts once its Rule has seen `when` not holding after the previous Event Ended (or was Discarded), or at the first Sample after a [data gap](../data-gaps/) longer than `maxGap`, with a Truncated start. So a Rule with an End Condition does not flicker: see [End Conditions](../end-conditions/#when-does-the-next-event-start).
+Each Rule has at most one Event in progress. After an Event, the next one only starts once the Rule has seen `when` not holding. When an Event Ends because `when` stopped holding, or a Pending Event is Discarded, that Sample already counts, so the next Sample can start a new Event. While a Confirmed Event runs on its End Condition, however, `when` is not evaluated, and after the Event has Ended, `when` must be seen not holding at a later Sample. After a [data gap](../data-gaps/) longer than `maxGap`, the next Sample can start an Event at once, with a Truncated start. So a Rule with an End Condition does not flicker: see [End Conditions](../end-conditions/#when-does-the-next-event-start).
 
 ## What an Event carries
 
