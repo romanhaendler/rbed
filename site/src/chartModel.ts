@@ -18,8 +18,8 @@ export type MarkRow = { t: number; y: number };
     between the Channels and the lanes. */
 const CHANNEL_UNITS = 3;
 const SEPARATE_UNITS = 2;
-/** The Events' colors (site.css): Pending a lighter tone of Confirmed in light, a darker one in
-    dark, each at least 3:1 against the surface. */
+/** The Events' colors (site.css): Pending a lighter tone of Confirmed in light, a darker and
+    duller one in dark, each at least 3:1 against the surface. */
 export const EVENT_COLOR = 'var(--event-confirmed)';
 export const EVENT_STATES = [
   { label: 'Pending', color: 'var(--event-pending)' },

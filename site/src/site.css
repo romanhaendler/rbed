@@ -6,10 +6,11 @@
 
 :root {
   color-scheme: light dark;
-  /* An Event's bands (chartModel.ts): Pending a lighter tone of Confirmed in light, a darker one
-     in dark; each at least 3:1 against the surface (WCAG 1.4.11), about 2:1 against each other. */
+  /* An Event's bands (chartModel.ts): Pending a lighter tone of Confirmed in light, a darker and
+     duller one in dark, so it never reads as the louder of the two; each at least 3:1 against the
+     surface (WCAG 1.4.11), and about 2:1 (light) or 3:1 (dark) against each other. */
   --event-confirmed: light-dark(#be185d, #f9a8d4);
-  --event-pending: light-dark(#e668a0, #db2777);
+  --event-pending: light-dark(#e668a0, #a14d74);
 }
 
 /* An element scrolled or tabbed to stops below the sticky header, not under it. */
