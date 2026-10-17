@@ -54,6 +54,19 @@ class SnapshotTest {
   }
 
   @Test
+  void aSnapshotDoesNotRestoreWhenAggregatedChannelsAreInAnotherOrder() {
+    Channel a = Channel.named("a");
+    Channel b = Channel.named("b");
+    Channel c = Channel.named("c");
+    Detector d = Detector.builder()
+        .rules(Rule.named("R").when(c.above(1)).aggregate(a, b)).build();
+    d.push(0, Map.of(a, 1.0, b, 2.0, c, 5.0));
+    byte[] snapshot = d.snapshot();
+    assertThrows(IllegalArgumentException.class, () -> Detector.builder()
+        .rules(Rule.named("R").when(c.above(1)).aggregate(b, a)).restore(snapshot).build());
+  }
+
+  @Test
   void aSnapshotBeforeTheFirstSampleRestoresAFreshDetector() {
     byte[] snapshot = lift(new Recorder()).snapshot();
     Recorder rec = new Recorder();

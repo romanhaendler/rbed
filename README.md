@@ -810,7 +810,6 @@ This is the example [ResumingAStreamExample](src/test/java/io/github/romanhaendl
 - The listener is not part of a Snapshot. Pass it to the Builder on every start.
 - A replay needs the same input in the same order: all Samples and all `advanceTo` calls from the Replay Point on, and `close()`. Record time advances in the stream like messages, or derive them from the Samples' timestamps in the same way every time.
 - A replay is exact only while `droppedValues()` is 0. Once the Retention Limit dropped an entry, which entries a window holds depends on when they arrived. `droppedValues()` itself and the warning of the first drop are not reproduced by a replay (a Snapshot does).
-- A moving average is recomputed from the replayed values. In theory its last bit can differ after a replay; no difference has been observed. A Snapshot reproduces it exactly.
 - With a sampling rate there is no Replay Point (a fresh Detector cannot continue the Sample index). Use a Snapshot.
 
 ### Kafka notes
@@ -869,7 +868,7 @@ Runnable end-to-end examples from different domains, each a test with its expect
 
 ## Performance
 
-Conditions are bound to the Detector once, in `build()`. After that, Rules read Channel state directly, and pushing a Sample costs one hash lookup per value. In steady state (no Event starting or ending) it allocates nothing, so memory stays bounded however long an Event lasts. Moving averages use fixed ring buffers with compensated sums, so they neither allocate nor drift.
+Conditions are bound to the Detector once, in `build()`. After that, Rules read Channel state directly, and pushing a Sample costs one hash lookup per value. In steady state (no Event starting or ending) it allocates nothing, so memory stays bounded however long an Event lasts. Moving averages use fixed ring buffers with exact sums (rounded once), so they neither allocate nor drift; 0.3.0 used a running compensated sum, so from 0.4.0 the last bit of an average can differ.
 
 Measured with `mvn test -Pperformance` (Apple M2, JDK 21):
 

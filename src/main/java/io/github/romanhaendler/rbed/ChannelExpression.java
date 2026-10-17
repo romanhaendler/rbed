@@ -16,9 +16,16 @@ public abstract class ChannelExpression extends Expression {
   /** Resolves the track in a Detector; each call on a moving average creates its own window. */
   abstract ValueTrack track(Detector detector);
 
+  /** The track, which the Rule being bound is recorded to read. */
+  private ValueTrack read(Detector detector, int reads) {
+    ValueTrack t = track(detector);
+    detector.read(t, reads);
+    return t;
+  }
+
   @Override
   Bound bind(Detector detector) {
-    ValueTrack t = track(detector);
+    ValueTrack t = read(detector, 0);
     return new Bound() {
       @Override public double value() {
         return t.value;
@@ -44,7 +51,7 @@ public abstract class ChannelExpression extends Expression {
   public Expression rate() {
     return new Expression(this + ".rate()") {
       @Override Bound bind(Detector detector) {
-        ValueTrack t = track(detector);
+        ValueTrack t = read(detector, ValueTrack.PREVIOUS);
         t.needsPrevious = true;
         return t::rate;
       }
@@ -58,7 +65,7 @@ public abstract class ChannelExpression extends Expression {
   public Expression age() {
     return new Expression(this + ".age()") {
       @Override Bound bind(Detector detector) {
-        ValueTrack t = track(detector);
+        ValueTrack t = read(detector, ValueTrack.AGE);
         t.needsAge = true;
         return () -> t.age(detector.now());
       }
@@ -96,7 +103,7 @@ public abstract class ChannelExpression extends Expression {
   private Condition trend(boolean rising) {
     return new Condition(this + (rising ? ".rising()" : ".falling()")) {
       @Override Bound bind(Detector detector) {
-        ValueTrack t = track(detector);
+        ValueTrack t = read(detector, ValueTrack.PREVIOUS);
         t.needsPrevious = true;
         return rising
             ? () -> t.absent() ? Truth.FALSE : Truth.greater(t.value, t.previous)

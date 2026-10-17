@@ -67,7 +67,9 @@ class ReplayPointTest {
           signal(seed, 60, step, gapAbove, advanceShare)));
     }
     assertTrue(total.teeth() > 0, what + ": replaying from one Sample later never differs " + total);
-    assertTrue(total.earlier() > 0, what + ": the Replay Point is always the latest moment " + total);
+    // not pinned at the beginning of the input: in the second half of 60 moments, never
+    assertTrue(total.pinned() < total.checked() / 4,
+        what + ": the Replay Point stays at the first moment " + total);
     return total;
   }
 
@@ -212,6 +214,7 @@ class ReplayPointTest {
       assertTrue(total.checked() > total.stops() / 4, "few stops checked: " + total);
       assertTrue(total.teeth() > total.checked() / 20, "replay from one Sample later rarely differs: " + total);
       assertTrue(total.skippedDropped() > 0, "no case dropped entries: " + total);
+      assertTrue(total.pinned() < total.checked() / 2, "the Replay Point sits at the first moment: " + total);
     }
   }
 

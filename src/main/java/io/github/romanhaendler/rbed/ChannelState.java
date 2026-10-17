@@ -12,9 +12,8 @@ final class ChannelState extends ValueTrack {
     this.channel = channel;
   }
 
-  @Override
   void update(long t, double v) {
-    super.update(t, v);
+    super.update(t, v, t); // a Channel's value needs only its own Sample
     carried = true;
     absent = false;
   }

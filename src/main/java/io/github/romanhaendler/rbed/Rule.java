@@ -45,7 +45,7 @@ public final class Rule {
     if (maxGap != Long.MAX_VALUE) text.append(".maxGap(").append(maxGap).append(")");
     if (!aggregated.isEmpty()) {
       text.append(".aggregate(").append(String.join(", ",
-          aggregated.stream().map(Channel::toString).sorted().toList())).append(")");
+          aggregated.stream().map(Channel::toString).toList())).append(")");
     }
     return text.toString();
   }
@@ -139,7 +139,7 @@ public final class Rule {
   /**
    * Everything that defines this Rule's behaviour, written as in Java and in a fixed order, such
    * as {@code Rule.named("Hot").when(temp.above(80.0)).forSamples(3).maxGap(5000)}. Equal
-   * configuration gives equal text (aggregated Channels sorted by name), on every run and
+   * configuration gives equal text (aggregated Channels in the order given, which is the order of their Aggregates), on every run and
    * runtime. Expressions and Conditions name a Rule by {@link #name()} alone.
    */
   @Override

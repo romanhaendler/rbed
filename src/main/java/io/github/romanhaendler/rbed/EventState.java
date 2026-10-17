@@ -13,6 +13,8 @@ final class EventState {
   long lastConfirmed;
   /** Events Confirmed so far. */
   long count;
+  /** A Condition or watched Expression reads these Events: a replay must not split one. */
+  boolean read;
   /** The Rule producing these Events. */
   private RuleState producer;
   private long lastDuration;
@@ -68,6 +70,7 @@ final class EventState {
   Expression.Bound latest(ChannelState channel, Accumulator.Aggregate aggregate) {
     RuleState rule = producer;
     rule.latestIsRead();
+    detector.readsLatestOf(rule);
     int index = rule.aggregate(channel);
     return () -> rule.latest(index, aggregate);
   }

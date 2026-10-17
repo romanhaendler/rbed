@@ -1,5 +1,6 @@
 package io.github.romanhaendler.rbed;
 
+import java.util.Map;
 import java.util.OptionalLong;
 
 /**
@@ -35,15 +36,19 @@ final class RuleState {
   /** The latest moment this Rule was evaluated with data no older than {@code maxGap}. */
   private long lastValidMoment;
   /**
-   * Replay Point bookkeeping (see {@link Detector#replayPoint}): where a replay may start so that
-   * it is not inside this Rule's latest run (from an Event beginning until {@code when} stopped
-   * holding after it), when {@code when} was last seen false, and where the latest Ended Event
-   * began.
+   * Replay Point bookkeeping (see {@link Detector#replayPoint}): the earliest timestamp a replay
+   * must start at for this Rule's latest run (from an Event beginning until {@code when} stopped
+   * holding after it), for the moment {@code when} was last seen false, and for the latest Ended
+   * Event. Each also covers what the Conditions read at that moment ({@link #inputsNeed}).
    */
   private long runStart;
   private long falseSeen;
   private long latestEndedStart;
   private boolean latestRead;
+  /** What the Conditions read: tracks, and Rules whose latest Event's Aggregates they read. */
+  private final ValueTrack[] reads;
+  private final int[] readHow;
+  private final RuleState[] latestReads;
 
   /** Binds the Rule's Conditions; the Detector must be ready to resolve their references. */
   RuleState(Detector detector, Rule spec) {
@@ -57,6 +62,10 @@ final class RuleState {
     this.end = spec.end == null ? null : spec.end.condition().bind(detector);
     this.ending = spec.end == null ? null : new Progress(spec.end);
     for (ChannelState referenced : detector.recordedChannelLookups()) aggregate(referenced);
+    Map<ValueTrack, Integer> recorded = detector.recordedTrackReads();
+    this.reads = recorded.keySet().toArray(ValueTrack[]::new);
+    this.readHow = recorded.values().stream().mapToInt(Integer::intValue).toArray();
+    this.latestReads = detector.recordedLatestReads();
     for (Channel channel : spec.aggregated) aggregate(channel.state(detector));
     this.maxGap = spec.maxGap;
     detector.windowMillis(maxGap);
@@ -127,14 +136,30 @@ final class RuleState {
   }
 
   /**
-   * The earliest timestamp a replay must start at for this Rule: before the Event in progress, and
-   * before the run of an Event that Ended on its End Condition while {@code when} still holds
-   * (a fresh Rule would start another Event); before the moment {@code when} was last seen false
-   * (it decides whether the next Event starts truncated); before the latest Ended Event if its
-   * Aggregates are read.
+   * What a decision of this Rule depends on besides the moment itself: the tracks its Conditions
+   * read, the Channels it aggregates (an Event records the value a Channel holds) and the latest
+   * Events of the Rules whose Aggregates it reads. For a run ({@code later}), the decisions that
+   * follow read nothing older than that, because a track only moves forward.
+   */
+  private long inputsNeed(boolean later) {
+    long need = ValueTrack.NONE;
+    for (int i = 0; i < reads.length; i++) {
+      need = Math.min(need, reads[i].need(readHow[i], later));
+    }
+    for (int i = 0; i < channels.count(); i++) need = Math.min(need, channels.get(i).need(0, later));
+    for (RuleState rule : latestReads) need = Math.min(need, rule.latestNeed());
+    return need;
+  }
+
+  /**
+   * The earliest timestamp a replay must start at for this Rule: before the run in progress (an
+   * Event, or the wait for {@code when} to stop holding after one that Ended on its End
+   * Condition, so a fresh Rule would not start another Event); before the moment {@code when}
+   * was last seen false (it decides whether the next Event starts truncated); before the latest
+   * Ended Event if its Aggregates are read.
    */
   long replayNeed() {
-    long need = ValueTrack.NONE;
+    long need = running() ? runStart : ValueTrack.NONE;
     if (seenFalse) need = Math.min(need, falseSeen);
     return Math.min(need, latestNeed());
   }
@@ -147,15 +172,6 @@ final class RuleState {
   /** From the start of an Event until {@code when} stops holding after it. */
   private boolean running() {
     return state != State.IDLE || !armed;
-  }
-
-  /**
-   * Where a replay starting at moment {@code now} may start for this Rule: its run began earlier
-   * unless it is about to end for a gap in the data.
-   */
-  long runFrom(long now) {
-    boolean gap = detector.hasSamples() && now - detector.lastSample() > maxGap;
-    return running() && !gap ? runStart : ValueTrack.NONE;
   }
 
   /** An Aggregate of the latest Confirmed Event, running or Ended; NaN if there is none. */
@@ -171,7 +187,7 @@ final class RuleState {
   void step(long now, boolean isSample) {
     if (detector.hasSamples() && now - detector.lastSample() > maxGap) {
       close();
-      armed = true;
+      endRun(lastValidMoment); // the gap ends it: a replay may start right after
       seenFalse = false;
       if (!isSample) return; // values are stale until the next Sample
     }
@@ -218,18 +234,32 @@ final class RuleState {
     detector.listener.onDiscarded(snapshot(OptionalLong.empty(), false));
   }
 
-  private void stoppedHolding(Truth holds) {
+  /**
+   * The run, if one is in progress, is over. A replay that started inside it would produce a
+   * different Event, and where that matters it may no longer start there: when another Rule reads
+   * the Events (their count, ends and durations), or when the Event ends on an End Condition (the
+   * values it reads before the replay's start decide when). Otherwise the Rule ends in the same
+   * state however its Event began: idle, armed to start again.
+   */
+  private void endRun(long end) {
+    if (state == State.IDLE && !armed && (events.read || this.end != null)) {
+      detector.forbidReplayStarts(runStart, end);
+    }
     armed = true;
+  }
+
+  private void stoppedHolding(Truth holds) {
+    endRun(detector.now());
     if (holds == Truth.FALSE) {
       seenFalse = true;
-      falseSeen = detector.closedNow();
+      falseSeen = Math.min(detector.now(), inputsNeed(false));
     }
   }
 
   private void begin(long now, boolean isSample) {
     state = State.PENDING;
     armed = false;
-    runStart = detector.closedNow();
+    runStart = Math.min(detector.now(), inputsNeed(true));
     truncatedStart = !seenFalse;
     holding.begin(now, isSample);
     startRecording(aggregates, now, isSample);
