@@ -67,6 +67,7 @@ final class EventState {
    */
   Expression.Bound latest(ChannelState channel, Accumulator.Aggregate aggregate) {
     RuleState rule = producer;
+    rule.latestIsRead();
     int index = rule.aggregate(channel);
     return () -> rule.latest(index, aggregate);
   }
@@ -106,6 +107,11 @@ final class EventState {
   /** Counts Events Confirmed at most {@code window} before the current moment; see {@link #countWithin}. */
   Timestamps.Counter counter(long window) {
     return confirmations.new Counter(window);
+  }
+
+  /** Whether confirmation times are kept for {@code count(...).within(...)}. */
+  boolean keepsConfirmations() {
+    return confirmations != null;
   }
 
   /** Drops confirmation times no window needs any more. */
