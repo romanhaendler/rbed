@@ -38,7 +38,7 @@ Three problems surfaced while building the documentation site (spec `rbed-intera
 18. As a user of rbed, I want a watched Expression that refers to a Rule not added to the Detector to be rejected by `build()`, as Rules are, so that mistakes surface early.
 19. As a user of rbed, I want a watched `averageOverSamples(n)` above the Retention Limit to be rejected by `build()` with a message that names the watched Expression (not a Rule), so that I know what to fix.
 20. As a user of rbed, I want watching to cost nothing on Samples where I do not read, so that the Detector's steady-state performance and its zero-allocation push stay as documented.
-21. As a user of rbed, I want watching an Expression to change no Event, so that adding observation never changes detection.
+21. As a user of rbed, I want watching an Expression to change no Event, so that adding observation never changes which Events are found.
 22. As a user of rbed, I want the README to show how to watch and read an Expression, with a short example, so that I find the feature.
 23. As a user of rbed, I want the Javadoc of the new methods to state when a value is undefined, so that the contract is clear in my IDE.
 24. As a reader of the documentation site, I want the plotted Expression lines to be read from rbed directly, so that what I see is exactly rbed's value.
