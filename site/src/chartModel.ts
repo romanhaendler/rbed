@@ -385,7 +385,8 @@ const LABEL_SPACING = 0.04;
 /** The lines of the thresholds of the shown Channels: one per axis and value, labelled with
     the comparison alone ("> 100"; the key says the rest), or with the Channel too where the
     axis has several shown Channels ("temp > 26"), but on a phone (`narrow`), where the column
-    is narrow; from the top, a line too close to a labelled one has no label. None where the
+    is narrow and a shared line names its first comparison only ("> 500", not "> 500, < 500");
+    from the top, a line too close to a labelled one has no label. None where the
     threshold is a shown Channel. */
 export function thresholdLines(thresholds: Threshold[], axes: ChannelAxis[], channels: string[], narrow = false): ThresholdLine[] {
   const lines: ThresholdLine[] = [];
@@ -403,7 +404,7 @@ export function thresholdLines(thresholds: Threshold[], axes: ChannelAxis[], cha
     if (labelled.some((l) => l.axis === line.axis && Math.abs(l.value - line.value) <= span * LABEL_SPACING)) continue;
     const several = !narrow && axis.channels.filter((c) => channels.includes(c)).length > 1;
     const parts = line.thresholds.map((t) => `${several ? `${t.channel} ` : ''}${t.condition.match(COMPARISON)?.[0] ?? t.condition} ${t.value}`);
-    line.label = [...new Set(parts)].join(', ');
+    line.label = narrow ? parts[0] : [...new Set(parts)].join(', ');
     labelled.push(line);
   }
   return lines;

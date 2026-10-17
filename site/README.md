@@ -49,7 +49,7 @@ A page is three things; the build does the rest.
      - `readsLatest()`: the Rule whose latest Event its Rules read, which gives the readout its `latest(...)` line and the chart its highlight.
    - **What the chart does with them.**
      - Channels of very different scales (more than four times apart) get bands and axes of their own: the first band's axis on the left, every further one, and that of Expressions with a unit of their own, on the right.
-     - Thresholds of one value share a line, labelled with the comparison alone; the key names each in full. A window is a strip over the lane of the Rule that counts it, from the end of every Event of `after`; a restart without History cuts it there.
+     - Thresholds of one value share a line, labelled with the comparison alone (on a phone with the first only); the key names each in full. A window is a strip over the lane of the Rule that counts it, from the end of every Event of `after`; a restart without History cuts it there.
      - One rule for lines on every page: a Channel's line joins its consecutive Samples; where rbed holds a value instead (a Sample lacks the Channel, or time was advanced without a Sample, where every Channel holds its value), the line breaks, a thin step line carries the held value, and the hover readout marks it "(kept)".
      - A Pulse Channel holds nothing: it is drawn as marks, and the readout shows "–" wherever a Sample does not carry it.
      - The bridge reports Events in rbed's order (as they Ended); the site shows them in the order they started (`forDisplay` in `src/events.ts`).
