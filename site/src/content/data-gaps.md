@@ -31,7 +31,7 @@ At the defaults, the gap runs from 12 s to 18 s, one second longer than the `max
 
 - Raise `maxGap` to 6 s: the gap is no longer too long. The Samples at 12 s and 18 s are exactly 6 seconds apart, not more, and a single, complete Event runs from 6 s to 32 s.
 - Move the gap to 33 s, after the machine has stopped: it changes nothing.
-- Move the gap to 2 s, before the machine starts: the Event starts at 8 s, the first Sample after the gap, and its start is Truncated although `rpm` was 0 before the gap. After a gap, the Rule has to see its Conditions not holding again before it knows where an Event begins.
+- Move the gap to 0 s, so that it ends just as the machine starts: the Event starts at 6 s, the first Sample after the gap, and its start is Truncated although `rpm` was 0 before the gap. After a gap, the Rule has to see its Conditions not holding again before it knows where an Event begins.
 
 ## Reference
 

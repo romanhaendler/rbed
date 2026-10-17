@@ -1,17 +1,17 @@
 # Cranes
 
-A crane's load cell reports the weight on the hook every 500 ms, and the crane's rated load arrives once, as the Channel `ratedLoad` (5000 kg) in the first Sample, and holds from then on. Here a pallet is lifted and set down, then a container heavier than the rated load is lifted, partly set down (half of its weight is released) and set down completely.
+A crane's load cell reports the weight on the hook every 500 ms, and the crane's rated load arrives once, as the Channel `ratedLoad` (5000 kg) in the first Sample, and holds from then on. Here a pallet is lifted and set down, then a container heavier than the rated load is lifted, partly set down (to less than half of its weight) and set down completely.
 
 <!-- scenario cranes -->
 
 ## The Rules
 
-- **LoadLifted**: above 500 kg for 2 s, over only once the weight is below 50 kg for 1 s (hysteresis); a gap of more than 5 s in the data ends it.
+- **LoadLifted**: above 500 kg for 2 s, over only once the weight is below 50 kg for 1 s (hysteresis); a gap of more than 5 s in the data Ends it.
 - **Overload**: the weight above the rated load during a lift, for 2 Samples.
 - **PartialSetDown**: during a lift, the weight below half of the lift's maximum so far (`latest(loadLifted).max(weight)`) but still above 50 kg, for 2 Samples.
 - A plain method, which the listener calls for each Ended lift, classifies the lift by its mean weight, shown as a note in the table: below 1500 kg a pallet, otherwise a container.
 
-At the defaults, the pallet of 1200 kg is a `LoadLifted` from 1.5 s to 6.5 s, Confirmed at 3.5 s. The container is lifted from 8.5 s to 12.5 s and Confirmed at 10.5 s; its mean is 5125 kg, from 6 Samples at 6000 kg and 2 at 2500 kg. Its 6000 kg are above the rated load, so `Overload` runs from 10.5 s, once the lift is Confirmed, to 11.5 s. There 2500 kg of it are set down, less than half of the 6000 kg, and `PartialSetDown` runs from 11.5 s to 12.5 s.
+At the defaults, the pallet of 1200 kg is a `LoadLifted` from 1.5 s to 6.5 s, Confirmed at 3.5 s. The container is lifted from 8.5 s to 12.5 s and Confirmed at 10.5 s; its mean is 5125 kg, from 6 Samples at 6000 kg and 2 at 2500 kg. Its 6000 kg are above the rated load, so `Overload` runs from 10.5 s, once the lift is Confirmed, to 11.5 s. There the weight drops to 2500 kg, less than half of the 6000 kg, and `PartialSetDown` runs from 11.5 s to 12.5 s.
 
 ### Things to try
 
