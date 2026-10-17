@@ -115,7 +115,7 @@ public final class Detector implements AutoCloseable {
 
     for (Rule rule : b.rules.values()) ruleDescriptions.add(rule.toString());
     for (ChannelState state : sortedChannels()) {
-      ruleDescriptions.add("channel " + state.channel.name() + (state.channel.pulse ? " pulse" : ""));
+      ruleDescriptions.add((state.channel.pulse ? "pulse channel " : "channel ") + state.channel.name());
     }
     for (Expression expression : b.watched) watchedDescriptions.add(expression.toString());
 

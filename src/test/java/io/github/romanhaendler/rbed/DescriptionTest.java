@@ -40,7 +40,7 @@ class DescriptionTest {
     assertEquals("Rule.named(\"Run\")", Rule.named("Run").toString());
     assertEquals("Rule.named(\"Run\").when(temp.above(0.0))", RUN.toString());
     assertEquals("Rule.named(\"R\").when(temp.above(1.0)).forSamples(3).forDuration(1000)"
-            + ".endWhen(temp.below(0.0)).forSamples(2).maxGap(60000).aggregate(p, temp)",
+            + ".endWhen(temp.below(0.0)).forSamples(2).maxGap(60000).aggregate(temp, p)",
         Rule.named("R").when(TEMP.above(1)).forDuration(1000).forSamples(3)
             .endWhen(TEMP.below(0)).forSamples(2).maxGap(Duration.ofMinutes(1))
             .aggregate(TEMP, P).toString());
@@ -50,7 +50,10 @@ class DescriptionTest {
   void equalConfigurationGivesEqualDescriptions() {
     assertEquals(
         Rule.named("R").when(TEMP.above(1)).aggregate(P, TEMP).toString(),
-        Rule.named("R").when(TEMP.above(1)).aggregate(TEMP).aggregate(P).toString());
+        Rule.named("R").when(TEMP.above(1)).aggregate(P).aggregate(TEMP).toString());
+    assertNotEquals(
+        Rule.named("R").when(TEMP.above(1)).aggregate(P, TEMP).toString(),
+        Rule.named("R").when(TEMP.above(1)).aggregate(TEMP, P).toString());
     assertNotEquals(
         Rule.named("R").when(TEMP.above(1)).toString(),
         Rule.named("R").when(TEMP.above(2)).toString());
