@@ -1,5 +1,6 @@
 package io.github.romanhaendler.rbed;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -208,7 +209,7 @@ public final class Detector implements AutoCloseable {
     for (RuleState rule : rules) rule.save(w);
   }
 
-  void loadState(StateReader r) throws java.io.IOException {
+  void loadState(StateReader r) throws IOException {
     started = r.bool();
     now = r.int64();
     closed = r.bool();
@@ -219,7 +220,7 @@ public final class Detector implements AutoCloseable {
     hasHistory = r.bool();
     latestHistoryEnd = r.int64();
     int runs = r.length();
-    if (runs > MAX_RUNS) throw new java.io.IOException("runs");
+    if (runs > MAX_RUNS) throw new IOException("runs");
     for (int i = 0; i < runs; i++) {
       runStarts[i] = r.int64();
       runEnds[i] = r.int64();
@@ -751,7 +752,7 @@ public final class Detector implements AutoCloseable {
      * @throws NullPointerException if {@code snapshot} is null
      */
     public Builder restore(byte[] snapshot) {
-      restore = Objects.requireNonNull(snapshot, "snapshot");
+      restore = Objects.requireNonNull(snapshot, "snapshot").clone();
       return this;
     }
 

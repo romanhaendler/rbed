@@ -1,5 +1,7 @@
 package io.github.romanhaendler.rbed;
 
+import java.io.IOException;
+
 /** One Channel inside one Detector. */
 final class ChannelState extends ValueTrack {
   /** The Channel as first referenced by a Rule. */
@@ -25,7 +27,7 @@ final class ChannelState extends ValueTrack {
   }
 
   @Override
-  void load(StateReader r) throws java.io.IOException {
+  void load(StateReader r) throws IOException {
     super.load(r);
     absent = r.bool();
   }

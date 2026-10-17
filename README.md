@@ -163,7 +163,7 @@ detector.push(3_000, Map.of(temp, 70.0));  // Overheat 0..3000, Confirmed at 200
 
 ## Events
 
-An `Event` is an immutable record. The listener receives a fresh snapshot at each stage.
+An `Event` is an immutable record. The listener receives a fresh `Event` value at each stage.
 
 | Field              | Meaning                                                                        |
 | ------------------ | ------------------------------------------------------------------------------ |
@@ -593,7 +593,7 @@ Every Event carries Aggregates of the Channels its Rule's Conditions use, plus t
 
 The plain `mean` treats every Sample alike, which is right for regularly sampled data. With irregular sampling, for example a sensor that reports more often when something happens, `timeWeightedMean` gives the true average over time. The time-weighted values are NaN if the Channel had no value during the Event, and the time-weighted mean also for an Event of zero length.
 
-Aggregates in the Pending and Confirmed snapshots cover the Event so far. Reading a Channel the Rule does not aggregate throws an `IllegalArgumentException` that names the missing `.aggregate(...)`, so a forgotten declaration is never mistaken for "no data".
+Aggregates of the Pending and Confirmed Event values cover the Event so far. Reading a Channel the Rule does not aggregate throws an `IllegalArgumentException` that names the missing `.aggregate(...)`, so a forgotten declaration is never mistaken for "no data".
 
 ## Batch processing and sampling rates
 
