@@ -49,7 +49,7 @@ A page is three things; the build does the rest.
      - `readsLatest()`: the Rule whose latest Event its Rules read, which gives the readout its `latest(...)` line and the chart its highlight.
    - **What the chart does with them.**
      - Channels of very different scales (more than four times apart) get bands and axes of their own: the first band's axis on the left, every further one, and that of Expressions with a unit of their own, on the right.
-     - Thresholds of one value share a line, labelled with the comparison alone; the key names each in full. A window is a strip over the lane of the Rule that counts it, from the end of every Event of `after`; a restart without History cuts it there.
+     - Thresholds of one value share a line, labelled with the comparison alone (on a phone with the first only); the key names each in full. A window is a strip over the lane of the Rule that counts it, from the end of every Event of `after`; a restart without History cuts it there.
      - One rule for lines on every page: a Channel's line joins its consecutive Samples; where rbed holds a value instead (a Sample lacks the Channel, or time was advanced without a Sample, where every Channel holds its value), the line breaks, a thin step line carries the held value, and the hover readout marks it "(kept)".
      - A Pulse Channel holds nothing: it is drawn as marks, and the readout shows "–" wherever a Sample does not carry it.
      - The bridge reports Events in rbed's order (as they Ended); the site shows them in the order they started (`forDisplay` in `src/events.ts`).
@@ -67,4 +67,8 @@ From these, `npm run build` (`prerender.mjs`, run at the end of `vite build`) wr
 
 `node version.mjs` prints the rbed version of the root pom, which the scripts pass to the Scenario module (`-Drbed.version`; it has no default). `PORT=4391 npm run test:browser` serves the site on another port than 4173.
 
-The app reads the same Markdown for the page itself and for the search (Ctrl/Cmd+K), which finds a page by its title, its text, its inline code and the methods its Java source calls, and a section by its heading. `public/og-image.png` is the sharing image of every page.
+The app reads the same Markdown for the page itself and for the search (Ctrl/Cmd+K), which finds a page by its title, its text, its inline code and the methods its Java source calls, and a section by its heading. `public/og-image.png` is the sharing image of every page, `public/favicon.svg` its icon.
+
+## Deployment
+
+`.github/workflows/pages.yml` builds and tests the site on every pull request, and on a push to main or a manual run also deploys it to https://romanhaendler.github.io/rbed/. It needs GitHub Pages with Source "GitHub Actions", set once before the first push to main: Settings → Pages → Source, or `gh api -X POST repos/romanhaendler/rbed/pages -f build_type=workflow`. Without it the deploy job fails; the workflow's token cannot enable Pages itself.

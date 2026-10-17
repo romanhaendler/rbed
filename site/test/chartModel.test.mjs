@@ -245,6 +245,11 @@ test('thresholds at one value share a line; a line close to a labelled one is le
     thresholdLines([t('hr', 'when >', 100), t('spo2', 'when <', 90)], axes, ['hr']).map((l) => l.label),
     ['> 100'],
   );
+  // On a phone a shared line names its first comparison only, so its label fits the axis column.
+  assert.deepEqual(
+    thresholdLines([t('load', 'when >', 80), t('load', 'endWhen <', 80)], axes, ['load'], true).map((l) => l.label),
+    ['> 80'],
+  );
 });
 
 test('the key lists the lifecycle in order, and Pending only where something was Pending for a while', () => {

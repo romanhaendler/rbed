@@ -109,6 +109,14 @@ test.describe('without JavaScript', () => {
     await expect(page.locator('h1')).toHaveText('No page at this address');
     await expect(page.locator('.rail .railEntry')).toHaveCount(PAGES.length);
   });
+
+  test('the pages and 404.html name the site’s icon, and it is served', async ({ page }) => {
+    for (const path of ['', 'end-conditions/', '404.html']) {
+      await page.goto(path);
+      await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/rbed/favicon.svg');
+    }
+    expect((await page.request.get('favicon.svg')).ok()).toBe(true);
+  });
 });
 
 test('on a phone, the Event and Discarded tables need no sideways scrolling', async ({ page }) => {

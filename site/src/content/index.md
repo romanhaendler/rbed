@@ -52,9 +52,11 @@ rbed {{version}} is on Maven Central and needs Java 17 or later.
 implementation("io.github.romanhaendler:rbed:{{version}}")
 ```
 
+The library is the Java module `io.github.romanhaendler.rbed` (`requires io.github.romanhaendler.rbed;`) with a single package of the same name; it also works on the class path.
+
 ## The code on this site
 
-The Java on every page can be copied and run: it starts with its imports, and its statements are the body of a method, such as `main`. Where it calls a method of its own, that method follows under `// In the enclosing class:`. Time values are written as `java.time.Duration`; every method that takes one also takes a `long` in milliseconds. Short snippets in the text assume the Channels, Rules, variables and methods they name, and these imports:
+The Java on every page can be copied and run: it starts with its imports, and its statements are the body of a method, such as `main`. Most sources leave out the listener to stay short, so they run without output: the Events they detect are the page's Event table. To print them, add a listener before `.build()`, as in [A first Rule](#a-first-rule), or print the list that `detect` returns. Where it calls a method of its own, that method follows under `// In the enclosing class:`. Time values are written as `java.time.Duration`; every method that takes one also takes a `long` in milliseconds. Short snippets in the text assume the Channels, Rules, variables and methods they name, and these imports:
 
 ```java
 import static io.github.romanhaendler.rbed.Conditions.*;   // during, after, count, totalDuration, latest
@@ -73,7 +75,7 @@ import java.util.Map;
 - A Rule is an immutable value: `when`, `forDuration`, `endWhen` and the other methods each return a new Rule, so a Rule can be shared by several Detectors, and a call whose result is not used changes nothing.
 - A Detector is single-use and not thread-safe. Use one per data stream, and feed it from one thread at a time.
 - Rules and the listener are fixed when the Detector is built. To change Rules, build a new Detector and pass it the Events so far as [History](history/).
-- A pushed Sample costs one hash lookup per value, and in steady state (no Event starting or ending) a Detector allocates nothing: from about 1.2 million Samples per second for 50 Rules over 20 Channels to over 40 million for a single threshold Rule. See the README's [Performance](https://github.com/romanhaendler/rbed#performance), and [Memory and the Retention Limit](memory/) for what a Detector keeps.
+- A pushed Sample costs one hash lookup per value, and in steady state (no Event starting or ending) a Detector allocates nothing. Throughput ranges from about 1.2 million Samples per second for 50 Rules over 20 Channels to over 40 million for a single threshold Rule. See the README's [Performance](https://github.com/romanhaendler/rbed#performance), and [Memory and the Retention Limit](memory/) for what a Detector keeps.
 
 The Guide takes one concept per page, starting with [Samples and Channels](samples-and-channels/).
 

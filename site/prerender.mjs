@@ -310,6 +310,9 @@ export async function prerender(dist, version) {
   if (broken.length > 0) throw new Error(`Links to no page or member of the Javadoc:\n${broken.join('\n')}`);
   cpSync(apidocs, `${dist}/api`, { recursive: true });
   // the site's look and fonts on the Javadoc (api.css)
+  if (!existsSync(`${dist}/api/stylesheet.css`)) {
+    throw new Error("No stylesheet.css in the Javadoc: api.css is written for JDK 21's Javadoc layout");
+  }
   appendFileSync(`${dist}/api/stylesheet.css`, readFileSync(site('api.css')));
   for (const font of ['geist-sans/files/geist-sans-latin-400', 'geist-sans/files/geist-sans-latin-600', 'geist-mono/files/geist-mono-latin-400']) {
     const file = fileURLToPath(site(`node_modules/@fontsource/${font}-normal.woff2`));
