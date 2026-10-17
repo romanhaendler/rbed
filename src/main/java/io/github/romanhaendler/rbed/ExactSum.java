@@ -52,8 +52,15 @@ final class ExactSum {
     limbs[i + 2] += sign * (rest >>> 32);
   }
 
+  /** How many limbs {@link #value()} walks; only for tests. */
+  int touchedLimbs() {
+    return Math.max(0, hi - lo + 1);
+  }
+
   /** The exact sum rounded to the nearest double, ties to even; infinite on overflow. */
   double value() {
+    while (lo <= hi && limbs[lo] == 0) lo++; // keep the range tight once extremes have left
+    while (hi >= lo && limbs[hi] == 0) hi--;
     if (hi < lo) return 0.0;
     long[] w = work;
     int from = Math.max(0, lo - 3); // a rounding window reaches two limbs below and above

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -187,5 +188,24 @@ class ExactSumTest {
     } catch (IOException e) {
       throw new AssertionError(e);
     }
+  }
+
+  @Test
+  void theRangeReadIsTightAgainOnceExtremesHaveLeft() {
+    ExactSum sum = new ExactSum();
+    sum.add(1.5);
+    sum.value();
+    int normal = sum.touchedLimbs();
+    sum.add(Double.MAX_VALUE);
+    sum.add(Double.MIN_VALUE);
+    sum.value();
+    assertTrue(sum.touchedLimbs() > 60);
+    sum.remove(Double.MAX_VALUE);
+    sum.remove(Double.MIN_VALUE);
+    assertEquals(1.5, sum.value());
+    assertEquals(normal, sum.touchedLimbs());
+    sum.remove(1.5);
+    assertEquals(0.0, sum.value());
+    assertEquals(0, sum.touchedLimbs());
   }
 }
