@@ -4,6 +4,9 @@ import static io.github.romanhaendler.rbed.Conditions.count;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -200,5 +203,18 @@ class ResumingAStreamExample {
   @Test
   void anOlderSnapshotPlusTheTail() {
     everyStop(Consumer::restore, 7);
+  }
+
+  /** The code block of the README's "Resuming a stream" is this file's README region. */
+  @Test
+  void theReadmeShowsTheCodeOfThisExample() throws IOException {
+    String own = Files.readString(Path.of(
+        "src/test/java/io/github/romanhaendler/rbed/examples/ResumingAStreamExample.java"));
+    String region = own.substring(own.indexOf("  // README-BEGIN\n") + "  // README-BEGIN\n".length(),
+        own.indexOf("  // README-END")).replaceAll("(?m)^  ", "");
+    String readme = Files.readString(Path.of("README.md"));
+    int section = readme.indexOf("\n## Resuming a stream\n");
+    int start = readme.indexOf("```java\n", section) + "```java\n".length();
+    assertEquals(region, readme.substring(start, readme.indexOf("```", start)));
   }
 }
