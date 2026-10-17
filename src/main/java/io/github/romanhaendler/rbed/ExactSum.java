@@ -1,6 +1,5 @@
 package io.github.romanhaendler.rbed;
 
-import java.io.IOException;
 import java.util.Arrays;
 
 /**
@@ -52,8 +51,15 @@ final class ExactSum {
     limbs[i + 2] += sign * (rest >>> 32);
   }
 
+  /** How many limbs {@link #value()} walks; only for tests. */
+  int touchedLimbs() {
+    return Math.max(0, hi - lo + 1);
+  }
+
   /** The exact sum rounded to the nearest double, ties to even; infinite on overflow. */
   double value() {
+    while (lo <= hi && limbs[lo] == 0) lo++; // keep the range tight once extremes have left
+    while (hi >= lo && limbs[hi] == 0) hi--;
     if (hi < lo) return 0.0;
     long[] w = work;
     int from = Math.max(0, lo - 3); // a rounding window reaches two limbs below and above
@@ -99,34 +105,5 @@ final class ExactSum {
     double magnitude = Double.longBitsToDouble(
         low == 0 ? mant : ((long) (low + 1) << 52) + (mant - (1L << 52)));
     return negative ? -magnitude : magnitude;
-  }
-
-  /** The non-zero limbs as (index, value) pairs; the limbs are a function of the values alone. */
-  void save(StateWriter w) {
-    int count = 0;
-    for (long l : limbs) if (l != 0) count++;
-    w.int32(count);
-    for (int i = 0; i < LIMBS; i++) {
-      if (limbs[i] == 0) continue;
-      w.int32(i);
-      w.int64(limbs[i]);
-    }
-  }
-
-  void load(StateReader r) throws IOException {
-    int count = r.int32();
-    if (count < 0 || count > LIMBS) throw new IOException("sum");
-    Arrays.fill(limbs, 0);
-    lo = LIMBS;
-    hi = -1;
-    int previous = -1;
-    for (int k = 0; k < count; k++) {
-      int i = r.int32();
-      if (i <= previous || i >= LIMBS - 2) throw new IOException("sum");
-      previous = i;
-      limbs[i] = r.int64();
-      lo = Math.min(lo, i);
-      hi = Math.max(hi, i);
-    }
   }
 }

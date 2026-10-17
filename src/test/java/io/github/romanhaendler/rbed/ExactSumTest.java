@@ -1,11 +1,9 @@
 package io.github.romanhaendler.rbed;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -83,7 +81,7 @@ class ExactSumTest {
   }
 
   @Test
-  void theStateDependsOnlyOnTheValuesInTheSum() {
+  void theValueDependsOnlyOnTheValuesInTheSum() {
     SplittableRandom r = new SplittableRandom(11);
     for (int round = 0; round < 2_000; round++) {
       double[] keep = new double[1 + r.nextInt(4)];
@@ -97,11 +95,6 @@ class ExactSumTest {
       for (double v : keep) worn.add(v);
       for (double v : passed) worn.remove(v);
       assertEquals(bits(fresh.value()), bits(worn.value()), "round " + round);
-      StateWriter a = new StateWriter();
-      StateWriter b = new StateWriter();
-      fresh.save(a);
-      worn.save(b);
-      assertArrayEquals(a.toByteArray(), b.toByteArray(), "saved words, round " + round);
     }
   }
 
@@ -139,53 +132,22 @@ class ExactSumTest {
     }
   }
 
-  private static StateReader reader(StateWriter w) {
-    byte[] bytes = w.toByteArray();
-    return new StateReader(bytes, bytes.length);
-  }
-
   @Test
-  void aSavedSumLoadsBackAndReplacesWhatWasThere() throws IOException {
-    ExactSum saved = new ExactSum();
-    saved.add(1e300);
-    saved.add(-3.5);
-    StateWriter w = new StateWriter();
-    saved.save(w);
-    ExactSum loaded = new ExactSum();
-    loaded.add(7e200); // must not survive the load
-    loaded.add(1e-300);
-    loaded.load(reader(w));
-    assertEquals(bits(saved.value()), bits(loaded.value()));
-    loaded.remove(1e300);
-    loaded.remove(-3.5);
-    assertEquals(bits(0.0), bits(loaded.value()));
-  }
-
-  @Test
-  void anImplausibleSavedSumIsRejected() {
-    // count, then (index, value) pairs
-    long[][] bad = {{-1}, {69}, {1, 70, 0}, {1, 66, 0}, {1, -1, 0}, {2, 5, 5, 5, 6},
-        {2, 6, 5, 5, 5}};
-    for (long[] b : bad) {
-      StateWriter w = new StateWriter();
-      w.int32((int) b[0]);
-      for (int k = 1; k + 1 < b.length; k += 2) {
-        w.int32((int) b[k]);
-        w.int64(b[k + 1]);
-      }
-      assertThrows(IOException.class, () -> new ExactSum().load(reader(w)),
-          java.util.Arrays.toString(b));
-    }
-    StateWriter ok = new StateWriter(); // control: ascending indexes below the top are fine
-    ok.int32(2);
-    ok.int32(3);
-    ok.int64(5);
-    ok.int32(65);
-    ok.int64(6);
-    try {
-      new ExactSum().load(reader(ok));
-    } catch (IOException e) {
-      throw new AssertionError(e);
-    }
+  void theRangeReadIsTightAgainOnceExtremesHaveLeft() {
+    ExactSum sum = new ExactSum();
+    sum.add(1.5);
+    sum.value();
+    int normal = sum.touchedLimbs();
+    sum.add(Double.MAX_VALUE);
+    sum.add(Double.MIN_VALUE);
+    sum.value();
+    assertTrue(sum.touchedLimbs() > 60);
+    sum.remove(Double.MAX_VALUE);
+    sum.remove(Double.MIN_VALUE);
+    assertEquals(1.5, sum.value());
+    assertEquals(normal, sum.touchedLimbs());
+    sum.remove(1.5);
+    assertEquals(0.0, sum.value());
+    assertEquals(0, sum.touchedLimbs());
   }
 }

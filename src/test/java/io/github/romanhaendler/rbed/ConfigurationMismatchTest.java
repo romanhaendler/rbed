@@ -51,7 +51,8 @@ class ConfigurationMismatchTest {
   /** Names that spell other parts of a configuration, or that break naive encodings. */
   static final List<String> ADVERSARIAL = List.of("a.abs()", "a.above(1.0)", "a b", "a,b", "a, b",
       "a\")", "\"", "(", ")", ".", "pulse channel a", "channel a", "a pulse", "pulse", "\u00e9",
-      "\u0430", "\n", "a.rate()", "during(R0)", "R0).and(during(R1", "x\\", "5:abcde", "1:a");
+      "\u0430", "\n", "a.rate()", "during(R0)", "R0).and(during(R1", "x\\", "5:abcde", "1:a",
+      "\uD800", "\uD801", "\uDC00", "?", "a\uD800", "\uD800\uDC00");
 
   /** The readable text of a tree, built against placeholder Rules (an Expression names a Rule by name). */
   static String text(Node n, List<String> ruleNames) {
