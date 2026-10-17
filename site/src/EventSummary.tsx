@@ -35,13 +35,20 @@ export const drawnSummary = (channels: string[]) =>
   channels.length === 0 ? '' : ` The values of ${channels.join(' and ')} are drawn, not the Scenario's own.`;
 
 /** The time advances and the restart in words, for the text alternative. */
-export function timeSummary({ advances, restart }: { advances: number[]; restart?: number }, scenario: Scenario): string {
+export function timeSummary(
+  { advances, restart, restartForgets }: { advances: number[]; restart?: number; restartForgets?: boolean },
+  scenario: Scenario,
+): string {
   const at = timeIn(scenario.timeUnit);
   return (
     (advances.length === 0
       ? ''
       : ` Time is advanced without a Sample ${advances.length === 1 ? 'once' : `${advances.length} times`}, from ${at(advances[0])} to ${at(advances[advances.length - 1])}.`) +
-    (restart === undefined ? '' : ` The Detector is restarted at ${at(restart)}.`)
+    (restart === undefined
+      ? ''
+      : ` The Detector is restarted at ${at(restart)}${
+          restartForgets ? ' without History: it knows no earlier Event, so a within(...) strip from before it ends there' : ' with History'
+        }.`)
   );
 }
 

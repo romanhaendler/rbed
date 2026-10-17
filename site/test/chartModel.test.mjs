@@ -9,8 +9,10 @@ import {
   heldChannels,
   heldRows,
   keyOf,
+  latestEvent,
   lineRows,
   readoutValue,
+  ruleState,
   thresholdLines,
   thresholdText,
   tickText,
@@ -208,4 +210,42 @@ test('the key lists the lifecycle in order, and Pending only where something was
 
 test("an axis' ticks keep their decimals", () => {
   assert.deepEqual([0, 0.5, 1, 1500].map(tickText), ['0', '0.5', '1', '1,500']);
+});
+
+test('a restart without History cuts the within(...) windows of Events before it', () => {
+  const lifecycle = { events: [{ name: 'Maintenance', start: 10, end: 11 }], discarded: [] };
+  const windows = [{ rule: 'OverdueService', after: 'Maintenance', millis: 90 }];
+  const strip = (forgetsAt) => windowRows(windows, lifecycle, 1, forgetsAt).get('OverdueService');
+  assert.deepEqual(strip(undefined), [
+    { t: 11, s: 0 },
+    { t: 101, s: null },
+  ]);
+  assert.deepEqual(strip(60), [
+    { t: 11, s: 0 },
+    { t: 60, s: null },
+  ]);
+  assert.deepEqual(strip(5), [
+    { t: 11, s: 0 },
+    { t: 101, s: null },
+  ]);
+});
+
+test('a Rule is Pending until Confirmed, then Confirmed, Ended at its end, and Discarded where it was', () => {
+  const lifecycle = {
+    events: [{ name: 'R', start: 2000, confirmed: 4000, end: 6000 }],
+    discarded: [{ name: 'R', start: 8000, discarded: 9000 }],
+  };
+  assert.deepEqual(
+    [1, 2, 3, 4, 5, 6, 7, 8, 8.5, 9, 10].map((t) => ruleState(lifecycle, t, 1000)),
+    ['no Event', 'Pending', 'Pending', 'Confirmed', 'Confirmed', 'Ended', 'no Event', 'Pending', 'Pending', 'Discarded', 'no Event'],
+  );
+});
+
+test('latest(...) reads nothing before the first Confirmed Event, then the running one, then the Ended one until the next is Confirmed', () => {
+  const first = { name: 'LoadLifted', start: 10_000, confirmed: 10_000, end: 40_000 };
+  const second = { name: 'LoadLifted', start: 60_000, confirmed: 60_000, end: 90_000 };
+  assert.deepEqual(
+    [5, 10, 25, 40, 50, 60, 95].map((t) => latestEvent([first, second], t, 1000)),
+    [undefined, first, first, first, first, second, second],
+  );
 });

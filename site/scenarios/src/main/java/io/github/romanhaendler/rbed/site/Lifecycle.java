@@ -25,6 +25,8 @@ class Lifecycle implements EventListener {
   final List<Long> advances = new ArrayList<>();
   /** The timestamp of the first Sample after the Detector was restarted, or null. */
   Long restart;
+  /** Whether the restarted Detector started without History, knowing no earlier Event. */
+  boolean restartForgets;
   /** Notes a Scenario's listener made of Events during this run, by Event name and start. */
   private final Map<String, String> notes = new HashMap<>();
 
@@ -36,6 +38,15 @@ class Lifecycle implements EventListener {
   /** The note recorded for the Event (by its name and start), or null. */
   String noteOf(Event event) {
     return notes.get(event.name() + " " + event.start());
+  }
+
+  /**
+   * Records that the Detector was restarted at {@code at}, with the Events Ended so far as
+   * History or without.
+   */
+  void restart(long at, boolean withHistory) {
+    restart = at;
+    restartForgets = !withHistory;
   }
 
   /** Pushes the Sample to the Detector, keeping {@code now}. */

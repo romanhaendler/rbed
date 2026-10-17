@@ -141,6 +141,16 @@ test('the first Tab stop skips to the content', async ({ page }) => {
 test('the Javadoc has the site’s fonts and a link back to the site', async ({ page }) => {
   await page.goto('api/io.github.romanhaendler.rbed/io/github/romanhaendler/rbed/Rule.html');
   expect(await page.evaluate(() => getComputedStyle(document.body).fontFamily)).toContain('Geist Sans');
+  await expect(page.locator('footer')).toContainText('MIT licence');
+  await expect(page.locator('footer')).not.toContainText('All rights reserved');
+  // The search field's border has the site's edge colour, as the top bar's has, and its focus
+  // ring the site's accent, as its links have.
+  const search = page.locator('#search-input');
+  const edge = await page.locator('.top-nav').evaluate((e) => getComputedStyle(e).borderBottomColor);
+  expect(await search.evaluate((e) => getComputedStyle(e).borderTopColor)).toBe(edge);
+  await search.focus();
+  const accent = await page.locator('.top-nav .about-language a').evaluate((e) => getComputedStyle(e).color);
+  expect(await search.evaluate((e) => getComputedStyle(e).outlineColor)).toBe(accent);
   await page.getByRole('link', { name: 'rbed documentation' }).click();
   await expect(page).toHaveURL(/\/rbed\/$/);
 });

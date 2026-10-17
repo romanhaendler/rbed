@@ -50,7 +50,7 @@ export function inline(text: string): string {
 }
 
 /** The text of a heading without its inline marks, as its id is made from. */
-function plain(text: string): string {
+export function plain(text: string): string {
   return text.replace(/[`*]/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
 }
 

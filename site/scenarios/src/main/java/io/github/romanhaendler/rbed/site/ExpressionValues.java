@@ -72,7 +72,8 @@ final class ExpressionValues {
       pushed[count++] = m;
     }
     if (count != samples.size() || n - count != first.advances.size()) {
-      throw new IllegalStateException("Scenario " + scenario.id + " does not push each Sample once");
+      throw new IllegalStateException(
+          "Scenario " + scenario.id + " does not push each Sample once");
     }
     // Per position, a Rule comparing with a bisecting probe, and one testing for the value
     // the search has narrowed down to (see below).
@@ -184,8 +185,9 @@ final class ExpressionValues {
   }
 
   /**
-   * Runs the Scenario with the probing Rules after its own over the Samples, and records at each moment which of the Rules of its position hold. With a single group,
-   * that group is read at every position.
+   * Runs the Scenario with the probing Rules after its own over the Samples, and records at each
+   * moment which of the Rules of its position hold. With a single group, that group is read at
+   * every position.
    */
   private static Probe run(Scenario scenario, Map<String, Double> values, Rule[] rules,
       Rule[][] byPosition, List<Sample> samples) {
@@ -195,7 +197,6 @@ final class ExpressionValues {
     scenario.detect(all.toArray(Rule[]::new), samples, values, probe);
     return probe;
   }
-
 
   /** The bridge's Lifecycle, also noting after every moment which probing Rules hold. */
   private static final class Probe extends Lifecycle {

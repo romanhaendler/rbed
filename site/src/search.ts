@@ -2,7 +2,7 @@
 // keywords from its Markdown: the methods its Java source calls (fenced code and the source of
 // each Scenario it shows), the names in its inline code, its headings, its description and its
 // text; and one item per section (## and ###), which leads to the section itself.
-import { parse, slug } from './markdown.ts';
+import { parse, plain, slug } from './markdown.ts';
 import { type Page, rubricOf } from './pages.ts';
 
 // The group is the heading the items stand under; searchedGroup is empty, so the rows do not
@@ -26,7 +26,7 @@ export function searchItems(
     for (const m of prose.matchAll(/`([^`\n]+)`/g)) {
       for (const name of m[1].match(/[A-Za-z_]\w+/g) ?? []) words.add(name);
     }
-    const headings = [...prose.matchAll(/^#{2,3} +(.*)$/gm)].map((m) => m[1].replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[`*]/g, ''));
+    const headings = [...prose.matchAll(/^#{2,3} +(.*)$/gm)].map((m) => plain(m[1]));
     for (const heading of headings) words.add(heading);
     // The text as one keyword: the palette finds a query as a run of letters in it.
     const text = prose.replace(/[`*#]|\]\([^)]*\)|\[/g, '').replace(/\s+/g, ' ');

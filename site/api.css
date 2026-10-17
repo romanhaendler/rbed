@@ -68,3 +68,28 @@
 .top-nav {
   border-bottom: 1px solid var(--border-color);
 }
+
+/* Links in running text and in signatures are underlined, not told apart by colour alone. */
+.block a[href],
+footer a[href],
+.member-signature a[href],
+code a[href]:not(.member-name-link) {
+  text-decoration: underline;
+}
+
+/* Long member names in running text wrap on a phone instead of running off the page. */
+.block code {
+  overflow-wrap: anywhere;
+}
+
+/* The search fields: the site's edge, and its accent for the focus ring (Javadoc focuses the
+   field on load). */
+#search-input,
+#page-search-input {
+  border: 1px solid var(--border-color);
+}
+#search-input:focus,
+#page-search-input:focus {
+  outline: 2px solid var(--link-color);
+  outline-offset: 0;
+}

@@ -50,7 +50,8 @@ public final class Bridge {
 
   /**
    * The catalogue: a JSON array with, for each Scenario, its id, title, time unit, Channel names,
-   * the names of its Pulse Channels, Rule names, parameters (with default and limits) and source template.
+   * the names of its Pulse Channels, the Rule whose latest Event its Rules read (if any), Rule
+   * names, parameters (with default and limits) and source template.
    */
   @JSExport
   public static String scenarios() {
@@ -114,14 +115,16 @@ public final class Bridge {
    * @param drawnChannels JSON object of Channel values the reader drew, by Channel name, one
    *     number per Sample of the Scenario (null: absent in that Sample); they replace that
    *     Channel's own values
-   * @return JSON object with the Samples, the Events (in the order they Ended, as rbed reports them), the Discarded Pending Events (with the
-   *     timestamp they were Discarded), the timestamps time was advanced to without a Sample,
-   *     the timestamp of the restart if the Detector was restarted, each Expression the Scenario
-   *     plots (its name, unit if it has one of its own, threshold or null, value per Sample and,
-   *     if time was advanced, value per advance; null where undefined), the Channel thresholds
-   *     of its Rules and the windows their {@code within} opens; or {@code {"error": message,
-   *     "by": "rbed"}} if rbed rejected the Rules or the Samples, or {@code {"error": message}}
-   *     if the input was invalid
+   * @return JSON object with the Samples, the Events (in the order they Ended, as rbed reports
+   *     them), the Discarded Pending Events (with the timestamp they were Discarded), the
+   *     timestamps time was advanced to without a Sample, the timestamp of the restart if the
+   *     Detector was restarted (and {@code "restartForgets": true} if it was restarted without
+   *     History), each Expression the Scenario plots (its name, the Rule and comparison of its
+   *     threshold if it has one, unit if it has one of its own, threshold or null, value per
+   *     Sample and, if time was advanced, value per advance; null where undefined), the Channel
+   *     thresholds of its Rules and the windows their {@code within} opens; or {@code {"error":
+   *     message, "by": "rbed"}} if rbed rejected the Rules or the Samples, or {@code {"error":
+   *     message}} if the input was invalid
    */
   @JSExport
   public static String run(String scenarioId, String parameters, String drawnChannels) {
@@ -293,12 +296,15 @@ public final class Bridge {
     }
     out.append(']');
     if (lifecycle.restart != null) out.append(",\"restart\":").append(lifecycle.restart);
+    if (lifecycle.restartForgets) out.append(",\"restartForgets\":true");
     out.append(",\"expressions\":[");
     List<Scenario.Plot> plots = scenario.plots(values);
     for (int i = 0; i < plots.size(); i++) {
       Scenario.Plot plot = plots.get(i);
       if (i > 0) out.append(',');
       Json.string(out.append("{\"name\":"), plot.name());
+      if (plot.rule() != null) Json.string(out.append(",\"rule\":"), plot.rule());
+      if (plot.condition() != null) Json.string(out.append(",\"condition\":"), plot.condition());
       if (plot.unit() != null) Json.string(out.append(",\"unit\":"), plot.unit());
       ExpressionValues.Values plotted =
           ExpressionValues.of(scenario, plot.expression(), values, samples);

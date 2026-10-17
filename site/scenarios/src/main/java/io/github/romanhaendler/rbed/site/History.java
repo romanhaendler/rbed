@@ -95,9 +95,10 @@ final class History extends Scenario {
       if (sample.timestamp() == restart) {
         detector.close();
         Detector.Builder builder = Detector.builder().rules(rules).listener(lifecycle);
-        if (values.get("history") == 0) builder.history(List.copyOf(lifecycle.ended));
+        boolean withHistory = values.get("history") == 0;
+        if (withHistory) builder.history(List.copyOf(lifecycle.ended));
         detector = builder.build();
-        lifecycle.restart = restart;
+        lifecycle.restart(restart, withHistory);
       }
       lifecycle.push(detector, sample);
     }
