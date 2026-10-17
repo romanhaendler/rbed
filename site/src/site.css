@@ -446,9 +446,19 @@ dialog[aria-label='Search the documentation'] [role='option'] > [class*='_group_
   color: var(--u-color-text-secondary);
 }
 
+/* The front page's tagline on one line at desktop width, and the hero tight, so the first live
+   chart shows above the fold at 1280 x 800. */
+.page.front {
+  margin-top: calc(-1 * var(--u-space-4));
+}
+
+.front .flow > h1 ~ p:not(h2 ~ p) {
+  max-width: 80ch;
+}
+
 .front .flow > h1 + p {
-  max-width: 40rem;
-  font-size: 1.75rem;
+  max-width: 48rem;
+  font-size: 1.5rem;
   line-height: var(--u-leading-tight);
   font-weight: var(--u-weight-medium);
   letter-spacing: var(--u-tracking-display);
@@ -494,6 +504,16 @@ dialog[aria-label='Search the documentation'] [role='option'] > [class*='_group_
   border-radius: var(--u-radius-md);
   box-shadow: var(--u-edge);
   overflow: hidden;
+}
+
+/* Fenced blocks right after one another (Maven, Gradle) as tabs of one card (MarkdownPage). */
+.codeTabs {
+  display: block;
+  background: var(--u-color-surface-sunken);
+}
+
+.codeTabs [role='tablist'] {
+  padding: 0 var(--u-space-4);
 }
 
 .codeBar {
@@ -574,13 +594,13 @@ dialog[aria-label='Search the documentation'] [role='option'] > [class*='_group_
 
 /* ---------------- A Scenario: chart, controls, source ---------------- */
 
-/* The umriss configurator: the panel beside the stage from 900 px and under it below that, the
-   code always under the stage. Below 900 px the stage sticks under the header while the reader
-   works the controls, until the panel ends (.configuratorLive); clip rather than hide the
-   overflow, which would end the sticking. */
+/* The umriss configurator: the panel beside the stage from 900 px and under it below that; the
+   Event tables and then the code follow the configurator. Below 900 px the stage sticks under
+   the header while the reader works the controls, until the panel ends (.configuratorLive);
+   clip rather than hide the overflow, which would end the sticking. */
 .configurator {
   display: grid;
-  grid-template-areas: 'live' 'code';
+  grid-template-areas: 'live';
   border-radius: var(--u-radius-md);
   box-shadow: var(--u-edge);
   background: var(--u-color-surface);
@@ -630,6 +650,12 @@ dialog[aria-label='Search the documentation'] [role='option'] > [class*='_group_
   top: var(--title-separate, 50%);
 }
 
+/* The lanes' axis names the lanes by its ticks; a line the chart's full height beside the
+   Channels' bands would mean nothing. */
+.drawStage .uc-axis-y[data-axis='lanes'] > .uc-axis-line {
+  display: none;
+}
+
 /* On a phone, each Rule's name over its lane (EventChart). */
 .laneNames span {
   position: absolute;
@@ -655,18 +681,19 @@ dialog[aria-label='Search the documentation'] [role='option'] > [class*='_group_
   padding: var(--u-space-4);
 }
 
+/* On a phone the plot needs every pixel of width (at least 200 px at 375). */
+@media (max-width: 600px) {
+  .configuratorStage {
+    padding: var(--u-space-3) var(--u-space-2);
+  }
+}
+
 .configuratorPanel {
   grid-area: panel;
   display: flex;
   flex-direction: column;
   gap: var(--u-space-4);
   padding: var(--u-space-4);
-  border-top: 1px solid var(--u-edge-color);
-}
-
-.configuratorCode {
-  grid-area: code;
-  min-width: 0;
   border-top: 1px solid var(--u-edge-color);
 }
 
@@ -787,9 +814,8 @@ dialog[aria-label='Search the documentation'] [role='option'] > [class*='_group_
     display: contents;
   }
   .configurator {
-    grid-template-areas: 'stage panel' 'code panel';
+    grid-template-areas: 'stage panel';
     grid-template-columns: minmax(0, 1fr) 15rem;
-    grid-template-rows: auto 1fr;
   }
   .configuratorPanel {
     border-top: none;
@@ -945,6 +971,8 @@ dialog[aria-label='Search the documentation'] [role='option'] > [class*='_group_
 }
 
 .tile code {
+  align-self: flex-start;
+  max-width: 100%;
   font-size: var(--u-text-xs);
   color: var(--u-color-text-secondary);
   overflow-wrap: anywhere;

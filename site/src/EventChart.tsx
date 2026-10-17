@@ -19,10 +19,12 @@ import {
   type ChannelAxis,
   type ChartModel,
   channelColor,
-  EVENT_COLOR,
   EVENT_STATES,
   expressionColor,
   expressionKey,
+  expressionLabel,
+  expressionThreshold,
+  forgetsAt,
   expressionValue,
   heldChannels,
   heldRows,
@@ -41,12 +43,12 @@ import {
   type Row,
   readoutValue,
   ruleState,
+  stateColor,
   separateAxisOf,
   THRESHOLD_COLOR,
   TRUNCATED,
   thresholdLines,
   thresholdText,
-  labelRoom,
   tickText,
   timeDomain,
   timeTicks,
@@ -102,7 +104,10 @@ function Readout({ model, t }: { model: ChartModel; t: number }) {
         {expressions.map((x, k) =>
           line(x.name, expressionColor(scenario, k), expressionValue(expressionRow?.[expressionKey(k)]) + (x.unit ? ` ${x.unit}` : '')),
         )}
-        {rules.map((r) => line(r, EVENT_COLOR, ruleState(ofRule(lifecycle, r), t, millis)))}
+        {rules.map((r) => {
+          const state = ruleState(ofRule(lifecycle, r), t, millis);
+          return line(r, stateColor(state), state);
+        })}
         {scenario.latest &&
           line(
             `latest(${scenario.latest}) reads`,
@@ -200,11 +205,17 @@ export function EventChart({
   const separateAxis = separate.length > 0 ? separateAxisOf(model, channelAxes.length) : undefined;
   const axisOf = (channel: string) => channelAxes.find((a) => a.channels.includes(channel)) ?? channelAxes[0];
   const lines = thresholdLines(thresholds, channelAxes, channels, narrow);
+  // The first band's axis carries a threshold label (a Channel's, or an Expression's on its scale).
+  const firstLabelled =
+    lines.some((l) => l.axis === channelAxes[0].id && l.label !== '') || expressions.some((x) => !isSeparate(x) && x.threshold !== null);
   // Room for the labels of a band with more than two threshold lines.
   const crowded = channelAxes.reduce((sum, a) => sum + Math.max(0, lines.filter((l) => l.axis === a.id && l.label !== '').length - 2), 0) * 30;
-  const windows = windowRows(model.windows, lifecycle, millis, model.restartForgets ? model.restart : undefined);
-  // Lines with a marker at every Sample, unless the Samples lie too close for markers to read.
-  const markers = rows.length <= 100 ? 'always' : 'auto';
+  const windows = windowRows(model.windows, lifecycle, millis, forgetsAt(model));
+  // A Channel's line with a marker at every Sample, unless the Samples lie too close for markers
+  // to read (on a phone sooner). An Expression's line has none: its dash says it is derived.
+  const markers = rows.length <= (narrow ? 30 : 100) ? 'always' : 'auto';
+  // On a phone, smaller lifecycle marks, so a short Event's band still shows between them.
+  const radius = narrow ? { mark: 3.5, ring: 4.5, truncated: 6 } : { mark: 4, ring: 5.5, truncated: 9 };
   // Few Samples: a tick at each, written as the Samples' times are.
   const ticks = timeTicks(rows);
   // Each axis' title stands beside its band (site.css), not in the middle of the plot.
@@ -219,10 +230,12 @@ export function EventChart({
         style={titles}
         ariaLabel={`${scenario.channels.join(', ')} over time in ${unit}, with the Events of ${scenario.rules.join(', ')} as bands, Pending then Confirmed, and their lifecycle marked`}
       >
-        <XAxis value="t" domain={timeDomain(rows, labelRoom(model, channelAxes, narrow))} ticks={ticks} tickFormat={ticks && ((v) => String(v))} label={`Time (${unit})`} />
+        <XAxis value="t" domain={timeDomain(rows)} ticks={ticks} tickFormat={ticks && ((v) => String(v))} label={`Time (${unit})`} />
         {/* The first band's axis on the left, every further one on the right, next to the plot
             (charts 0.40.0 gives each y axis a column of its own); the Expressions' with a unit
-            of their own is titled with the unit, as the key names the Expression. */}
+            of their own is titled with the unit, as the key names the Expression. On a phone an
+            axis with a threshold label, and every right-hand one, has no title: its column is
+            narrow, the label would run into the title, and the key names each threshold in full. */}
         {channelAxes.map((a, b) => (
           <YAxis
             key={a.id}
@@ -232,7 +245,7 @@ export function EventChart({
             domain={a.domain}
             ticks={a.ticks}
             tickFormat={tickText}
-            label={a.channels.filter((c) => channels.includes(c)).join(', ')}
+            label={narrow && (b > 0 || firstLabelled) ? undefined : a.channels.filter((c) => channels.includes(c)).join(', ')}
           />
         ))}
         {separateAxis && (
@@ -243,7 +256,7 @@ export function EventChart({
             domain={separateAxis.domain}
             ticks={separateAxis.ticks}
             tickFormat={tickText}
-            label={[...new Set(separate.map((x) => x.unit))].join(', ')}
+            label={narrow ? undefined : [...new Set(separate.map((x) => x.unit))].join(', ')}
           />
         )}
         {/* Lane i (first Rule on top) spans lanes - i - 1 .. lanes - i. The lane names change with
@@ -275,8 +288,8 @@ export function EventChart({
                 key={`expression ${k}`}
                 axisId={isSeparate(x) ? 'separate' : channelAxes[0].id}
                 value={x.threshold}
-                // On a phone a longer label would stand in the plot; the line's mark says what it is.
-                label={narrow ? String(x.threshold) : `threshold ${x.threshold}`}
+                // As a Channel threshold's: the comparison and the value; the key names the Rule.
+                label={expressionLabel(x)}
                 color={narrow ? THRESHOLD_COLOR : undefined}
               />
             ),
@@ -322,10 +335,10 @@ export function EventChart({
           yAxisId="lanes"
           name={TRUNCATED.name}
           color={TRUNCATED.color}
-          radius={9}
+          radius={radius.truncated}
         />
         {/* A ring in the surface's color sets each mark off its band. */}
-        <Scatter<MarkRow> data={laneMarks(rules, lifecycle, millis, allMoments, narrow)} value="y" yAxisId="lanes" name="Mark outline" color={RING_COLOR} radius={5.5} />
+        <Scatter<MarkRow> data={laneMarks(rules, lifecycle, millis, allMoments, narrow)} value="y" yAxisId="lanes" name="Mark outline" color={RING_COLOR} radius={radius.ring} />
         {MARKS.map((m) => (
           <Scatter<MarkRow>
             key={m.name}
@@ -334,7 +347,7 @@ export function EventChart({
             yAxisId="lanes"
             name={m.name}
             color={m.color}
-            radius={4}
+            radius={radius.mark}
           />
         ))}
         {model.advances.length > 0 && (
@@ -344,7 +357,8 @@ export function EventChart({
             yAxisId="lanes"
             name="Time advance"
             color={ADVANCE_COLOR}
-            radius={3}
+            // Small, so many advances read as ticks, not as a bar.
+            radius={2.5}
           />
         )}
         {/* A Pulse Channel has no value between its Samples, so it is drawn as marks, not a line. */}
@@ -370,7 +384,7 @@ export function EventChart({
             name={x.name}
             color={expressionColor(scenario, k)}
             dash={[6, 4]}
-            markers={isSeparate(x) ? 'auto' : markers}
+            markers="never"
             yAxisId={isSeparate(x) ? 'separate' : channelAxes[0].id}
           />
         ))}
@@ -423,8 +437,8 @@ export function LifecycleKey({ model }: { model: ChartModel }) {
       {group(
         'Thresholds:',
         [
-          ...thresholds.filter((t) => channels.includes(t.channel)).map(thresholdText),
-          ...expressions.flatMap((x) => (x.threshold === null ? [] : [`${x.name} ${x.threshold}${x.unit ? ` ${x.unit}` : ''}`])),
+          ...thresholds.filter((t) => channels.includes(t.channel)).map((t) => thresholdText(t)),
+          ...expressions.flatMap((x) => (x.threshold === null ? [] : [thresholdText(expressionThreshold({ ...x, threshold: x.threshold }), x.unit)])),
         ].map((text) => item(text, THRESHOLD_COLOR, 'dash')),
       )}
       {group('Shaded:', [

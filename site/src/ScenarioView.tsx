@@ -1,15 +1,15 @@
 // A Scenario live, with the tools every page that shows one offers: its Channels and Events on
 // one time axis with a hover readout (EventChart), a control per parameter, a reset, toggles for
-// each Rule and Channel (ScenarioControls), the Java source with the current values, and the
-// Event table with each Event's Aggregates, whose rows and the chart's bands select each other; a
-// selected Event's Aggregates are shown in full above the table (EventTables). Non-default values
-// live in the address. Where the page asks for it, the reader can draw a Channel's values on the
-// chart (DrawLayer; not kept in the address). The Detector runs again on every change, and a
-// screen reader hears what came of it.
+// each Rule and Channel (ScenarioControls), under them the Event table with each Event's
+// Aggregates, whose rows and the chart's bands select each other (a selected Event's Aggregates
+// are shown in full above the table, EventTables), and then the Java source with the current
+// values. Non-default values live in the address. Where the page asks for it, the reader can
+// draw a Channel's values on the chart (DrawLayer; not kept in the address). The Detector runs
+// again on every change, and a screen reader hears what came of it.
 import { Alert, VisuallyHidden } from '@umriss-ui/core';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { type Result, run, type Scenario, source } from './bridge';
-import { type ChannelAxis, type ChartModel, channelAxesOf, expressionKey, expressionRows, labelRoom, type Row, timeDomain } from './chartModel.ts';
+import { type ChannelAxis, type ChartModel, channelAxesOf, expressionKey, expressionRows, type Row, timeDomain } from './chartModel.ts';
 import { CodeBlock } from './CodeBlock';
 import { drawnSource, drawTo } from './draw.ts';
 import { DrawLayer } from './DrawLayer';
@@ -42,10 +42,11 @@ function useAnnouncement(result: Result): string {
   return said;
 }
 
-/** `draw` lets the reader draw the values of the Scenario's Channels other than Pulse Channels. */
-export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; draw?: boolean }) {
+/** `draw` lets the reader draw the values of the Scenario's Channels other than Pulse Channels;
+    `hidden` names the Channels and Rules the chart hides until the reader shows them. */
+export function ScenarioView({ scenario, draw = false, hidden: hiddenAtFirst = [] }: { scenario: Scenario; draw?: boolean; hidden?: string[] }) {
   const [parameters, setParameters] = useState(() => fromQuery(window.location.search, scenario.parameters));
-  const [hidden, setHidden] = useState<string[]>([]);
+  const [hidden, setHidden] = useState(hiddenAtFirst);
   const [selected, select] = useState<string>();
   // Drawn values by Channel, one per Sample (also in a ref, so two pointer moves before a render
   // both build on the latest); the Channel the pointer draws ('' for none); the Channels' axes
@@ -143,7 +144,7 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
             latest={result.events.find((e) => eventKey(e) === hoveredLatest)}
             select={select}
           />
-          {pen !== '' && <DrawLayer x={timeDomain(rows, labelRoom(model, channelAxes, narrow))} channelAxis={penAxis} draw={drawPoint} end={() => setFrozen(undefined)} />}
+          {pen !== '' && <DrawLayer x={timeDomain(rows)} channelAxis={penAxis} draw={drawPoint} end={() => setFrozen(undefined)} />}
         </div>
         <LifecycleKey model={model} />
         <EventSummary
@@ -189,11 +190,10 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
             />
           </div>
         </div>
-        <div className="configuratorCode">
-          <CodeBlock language="java" label="Java" source={drawnSource(source(scenario, parameters), drawn)} />
-        </div>
       </div>
       <VisuallyHidden role="status">{announcement}</VisuallyHidden>
+      {/* The Event tables right under the chart, so a selected band's row and a changed table
+          stay in view; the source after them. */}
       {!('error' in result) && (
         <>
           {/* An Event whose Rule reads no Channel has no Aggregates to show in full. */}
@@ -204,6 +204,9 @@ export function ScenarioView({ scenario, draw = false }: { scenario: Scenario; d
           <DiscardedTable scenario={scenario} discarded={result.discarded} />
         </>
       )}
+      <div className="codeCard scenarioCode">
+        <CodeBlock language="java" label="Java" source={drawnSource(source(scenario, parameters), drawn)} />
+      </div>
     </>
   );
 }

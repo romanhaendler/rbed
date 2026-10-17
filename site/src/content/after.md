@@ -14,7 +14,7 @@ A cold room's door is open from minute 10 to minute 12, and once more at minute 
 <!-- live -->
 Move the window and watch which excursion still counts.
 
-<!-- scenario after draw -->
+<!-- scenario after draw hide door -->
 
 The window is measured from where `DoorOpen` Ended, not from where it started. At the default of 30 minutes, the first door opening Ended at minute 12, so the window lasts until minute 42 and covers the first excursion: `ExcursionAfterDoor` runs from 15 to 25. The second door opening Ended at minute 61, 39 minutes before the second excursion starts, so that excursion is not attributed to the door.
 

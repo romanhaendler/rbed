@@ -2,7 +2,7 @@
 
 A refrigerated truck carries vaccines, which must stay between 2 and 8 °C; its temperature and door sensors report every minute. Regulations limit the total time above 8 °C over the trip to 45 minutes, across all excursions, and an excursion soon after the door was open is probably caused by it.
 
-<!-- scenario logistics -->
+<!-- scenario logistics hide door -->
 
 ## The Rules
 

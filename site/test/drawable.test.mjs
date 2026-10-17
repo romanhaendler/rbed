@@ -10,7 +10,7 @@ import * as bridge from '../scenarios/target/js/rbed.js';
 const content = new URL('../src/content/', import.meta.url);
 const drawable = readdirSync(content)
   .filter((f) => f.endsWith('.md'))
-  .flatMap((f) => [...readFileSync(new URL(f, content), 'utf8').matchAll(/^<!-- scenario (\S+) draw -->$/gm)].map((m) => m[1]));
+  .flatMap((f) => [...readFileSync(new URL(f, content), 'utf8').matchAll(/^<!-- scenario (\S+) draw(?: hide \S+)? -->$/gm)].map((m) => m[1]));
 const catalogue = JSON.parse(bridge.scenarios());
 
 test('pages let the reader draw', () => assert.ok(drawable.length > 0));
