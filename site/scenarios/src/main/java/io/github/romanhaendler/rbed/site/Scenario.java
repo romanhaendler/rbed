@@ -56,17 +56,18 @@ abstract class Scenario {
   abstract Rule[] rules(Map<String, Double> values);
 
   /**
-   * Runs the Rules over {@code samples} (its own, with any Channel values the reader drew) with
-   * {@code lifecycle} as the listener, feeding each Sample through {@link Lifecycle#push}, and
-   * closes the Detector. A Scenario whose feeding depends on its parameters or is otherwise
-   * different (a sampling rate, time advances, a restart with or without History) overrides it
-   * and feeds through {@code lifecycle} the same way ({@code push}, {@code pushValues},
+   * Runs the Rules over {@code samples} (its own, with any Channel values the reader drew) in a
+   * Detector from {@link Lifecycle#builder}, feeding each Sample through {@link Lifecycle#push},
+   * and closes the Detector. A Scenario whose feeding depends on its parameters or is otherwise
+   * different (a sampling rate, time advances, a restart with or without History) overrides it,
+   * builds every Detector from {@code lifecycle.builder()} the same way (so it watches the plotted
+   * Expressions) and feeds through {@code lifecycle} ({@code push}, {@code pushValues},
    * {@code advance}, and {@code restart(at, withHistory)} for a new Detector), so the bridge sees
    * every moment.
    */
   void detect(Rule[] rules, List<Sample> samples, Map<String, Double> values,
       Lifecycle lifecycle) {
-    Detector detector = Detector.builder().rules(rules).listener(lifecycle).build();
+    Detector detector = lifecycle.builder().rules(rules).build();
     for (Sample sample : samples) lifecycle.push(detector, sample);
     detector.close();
   }

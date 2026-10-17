@@ -75,10 +75,9 @@ final class Validation extends Scenario {
   @Override
   void detect(Rule[] rules, List<Sample> samples, Map<String, Double> values,
       Lifecycle lifecycle) {
-    Detector detector = Detector.builder()
+    Detector detector = lifecycle.builder()
         .retentionLimit((int) Math.round(values.get("retention")))
         .rules(rules)
-        .listener(lifecycle)
         .build();
     for (Sample sample : samples) lifecycle.push(detector, sample);
     detector.close();

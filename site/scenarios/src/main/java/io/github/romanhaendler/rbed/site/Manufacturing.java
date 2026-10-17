@@ -112,7 +112,7 @@ final class Manufacturing extends Scenario {
   @Override
   void detect(Rule[] rules, List<Sample> samples, Map<String, Double> values,
       Lifecycle lifecycle) {
-    Detector detector = Detector.builder().samplingRate(1).rules(rules).listener(lifecycle).build();
+    Detector detector = lifecycle.builder().samplingRate(1).rules(rules).build();
     for (Sample sample : samples) lifecycle.pushValues(detector, sample);  // round(i * 1000 / 1)
     detector.close();
   }

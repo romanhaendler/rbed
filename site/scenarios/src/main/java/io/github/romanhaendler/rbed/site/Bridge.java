@@ -3,6 +3,7 @@ package io.github.romanhaendler.rbed.site;
 import io.github.romanhaendler.rbed.Aggregates;
 import io.github.romanhaendler.rbed.Channel;
 import io.github.romanhaendler.rbed.Event;
+import io.github.romanhaendler.rbed.Expression;
 import io.github.romanhaendler.rbed.Rule;
 import io.github.romanhaendler.rbed.Sample;
 import java.util.ArrayList;
@@ -147,7 +148,14 @@ public final class Bridge {
     } catch (RuntimeException e) {
       return error(e, "");
     }
-    Lifecycle lifecycle = new Lifecycle();
+    Lifecycle lifecycle;
+    try {
+      List<Expression> plotted = new ArrayList<>();
+      for (Scenario.Plot plot : scenario.plots(values)) plotted.add(plot.expression());
+      lifecycle = new Lifecycle(plotted);
+    } catch (RuntimeException e) {
+      return error(e, "");
+    }
     try {
       scenario.detect(scenario.rules(values), samples, values, lifecycle);
     } catch (IllegalArgumentException | IllegalStateException e) {
@@ -306,12 +314,10 @@ public final class Bridge {
       if (plot.rule() != null) Json.string(out.append(",\"rule\":"), plot.rule());
       if (plot.condition() != null) Json.string(out.append(",\"condition\":"), plot.condition());
       if (plot.unit() != null) Json.string(out.append(",\"unit\":"), plot.unit());
-      ExpressionValues.Values plotted =
-          ExpressionValues.of(scenario, plot.expression(), values, samples);
       Json.number(out.append(",\"threshold\":"), plot.threshold());
-      numbers(out.append(",\"values\":"), plotted.atSamples());
-      if (plotted.atAdvances().length > 0) {
-        numbers(out.append(",\"atAdvances\":"), plotted.atAdvances());
+      numbers(out.append(",\"values\":"), lifecycle.atSamples, i);
+      if (!lifecycle.atAdvances.isEmpty()) {
+        numbers(out.append(",\"atAdvances\":"), lifecycle.atAdvances, i);
       }
       out.append('}');
     }
@@ -337,12 +343,12 @@ public final class Bridge {
     return out.append('}').toString();
   }
 
-  /** A JSON array of the numbers; NaN becomes null. */
-  private static StringBuilder numbers(StringBuilder out, double[] numbers) {
+  /** A JSON array of the k-th value of each moment; NaN becomes null. */
+  private static StringBuilder numbers(StringBuilder out, List<double[]> moments, int k) {
     out.append('[');
-    for (int i = 0; i < numbers.length; i++) {
+    for (int i = 0; i < moments.size(); i++) {
       if (i > 0) out.append(',');
-      Json.number(out, numbers[i]);
+      Json.number(out, moments.get(i)[k]);
     }
     return out.append(']');
   }

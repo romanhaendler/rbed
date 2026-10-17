@@ -96,8 +96,8 @@ final class SamplingRate extends Scenario {
       super.detect(rules, samples, values, lifecycle);
       return;
     }
-    Detector detector = Detector.builder().samplingRate(values.get("rate"))
-        .rules(rules).listener(lifecycle).build();
+    Detector detector = lifecycle.builder().samplingRate(values.get("rate"))
+        .rules(rules).build();
     // samples(values) gave them the derived round(index * 1000 / rate)
     for (Sample sample : samples) lifecycle.pushValues(detector, sample);
     detector.close();

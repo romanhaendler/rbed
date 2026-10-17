@@ -109,7 +109,7 @@ final class Sports extends Scenario {
   @Override
   void detect(Rule[] rules, List<Sample> samples, Map<String, Double> values,
       Lifecycle lifecycle) {
-    Detector detector = Detector.builder().rules(rules).listener(new EventListener() {
+    Detector detector = lifecycle.builder().rules(rules).listener(new EventListener() {
       private long lastSprintEnd;
 
       @Override public void onPending(Event e) {
