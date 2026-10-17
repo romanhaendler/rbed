@@ -260,9 +260,9 @@ public final class Detector implements AutoCloseable {
     return v == v ? OptionalDouble.of(v) : OptionalDouble.empty();
   }
 
-  /** Called while binding by every windowed construct; unbounded ({@code Long.MAX_VALUE}) counts for nothing. */
+  /** Called while binding by every windowed construct; {@code Long.MAX_VALUE} is a window that never forgets. */
   void windowMillis(long millis) {
-    if (millis != Long.MAX_VALUE) horizonMillis = Math.max(horizonMillis, millis);
+    horizonMillis = Math.max(horizonMillis, millis);
   }
 
   void windowSamples(int n) {

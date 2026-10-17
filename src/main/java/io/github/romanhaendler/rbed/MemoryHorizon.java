@@ -7,7 +7,9 @@ package io.github.romanhaendler.rbed;
  * further back; the Replay Point is the exact answer.
  *
  * @param millis the longest time window in milliseconds, from {@code forDuration}, End Condition
- *     durations, {@code averageOverDuration}, {@code within(...)} and {@code maxGap}; 0 if none
+ *     durations, {@code averageOverDuration}, {@code within(...)} and {@code maxGap}; 0 if none;
+ *     {@link Long#MAX_VALUE} if a window never forgets (one given as {@code Long.MAX_VALUE}, as
+ *     {@code averageOverDuration(Long.MAX_VALUE)}: it keeps what the Retention Limit allows)
  * @param samples the largest Sample count, from {@code forSamples} and
  *     {@code averageOverSamples}; 0 if none
  */
