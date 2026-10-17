@@ -87,6 +87,39 @@ final class Accumulator {
     lastTime = later.lastTime;
   }
 
+  void save(StateWriter w) {
+    w.float64s(min);
+    w.float64s(max);
+    w.float64s(sum);
+    w.int64s(count);
+    w.float64s(integral);
+    w.float64s(lastValue);
+    w.bools(valued);
+    w.int64s(firstTime);
+    w.int64(lastTime);
+    w.int64(startTime);
+    w.bool(empty);
+  }
+
+  void load(StateReader r) throws java.io.IOException {
+    min = r.float64s();
+    max = r.float64s();
+    sum = r.float64s();
+    count = r.int64s();
+    integral = r.float64s();
+    lastValue = r.float64s();
+    valued = r.bools();
+    firstTime = r.int64s();
+    lastTime = r.int64();
+    startTime = r.int64();
+    empty = r.bool();
+    int n = count.length;
+    if (min.length != n || max.length != n || sum.length != n || integral.length != n
+        || lastValue.length != n || valued.length != n || firstTime.length != n) {
+      throw new java.io.IOException("inconsistent Aggregates");
+    }
+  }
+
   void clear() {
     Arrays.fill(min, Double.POSITIVE_INFINITY);
     Arrays.fill(max, Double.NEGATIVE_INFINITY);

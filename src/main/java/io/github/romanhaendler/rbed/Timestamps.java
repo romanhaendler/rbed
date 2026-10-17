@@ -37,6 +37,23 @@ final class Timestamps {
     detector.retain();
   }
 
+  /** Writes the timestamps oldest first; the ring's position and capacity are not state. */
+  void save(StateWriter w) {
+    w.int32(size);
+    for (int i = 0; i < size; i++) w.int64(times[(head + i) % times.length]);
+    w.int64(base);
+  }
+
+  void load(StateReader r) throws java.io.IOException {
+    int n = r.length();
+    if (n > detector.retentionLimit()) throw new java.io.IOException("too many timestamps");
+    times = new long[Math.max(times.length, n)];
+    for (int i = 0; i < n; i++) times[i] = r.int64();
+    head = 0;
+    size = n;
+    base = r.int64();
+  }
+
   /** Drops timestamps more than {@code window} before {@code now}. */
   void dropOlderThan(long now, long window) {
     while (size > 0 && now - times[head] > window) {

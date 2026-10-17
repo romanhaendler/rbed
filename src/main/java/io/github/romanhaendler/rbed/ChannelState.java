@@ -20,6 +20,18 @@ final class ChannelState extends ValueTrack {
   }
 
   @Override
+  void save(StateWriter w) {
+    super.save(w);
+    w.bool(absent);
+  }
+
+  @Override
+  void load(StateReader r) throws java.io.IOException {
+    super.load(r);
+    absent = r.bool();
+  }
+
+  @Override
   boolean absent() {
     return absent;
   }

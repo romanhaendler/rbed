@@ -22,7 +22,8 @@ record Scenario(
     List<Differential.Op> ops) {
 
   /** The configuration of a Detector Builder plus the Expressions it watches. */
-  record Built(Consumer<Detector.Builder> config, List<Expression> watched) {}
+  record Built(Consumer<Detector.Builder> config, List<Expression> watched,
+      Consumer<Detector.Builder> configWithoutHistory) {}
 
   /** A Rule as data; 0 / -1 / null mean "not set". */
   record RuleSpec(
@@ -271,13 +272,16 @@ record Scenario(
       exprs.add(e);
     }
     List<Event> hist = history.stream().map(HistorySpec::build).toList();
-    Consumer<Detector.Builder> config = b -> {
+    Consumer<Detector.Builder> withoutHistory = b -> {
       b.rules(ruleArray).watch(exprs.toArray(Expression[]::new));
       if (samplingRate > 0) b.samplingRate(samplingRate);
       if (retentionLimit > 0) b.retentionLimit(retentionLimit);
+    };
+    Consumer<Detector.Builder> config = b -> {
+      withoutHistory.accept(b);
       if (!hist.isEmpty()) b.history(hist);
     };
-    return new Built(config, exprs);
+    return new Built(config, exprs, withoutHistory);
   }
 
   /** Constants that appear in the Rules, so inputs can hit thresholds exactly. */

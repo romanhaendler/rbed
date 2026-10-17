@@ -58,6 +58,44 @@ final class RuleState {
     }
   }
 
+  void save(StateWriter w) {
+    w.int32(state.ordinal());
+    w.bool(armed);
+    w.bool(seenFalse);
+    w.bool(truncatedStart);
+    w.int64(confirmedAt);
+    w.bool(inEndPhase);
+    w.int64(lastValidMoment);
+    w.bool(hasEnded);
+    holding.save(w);
+    if (ending != null) ending.save(w);
+    w.int32(channels.count());
+    aggregates.save(w);
+    endPhaseAggregates.save(w);
+    latestEnded.save(w);
+    events.save(w);
+  }
+
+  void load(StateReader r) throws java.io.IOException {
+    int ordinal = r.int32();
+    if (ordinal < 0 || ordinal >= State.values().length) throw new java.io.IOException("state");
+    state = State.values()[ordinal];
+    armed = r.bool();
+    seenFalse = r.bool();
+    truncatedStart = r.bool();
+    confirmedAt = r.int64();
+    inEndPhase = r.bool();
+    lastValidMoment = r.int64();
+    hasEnded = r.bool();
+    holding.load(r);
+    if (ending != null) ending.load(r);
+    r.expect(channels.count());
+    aggregates.load(r);
+    endPhaseAggregates.load(r);
+    latestEnded.load(r);
+    events.load(r);
+  }
+
   /** Keeps Aggregates for this Channel too; returns its index in the Accumulators. */
   int aggregate(ChannelState channel) {
     return channels.indexOf(channel);

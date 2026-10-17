@@ -27,8 +27,8 @@ public final class Detector implements AutoCloseable {
   private final double samplingRate;
   private final Map<Channel, ChannelState> channels = new HashMap<>();
   private final Map<String, EventState> events = new HashMap<>();
-  private final boolean hasHistory;
-  private final long latestHistoryEnd;
+  private boolean hasHistory;
+  private long latestHistoryEnd;
   private final RuleState[] rules;
   private final ChannelState[] pulses;
   /** Watched Expressions, bound once; a Channel matches by name, others by identity. */
@@ -39,6 +39,11 @@ public final class Detector implements AutoCloseable {
   private long lastSample;
   private long samples;
   private boolean closed;
+  /** A push, advance or close is running, so a listener callback may be on the stack. */
+  private boolean processing;
+  /** Descriptions of the Rules, their Channels and the watched Expressions, for the Snapshot fingerprint. */
+  private final List<String> ruleDescriptions = new ArrayList<>();
+  private final List<String> watchedDescriptions = new ArrayList<>();
   /** Entries held by moving-average windows and count timestamps; see {@link #retainedValues}. */
   private long retained;
   private final int retentionLimit;
@@ -92,8 +97,101 @@ public final class Detector implements AutoCloseable {
         .filter(state -> state.channel.pulse)
         .toArray(ChannelState[]::new);
 
+    for (Rule rule : b.rules.values()) ruleDescriptions.add(rule.toString());
+    for (ChannelState state : sortedChannels()) {
+      ruleDescriptions.add("channel " + state.channel.name() + (state.channel.pulse ? " pulse" : ""));
+    }
+    for (Expression expression : b.watched) watchedDescriptions.add(expression.toString());
+
+    if (b.restore != null) {
+      if (!b.history.isEmpty()) {
+        throw new IllegalArgumentException(
+            "restore(...) and history(...) cannot be combined: a Snapshot already contains the"
+                + " History that was known when it was taken");
+      }
+      Snapshots.restore(this, b.restore);
+      return;
+    }
     hasHistory = !b.history.isEmpty();
     latestHistoryEnd = remember(b.history); // after binding, so that Event counts see it too
+  }
+
+  private ChannelState[] sortedChannels() {
+    return channels.values().stream()
+        .sorted(Comparator.comparing(state -> state.channel.name()))
+        .toArray(ChannelState[]::new);
+  }
+
+  /**
+   * Returns this Detector's complete state at the latest moment processed, as a byte array that
+   * {@link Builder#restore} turns back into a Detector.
+   *
+   * <p>The guarantee: a Detector restored from a Snapshot is indistinguishable from the one the
+   * Snapshot was taken from. For every input that follows, the callbacks (kind, order and the
+   * complete Event, every Aggregate bit for bit), the values read through {@link #value}, {@link
+   * #retainedValues()}, {@link #droppedValues()}, the warnings logged and the exceptions thrown
+   * are identical. The Snapshot also works after {@link #close} (it restores a closed Detector),
+   * and before the first Sample. It does not contain the listener; the restored Detector reports
+   * to the Builder's listener. Taking a Snapshot does not change this Detector. Its size is
+   * bounded by the Retention Limit.
+   *
+   * <p>The array starts with a magic header and a format version, followed by a fingerprint of
+   * the Rules and options; {@link Builder#build()} rejects a Snapshot that does not match.
+   *
+   * @throws IllegalStateException if called from within an {@link EventListener} callback, where
+   *     a moment is only half processed
+   */
+  public byte[] snapshot() {
+    if (processing) {
+      throw new IllegalStateException(
+          "snapshot() cannot be called from a listener callback: the moment is only half"
+              + " processed. Take it after push, advanceTo or close returns.");
+    }
+    return Snapshots.write(this);
+  }
+
+  List<String> ruleDescriptions() {
+    return ruleDescriptions;
+  }
+
+  List<String> watchedDescriptions() {
+    return watchedDescriptions;
+  }
+
+  double samplingRate() {
+    return samplingRate;
+  }
+
+  void saveState(StateWriter w) {
+    w.bool(started);
+    w.int64(now);
+    w.bool(closed);
+    w.int64(lastSample);
+    w.int64(samples);
+    w.int64(retained);
+    w.int64(dropped);
+    w.bool(hasHistory);
+    w.int64(latestHistoryEnd);
+    ChannelState[] sorted = sortedChannels();
+    w.int32(sorted.length);
+    for (ChannelState state : sorted) state.save(w);
+    for (RuleState rule : rules) rule.save(w);
+  }
+
+  void loadState(StateReader r) throws java.io.IOException {
+    started = r.bool();
+    now = r.int64();
+    closed = r.bool();
+    lastSample = r.int64();
+    samples = r.int64();
+    retained = r.int64();
+    dropped = r.int64();
+    hasHistory = r.bool();
+    latestHistoryEnd = r.int64();
+    ChannelState[] sorted = sortedChannels();
+    r.expect(sorted.length);
+    for (ChannelState state : sorted) state.load(r);
+    for (RuleState rule : rules) rule.load(r);
   }
 
   /**
@@ -252,7 +350,13 @@ public final class Detector implements AutoCloseable {
   public void close() {
     if (closed) return;
     closed = true;
-    if (started) for (RuleState rule : rules) rule.close();
+    boolean outer = processing;
+    processing = true;
+    try {
+      if (started) for (RuleState rule : rules) rule.close();
+    } finally {
+      processing = outer;
+    }
   }
 
   private List<Event> batch(Runnable pushAll) {
@@ -278,7 +382,13 @@ public final class Detector implements AutoCloseable {
     }
     moveTo(timestamp);
     for (ChannelState pulse : pulses) pulse.pulseAbsent();
-    evaluate(timestamp, false);
+    boolean outer = processing;
+    processing = true;
+    try {
+      evaluate(timestamp, false);
+    } finally {
+      processing = outer;
+    }
   }
 
   private void accept(long timestamp, Map<Channel, Double> values) {
@@ -288,7 +398,13 @@ public final class Detector implements AutoCloseable {
     sampleTimestamp = timestamp;
     values.forEach(applyValue);
     for (ChannelState pulse : pulses) if (!pulse.carried) pulse.pulseAbsent();
-    evaluate(timestamp, true);
+    boolean outer = processing;
+    processing = true;
+    try {
+      evaluate(timestamp, true);
+    } finally {
+      processing = outer;
+    }
     lastSample = timestamp;
     samples++;
   }
@@ -406,6 +522,7 @@ public final class Detector implements AutoCloseable {
     private final Map<String, Rule> rules = new LinkedHashMap<>();
     private final List<Event> history = new ArrayList<>();
     private final Set<Expression> watched = new LinkedHashSet<>();
+    private byte[] restore;
     private EventListener listener = new EventListener() {};
     private double samplingRate;
     private int retentionLimit = 1_000_000;
@@ -445,6 +562,25 @@ public final class Detector implements AutoCloseable {
      */
     public Builder watch(Expression... expressions) {
       for (Expression e : expressions) watched.add(Objects.requireNonNull(e, "expression"));
+      return this;
+    }
+
+    /**
+     * Makes {@link #build()} produce a Detector in the state of a {@link Detector#snapshot()}
+     * instead of a fresh one, ready for the next Sample. The Rules, the sampling rate, the
+     * Retention Limit and the watched Expressions of this Builder must be those of the Detector
+     * that took the Snapshot. The listener is not part of a Snapshot: set it on this Builder.
+     *
+     * <p>{@code build()} throws {@link IllegalArgumentException}, with a message naming the cause,
+     * if the array is not a Snapshot, is corrupted or truncated, has a format version this rbed
+     * does not read, was taken with other Rules (also a renamed or changed Rule) or other options
+     * (sampling rate, Retention Limit, watched Expressions), or if {@link #history} was also
+     * called (a Snapshot already contains the History that was known).
+     *
+     * @throws NullPointerException if {@code snapshot} is null
+     */
+    public Builder restore(byte[] snapshot) {
+      restore = Objects.requireNonNull(snapshot, "snapshot");
       return this;
     }
 
