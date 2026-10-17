@@ -106,7 +106,7 @@ class SnapshotWindowsTest {
   }
 
   @Test
-  void compensatedSumsSurviveARestoreBitForBitOverLongRuns() {
+  void partialSumsSurviveARestoreBitForBitOverLongRuns() {
     ChannelExpression avgS = A.averageOverSamples(5);
     ChannelExpression avgD = A.averageOverDuration(450);
     Consumer<Detector.Builder> config = b -> b.rules(Rule.named("X").when(avgS.above(0))).watch(avgS, avgD);

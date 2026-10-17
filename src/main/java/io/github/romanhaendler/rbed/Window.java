@@ -2,10 +2,9 @@ package io.github.romanhaendler.rbed;
 
 /**
  * The recent values of one Channel for a moving average. Memory is bounded by the window size and
- * nothing is allocated per value once the window is full. The running sum is compensated, so a
- * large value leaving the window does not wipe out small ones, and it is recomputed from the
- * window each time the window has turned over, so rounding error cannot build up on endless
- * streams. Both keep the amortized cost per value constant.
+ * nothing is allocated per value once the window is full. The sum is exact (see {@link
+ * ExactSum}), so the average depends only on the values in the window, never on the order they
+ * arrived in or on values that left.
  */
 abstract class Window {
   final Detector detector;
@@ -35,8 +34,7 @@ abstract class Window {
     private final long[] needs;
     private int size;
     private int next;
-    private int evictedSinceExactSum;
-    private final CompensatedSum sum = new CompensatedSum();
+    private final ExactSum sum = new ExactSum();
 
     OverSamples(Detector detector, int n) {
       super(detector);
@@ -59,8 +57,7 @@ abstract class Window {
     @Override
     void add(long time, double value) {
       if (size == values.length) {
-        sum.add(-values[next]);
-        evictedSinceExactSum++;
+        sum.remove(values[next]);
       } else {
         size++;
         detector.retain();
@@ -69,11 +66,6 @@ abstract class Window {
       needs[next] = ValueTrack.NONE; // until settled
       sum.add(value);
       next = (next + 1) % values.length;
-      if (evictedSinceExactSum == values.length) {
-        evictedSinceExactSum = 0;
-        sum.reset();
-        for (double v : values) sum.add(v);
-      }
     }
 
     @Override
@@ -87,7 +79,6 @@ abstract class Window {
       w.int64s(needs);
       w.int32(size);
       w.int32(next);
-      w.int32(evictedSinceExactSum);
       sum.save(w);
     }
 
@@ -101,7 +92,6 @@ abstract class Window {
       System.arraycopy(loadedNeeds, 0, needs, 0, loadedNeeds.length);
       size = r.int32();
       next = r.int32();
-      evictedSinceExactSum = r.int32();
       sum.load(r);
       if (size < 0 || size > values.length || next < 0 || next >= values.length) {
         throw new java.io.IOException("window position");
@@ -120,8 +110,7 @@ abstract class Window {
     private long expiredNeed = ValueTrack.NONE;
     private int head;
     private int size;
-    private int evictedSinceExactSum;
-    private final CompensatedSum sum = new CompensatedSum();
+    private final ExactSum sum = new ExactSum();
     private boolean started;
     private long first;
 
@@ -156,18 +145,16 @@ abstract class Window {
       // evict by time first: an entry leaving by time is not a drop
       while (size > 0 && time - times[head] > millis) {
         expiredNeed = needs[head];
-        sum.add(-values[head]);
+        sum.remove(values[head]);
         head = (head + 1) % times.length;
         size--;
         detector.release();
-        evictedSinceExactSum++;
       }
       if (size == detector.retentionLimit()) { // still full: drop the oldest like one leaving by time
-        sum.add(-values[head]);
+        sum.remove(values[head]);
         head = (head + 1) % times.length;
         size--;
         detector.release();
-        evictedSinceExactSum++;
         detector.recordDrop(binding);
       }
       if (size == times.length) grow();
@@ -180,16 +167,10 @@ abstract class Window {
       sum.add(value);
       while (time - times[head] > millis) {
         expiredNeed = needs[head];
-        sum.add(-values[head]);
+        sum.remove(values[head]);
         head = (head + 1) % times.length;
         size--;
         detector.release();
-        evictedSinceExactSum++;
-      }
-      if (evictedSinceExactSum >= size) {
-        evictedSinceExactSum = 0;
-        sum.reset();
-        for (int i = 0; i < size; i++) sum.add(values[(head + i) % values.length]);
       }
     }
 
@@ -203,7 +184,6 @@ abstract class Window {
         w.int64(needs[(head + i) % needs.length]);
       }
       w.int64(expiredNeed);
-      w.int32(evictedSinceExactSum);
       sum.save(w);
       w.bool(started);
       w.int64(first);
@@ -223,7 +203,6 @@ abstract class Window {
       }
       expiredNeed = r.int64();
       size = n; // a restore only happens in a Detector just built, so head is 0
-      evictedSinceExactSum = r.int32();
       sum.load(r);
       started = r.bool();
       first = r.int64();

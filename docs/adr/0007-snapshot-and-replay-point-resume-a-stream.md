@@ -10,7 +10,7 @@ An application that feeds a Detector from a message stream must be able to stop 
 
 ## The guarantee
 
-A Detector restored from a Snapshot is observationally indistinguishable from the one the Snapshot was taken from: for every input that follows, every callback (kind, order, the complete Event, every Aggregate bit for bit), `value(...)`, `retainedValues()`, `droppedValues()`, the warnings logged and every exception (type and message) are identical. There are no preconditions beyond those `build()` enforces. Any difference is a bug. This is why state is written as raw bits (NaN, -0.0 and the compensated sums of moving averages included) and why the tests compare twins at every moment.
+A Detector restored from a Snapshot is observationally indistinguishable from the one the Snapshot was taken from: for every input that follows, every callback (kind, order, the complete Event, every Aggregate bit for bit), `value(...)`, `retainedValues()`, `droppedValues()`, the warnings logged and every exception (type and message) are identical. There are no preconditions beyond those `build()` enforces. Any difference is a bug. This is why state is written as raw bits (NaN, -0.0 and the partial sums of moving averages included) and why the tests compare twins at every moment.
 
 ## The format
 
@@ -18,7 +18,7 @@ All written with the JDK only:
 
 1. the magic bytes `RBED` and the **format version** (an int, currently 1);
 2. a **fingerprint**: a 128-bit hash (two FNV-1a style lanes, hand-written because the compiled browser module has no `MessageDigest`; it guards against a mismatched configuration, not an adversary) over the Rules' readable descriptions (`Rule.toString()`, in the order added, plus the name and kind, Pulse or not, of every Channel) and, separately, over the watched Expressions' descriptions; then the sampling rate and the Retention Limit in plain. Separate parts let `build()` say which option differs;
-3. the Detector's state: the latest moment and the Sample index, the closed flag, the retained and dropped counters, History's latest end, every Channel's track (values, previous value, times, absence), every moving-average window with its compensated sum, and per Rule its state machine, its Aggregates, and the Event state other Rules read (counts, durations, confirmation times kept for `count(...).within(...)`);
+3. the Detector's state: the latest moment and the Sample index, the closed flag, the retained and dropped counters, History's latest end, every Channel's track (values, previous value, times, absence), every moving-average window with its exact partial sums, and per Rule its state machine, its Aggregates, and the Event state other Rules read (counts, durations, confirmation times kept for `count(...).within(...)`);
 4. a CRC-32 of everything before it, so a corrupted or truncated array is rejected rather than half read.
 
 Rings are written oldest first without their position or capacity, so a Snapshot of a restored Detector equals the Snapshot it was restored from byte for byte. The listener is not part of a Snapshot. The size is bounded by the Retention Limit, as the windows are.
@@ -39,7 +39,6 @@ Preconditions, each with a test:
 
 - `droppedValues()` is 0. Once a window or the confirmation times dropped an entry because of the Retention Limit, which entries are held depends on when entries arrived, and a replay that starts later can hold different ones (`ReplayPointTest.aSmallRetentionLimitThatDroppedEntriesIsAPrecondition`). `droppedValues()` itself, a count since the Detector was built, and the one warning logged at the first drop are never reproduced.
 - The replay gets the same input in the same order: all Samples and time advances from the Replay Point on, and `close()`.
-- A moving average is recomputed from the replayed values. The compensated sum of the original also subtracted the values that left and was recomputed at turnovers, so in principle the last bit of an average can differ when the rounding depends on that order. No difference was found in the generated cases (all comparisons are bit for bit); a Snapshot reproduces the sums exactly.
 - Side effects must be suppressed up to the stop by the application: the replay reports Events that already happened.
 
 The Replay Point is also not monotonic and not minimal in general: it is conservative where a Rule may end by a gap in the data in the next moment, and after an Event ends it still points before the Event for the one moment in which it ended.
@@ -53,3 +52,7 @@ A Snapshot is readable by any rbed version with the same format version. The for
 - **Replay only.** Rejected as the only answer: an Event in progress, a window or a `latest(...)` Aggregate reaches back a data-dependent distance, and a restart is slow when the stream is long.
 - **Java serialization.** Rejected: it ties the format to class layout and is a known hazard on untrusted input; the explicit format is small and checked.
 - **Restoring into different Rules.** Rejected by design: the fingerprint makes a deployment that changed a Rule fall back to a replay instead of continuing from an incompatible state.
+
+## Moving averages are correctly rounded (since 0.4.0)
+
+A moving average used to keep a running compensated sum that also subtracted the values leaving the window, so its last bit depended on the whole history, and a replay (which restarts the sum) could not be guaranteed to match. The sum of a window is now exact: Shewchuk-style partial sums with exact add and exact remove (`ExactSum`, as in Python's `math.fsum`), rounded once, then divided by the window size. The average therefore depends only on the multiset of values currently in the window, never on their order or on values that left, which is what lets the Replay Point drop the history before the window. Values of magnitude 2^500 and above are summed apart, scaled by 2^-600, so partial sums cannot overflow before the true sum does; a sum beyond the range of a double is infinite. A Snapshot stores the partials. The format version stays 1 (unreleased). Consequence: results can differ from 0.3.0 in the last bit where the old compensated sum was off by one ulp. Cost: pushing stays allocation free; throughput of the performance tests is unchanged within noise.

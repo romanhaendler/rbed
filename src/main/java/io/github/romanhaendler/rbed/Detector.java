@@ -294,9 +294,8 @@ public final class Detector implements AutoCloseable {
    * not dropped entries because of the Retention Limit ({@link #droppedValues} is 0), which would
    * make windows depend on the dropped entries; and {@code droppedValues()}, a count since the
    * Detector was built, and the warning logged with the first drop are not reproduced by a replay.
-   * A moving average is recomputed from the replayed values, so its last bit can differ from the
-   * original when floating-point rounding depends on the order in which values entered and left
-   * the window.
+   * A moving average depends only on the values in its window, so a replay reproduces it bit for
+   * bit.
    */
   public OptionalLong replayPoint() {
     if (samplingRate > 0 || samples == 0) return OptionalLong.empty();
