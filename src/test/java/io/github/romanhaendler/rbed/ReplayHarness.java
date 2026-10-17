@@ -25,13 +25,13 @@ final class ReplayHarness {
       List<OptionalLong> points, List<Long> dropped, List<Integer> endedCount, List<Event> ended,
       List<Boolean> accepted, List<List<String>> lines, List<List<String>> state) {}
 
-  /** Counts over all stops of one input. */
-  record Stats(int stops, int checked, int skippedDropped, int empty, int teeth, int earlier) {
+  /** Counts over all stops of one input; {@code pinned}: the Replay Point is still the first moment. */
+  record Stats(int stops, int checked, int skippedDropped, int empty, int teeth, int pinned) {
     static final Stats NONE = new Stats(0, 0, 0, 0, 0, 0);
 
     Stats plus(Stats o) {
       return new Stats(stops + o.stops, checked + o.checked, skippedDropped + o.skippedDropped,
-          empty + o.empty, teeth + o.teeth, earlier + o.earlier);
+          empty + o.empty, teeth + o.teeth, pinned + o.pinned);
     }
   }
 
@@ -130,7 +130,7 @@ final class ReplayHarness {
   /** Checks every stop of the input. */
   static Outcome check(Consumer<Detector.Builder> config, List<Expression> watched, List<Op> ops) {
     Original o = run(config, watched, ops);
-    int stops = 0, checked = 0, skipped = 0, empty = 0, teeth = 0, earlier = 0;
+    int stops = 0, checked = 0, skipped = 0, empty = 0, teeth = 0, pinned = 0;
     for (int stop = 0; stop <= ops.size(); stop++) {
       stops++;
       OptionalLong point = o.points().get(stop);
@@ -146,22 +146,20 @@ final class ReplayHarness {
       checked++;
       Difference d = replay(o, stop, from);
       if (d != null) return new Outcome(Stats.NONE, new Failure(stop, from, d));
-      long latest = lastTimestamp(o, stop);
-      if (from < latest) earlier++;
+      if (from <= firstTimestamp(o)) pinned++;
       long next = nextSampleAfter(o, stop, from);
       if (next != Long.MIN_VALUE && replay(o, stop, next) != null) teeth++;
     }
-    return new Outcome(new Stats(stops, checked, skipped, empty, teeth, earlier), null);
+    return new Outcome(new Stats(stops, checked, skipped, empty, teeth, pinned), null);
   }
 
-  /** The timestamp of the latest accepted Sample or advance up to the stop. */
-  private static long lastTimestamp(Original o, int stop) {
-    long last = Long.MIN_VALUE;
-    for (int i = 0; i < stop; i++) {
+  /** The timestamp of the first accepted Sample or advance. */
+  private static long firstTimestamp(Original o) {
+    for (int i = 0; i < o.ops().size(); i++) {
       Op op = o.ops().get(i);
-      if (o.accepted().get(i + 1) && op.kind() != Op.Kind.CLOSE) last = Math.max(last, op.timestamp());
+      if (o.accepted().get(i + 1) && op.kind() != Op.Kind.CLOSE) return op.timestamp();
     }
-    return last;
+    return Long.MAX_VALUE;
   }
 
   /** The timestamp of the first accepted Sample after {@code from} up to the stop, or MIN_VALUE. */
