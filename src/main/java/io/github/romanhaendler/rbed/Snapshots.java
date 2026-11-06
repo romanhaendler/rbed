@@ -100,8 +100,7 @@ final class Snapshots {
   /**
    * A 128-bit fingerprint of the strings (each preceded by its length, so no two lists hash alike
    * by accident): two independent 64-bit FNV-1a style lanes. It guards against a mismatched
-   * configuration, not against an adversary, and needs no JDK class beyond java.lang (the
-   * compiled browser module has no MessageDigest).
+   * configuration, not against an adversary, and needs no JDK class beyond java.lang.
    */
   static byte[] hash(List<String> lines) {
     long a = 0xcbf29ce484222325L;
